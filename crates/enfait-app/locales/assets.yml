@@ -1,0 +1,142 @@
+_version: 2
+"assets.add_failed":
+  en: "%{title}: %{error}"
+  fr: "%{title} : %{error}"
+"assets.added":
+  en: "added"
+  fr: "ajouté"
+"assets.adding":
+  en: "adding…"
+  fr: "ajout…"
+"assets.and":
+  en: " and "
+  fr: " et "
+"assets.broll_note":
+  en: "Edited without a model: a video plays from its start point (looping if too short), an image gets a slow zoom."
+  fr: "Monté sans modèle : une vidéo est lue à partir du départ (reprise au début si elle est trop courte), une image reçoit un lent zoom."
+"assets.broll_target":
+  en: "The file you add will become the shot of the B-roll block."
+  fr: "Le fichier ajouté deviendra le plan du bloc B-roll."
+"assets.clear":
+  en: "Clear the results"
+  fr: "Effacer les résultats"
+"assets.click_to_add":
+  en: "Click to add to the library. In orange: commercial use or changes forbidden, or licence to check."
+  fr: "Clique pour ajouter à la bibliothèque. En orange : usage commercial ou modification interdits, ou licence à vérifier."
+"assets.copy_credits":
+  en: "Copy the credits"
+  fr: "Copier les crédits"
+"assets.credits_copied":
+  en: "Credits copied"
+  fr: "Crédits copiés"
+"assets.cut_out":
+  en: "Cut out"
+  fr: "Détourer"
+"assets.cut_out_change":
+  en: "cut out"
+  fr: "détouré"
+"assets.cut_out_failed":
+  en: "cutout: %{error}"
+  fr: "détourage : %{error}"
+"assets.cut_out_name":
+  en: "%{name} (cut out)"
+  fr: "%{name} (détouré)"
+"assets.cutout_off":
+  en: "Cuts the person out on every frame: titles and shapes can pass behind them."
+  fr: "Détoure la personne à chaque image : titres et formes peuvent passer derrière elle."
+"assets.cutout_on":
+  en: "The animation can pass behind the person. Regenerate to apply it."
+  fr: "L'animation peut passer derrière la personne. Regénère pour l'appliquer."
+"assets.cutout_person":
+  en: "Person cut out"
+  fr: "Personne détourée"
+"assets.cutting":
+  en: "Cutting out… (a few seconds)"
+  fr: "Détourage… (quelques secondes)"
+"assets.file_page":
+  en: "File page"
+  fr: "Page du fichier"
+"assets.found_online":
+  en: "%{count} file(s) found online, %{credit} to credit."
+  fr: "%{count} fichier(s) trouvé(s) en ligne, dont %{credit} à créditer."
+"assets.from_start":
+  en: "Start"
+  fr: "Début"
+"assets.label.broll":
+  en: "B-ROLL SHOT"
+  fr: "PLAN DE B-ROLL"
+"assets.label.search":
+  en: "SEARCH — royalty-free images and videos"
+  fr: "CHERCHER — images et vidéos libres de droits"
+"assets.licence_line":
+  en: "%{licence} — %{summary}"
+  fr: "%{licence} — %{summary}"
+"assets.media.images":
+  en: "Images"
+  fr: "Images"
+"assets.media.sounds":
+  en: "Sounds"
+  fr: "Sons"
+"assets.media.videos":
+  en: "Videos"
+  fr: "Vidéos"
+"assets.missing_keys":
+  en: "Commons and Openverse need no key. For Pexels, Pixabay and Freesound, add a key in Settings (missing: %{banks})."
+  fr: "Commons et Openverse sans clé. Pour Pexels, Pixabay et Freesound, ajoute une clé dans les Réglages (manquantes : %{banks})."
+"assets.modified":
+  en: "Modified: %{changes}"
+  fr: "Modifié : %{changes}"
+"assets.no_candidates":
+  en: "No video or image in the library: search for one, or add your files (left column)."
+  fr: "Aucune vidéo ni image dans la bibliothèque : cherches-en une, ou ajoute tes fichiers (colonne de gauche)."
+"assets.note_placeholder":
+  en: "Brand logo, to show at the end"
+  fr: "Logo de la marque, à montrer à la fin"
+"assets.personal":
+  en: "Personal file."
+  fr: "Fichier personnel."
+"assets.restricted":
+  en: "%{count} with restrictions (see each file)."
+  fr: "%{count} avec des restrictions (voir chaque fichier)."
+"assets.results":
+  en: "%{count} results"
+  fr: "%{count} résultats"
+"assets.search_placeholder":
+  en: "steam train, city at night… then Enter"
+  fr: "train à vapeur, ville la nuit… puis Entrée"
+"assets.search_shot":
+  en: "Find a shot…"
+  fr: "Chercher un plan…"
+"assets.searching":
+  en: "Searching…"
+  fr: "Recherche…"
+"assets.start_at":
+  en: "start %{seconds} s"
+  fr: "départ %{seconds} s"
+"assets.terms.check":
+  en: "to check"
+  fr: "à vérifier"
+"assets.terms.credit":
+  en: "credit the author"
+  fr: "citer l'auteur"
+"assets.terms.free":
+  en: "free"
+  fr: "libre"
+"assets.video":
+  en: "video"
+  fr: "vidéo"
+"assets.warn.nc":
+  en: "no commercial use (monetised video, advertising)"
+  fr: "pas d'usage commercial (vidéo monétisée, publicité)"
+"assets.warn.nd":
+  en: "no changes: show it whole, without cropping or cutout"
+  fr: "pas de modification : à montrer entier, sans recadrage ni détourage"
+"assets.warn.sa":
+  en: "share alike: the video must use the same licence"
+  fr: "partage dans les mêmes conditions : la vidéo doit reprendre cette licence"
+"assets.warn.unknown":
+  en: "unrecognised licence: check it on the file page"
+  fr: "licence non reconnue : vérifie-la sur la page du fichier"
+"assets.warning":
+  en: "⚠ %{text}"
+  fr: "⚠ %{text}"

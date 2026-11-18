@@ -1,0 +1,18 @@
+{
+ "result_count": 2, "page_count": 1, "page_size": 20, "page": 1,
+ "results": [
+  {"id": "a1b2", "title": "Steam train", "indexed_on": "2021-01-01T00:00:00Z",
+   "foreign_landing_url": "https://www.flickr.com/photos/someone/123", "url": "https://live.staticflickr.com/1/123_abc_b.jpg",
+   "creator": "someone", "creator_url": "https://www.flickr.com/photos/someone",
+   "license": "by-nc", "license_version": "2.0", "license_url": "https://creativecommons.org/licenses/by-nc/2.0/",
+   "provider": "flickr", "source": "flickr", "category": "photograph", "filesize": 120000, "filetype": "jpg",
+   "tags": [{"name": "train"}], "attribution": "\"Steam train\" by someone is licensed under CC BY-NC 2.0.",
+   "height": 683, "width": 1024, "thumbnail": "https://api.openverse.org/v1/images/a1b2/thumb/"},
+  {"id": "c3d4", "title": "Rails", "foreign_landing_url": "https://www.rawpixel.com/image/42",
+   "url": "https://images.rawpixel.com/42.png", "creator": "", "license": "cc0", "license_version": "1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/", "provider": "rawpixel", "source": "rawpixel",
+   "filetype": null, "height": 800, "width": 1200, "thumbnail": "https://api.openverse.org/v1/images/c3d4/thumb/"},
+  {"id": "e5f6", "title": "Diagram", "foreign_landing_url": "https://example.org/42", "url": "https://example.org/42.tiff",
+   "license": "by", "license_version": "4.0", "source": "example", "filetype": "tiff", "height": 10, "width": 10, "thumbnail": ""}
+ ]
+}

@@ -1,0 +1,13 @@
+_version: 2
+"common.quoted":
+  en: "“%{text}”"
+  fr: "« %{text} »"
+"common.redo":
+  en: "Redo"
+  fr: "Rétablir"
+"common.undo":
+  en: "Undo"
+  fr: "Annuler"
+"common.untitled":
+  en: "Untitled"
+  fr: "Sans titre"

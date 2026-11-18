@@ -1,0 +1,37 @@
+_version: 2
+"onboarding.appearance_help":
+  en: "Pick a theme and an accent colour."
+  fr: "Choisis un thème et une couleur d'accent."
+"onboarding.back":
+  en: "Back"
+  fr: "Retour"
+"onboarding.banks_help":
+  en: "Optional: keys for more royalty-free videos, photos and sounds."
+  fr: "Facultatif : des clés pour plus de vidéos, photos et sons libres de droits."
+"onboarding.models_help":
+  en: "enfait calls language models to write the storyboard and the animations. Pick how."
+  fr: "enfait appelle des modèles de langage pour écrire le storyboard et les animations. Choisis comment."
+"onboarding.next":
+  en: "Next"
+  fr: "Suivant"
+"onboarding.ready":
+  en: "Ready"
+  fr: "Prêt"
+"onboarding.ready_help":
+  en: "Settings stay one click away: gear icon at the top right, or %{key}."
+  fr: "Les réglages restent à portée : roue dentée en haut à droite, ou %{key}."
+"onboarding.skip":
+  en: "Skip the setup"
+  fr: "Passer la configuration"
+"onboarding.start":
+  en: "Start"
+  fr: "Commencer"
+"onboarding.tools_help":
+  en: "enfait needs ffmpeg, a transcription model and a renderer. The downloads go on in the background."
+  fr: "enfait a besoin de ffmpeg, d'un modèle de transcription et d'un moteur de rendu. Les téléchargements continuent en arrière-plan."
+"onboarding.welcome":
+  en: "Setting up enfait"
+  fr: "Configuration d'enfait"
+"onboarding.welcome_help":
+  en: "A few choices before starting. Everything can be changed later in Settings."
+  fr: "Quelques choix avant de commencer. Tout se modifie ensuite dans les Réglages."

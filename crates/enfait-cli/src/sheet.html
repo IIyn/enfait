@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planche d'évaluation</title>
+<link rel="stylesheet" href="lib/fonts.css">
+<style>
+:root {
+  --bg: #101312; --panel: #161a19; --raised: #1c211f; --hover: #242a28;
+  --line: #2b3230; --line-strong: #3d4542;
+  --fg: #e6ece9; --fg2: #aeb8b4; --mute: #85908c;
+  --signal: #c3f53c; --on-signal: #0e1110; --error: #e5566e;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.45 "IBM Plex Sans", system-ui, sans-serif;
+}
+header {
+  position: sticky; top: 0; z-index: 2; background: var(--panel);
+  border-bottom: 1px solid var(--line); padding: 10px 16px;
+  display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+}
+header h1 { font-size: 15px; font-weight: 600; margin: 0; }
+.meta { color: var(--mute); font: 12px "IBM Plex Mono", monospace; }
+.spacer { flex: 1; }
+button, select {
+  font: inherit; color: var(--fg); background: var(--raised);
+  border: 1px solid var(--line-strong); border-radius: 4px; padding: 4px 10px; cursor: pointer;
+}
+button:hover { background: var(--hover); }
+button.primary { background: var(--signal); color: var(--on-signal); border-color: var(--signal); font-weight: 600; }
+main {
+  display: grid; gap: 16px; padding: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+}
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+.card.rated { border-color: var(--line-strong); }
+.head { padding: 10px 12px 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.num { font: 12px "IBM Plex Mono", monospace; color: var(--mute); }
+.id { font-weight: 600; }
+.chip { font-size: 11px; color: var(--fg2); border: 1px solid var(--line-strong); border-radius: 3px; padding: 0 5px; }
+.theme { color: var(--mute); font-size: 12px; width: 100%; }
+.stage { background: #000; display: flex; justify-content: center; }
+.stage video, .stage img { display: block; width: 100%; height: auto; max-height: 480px; object-fit: contain; }
+.missing { color: var(--mute); padding: 40px 12px; text-align: center; width: 100%; }
+.error { color: var(--error); font: 12px "IBM Plex Mono", monospace; padding: 12px; white-space: pre-wrap; max-height: 160px; overflow: auto; width: 100%; background: var(--bg); }
+.caption { padding: 8px 12px; font-size: 13px; color: var(--mute); min-height: 3.2em; }
+.caption span.on { color: var(--fg); }
+.caption span.now { color: var(--signal); }
+details { padding: 0 12px 8px; color: var(--fg2); font-size: 12px; }
+summary { cursor: pointer; color: var(--mute); }
+details p { margin: 6px 0; }
+.rate { border-top: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 8px; margin-top: auto; }
+.scores { display: flex; gap: 4px; align-items: center; }
+.scores button { width: 34px; padding: 4px 0; }
+.scores button.on { background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+.scores .label { color: var(--mute); font-size: 12px; margin-left: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tags button { font-size: 11px; padding: 1px 7px; color: var(--fg2); }
+.tags button.on { border-color: var(--error); color: var(--fg); }
+textarea {
+  width: 100%; resize: vertical; min-height: 2.6em; font: inherit; font-size: 13px;
+  color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;
+}
+textarea:focus, button:focus-visible { outline: 1px solid var(--signal); outline-offset: 1px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Planche d'évaluation</h1>
+  <span class="meta" id="run"></span>
+  <span class="spacer"></span>
+  <span class="meta" id="progress"></span>
+  <select id="filter" aria-label="Filtre">
+    <option value="all">Tous les cas</option>
+    <option value="todo">À noter</option>
+    <option value="low">Notés 1 ou 2</option>
+  </select>
+  <button class="primary" id="export">Exporter notes.json</button>
+</header>
+<main id="cases"></main>
+<script>
+const DATA = /*DATA*/null;
+const SCALE = { 1: "raté", 2: "faible", 3: "correct", 4: "bon", 5: "wow" };
+const TAGS = ["illisible", "décalé sur la voix", "cliché", "vide", "surchargé",
+  "mouvement raide", "style non respecté", "texte coupé", "bug de rendu"];
+const run = DATA.run || {};
+const key = "enfait-eval:" + (run.fingerprint || "sans-empreinte") + ":" + (run.created || 0);
+
+function load() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(key) || "null"); } catch (_) {}
+  return Object.assign({}, (DATA.notes && DATA.notes.scores) || {}, saved || {});
+}
+let notes = load();
+function save() {
+  try { localStorage.setItem(key, JSON.stringify(notes)); } catch (_) {}
+  progress();
+}
+function note(id) { return notes[id] || (notes[id] = { score: null, tags: [], comment: "" }); }
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+document.getElementById("run").textContent = run.fingerprint
+  ? "prompts " + run.fingerprint + " · " + run.quality + " (" + run.model + ") · " + run.provider
+    + " · " + new Date(run.created * 1000).toLocaleString("fr-FR")
+  : "passe sans métadonnées";
+
+function progress() {
+  const scored = DATA.cases.map(c => notes[c.id] && notes[c.id].score).filter(Boolean);
+  const mean = scored.length ? (scored.reduce((a, b) => a + b, 0) / scored.length).toFixed(2) : "–";
+  const wow = scored.filter(s => s >= 5).length;
+  document.getElementById("progress").textContent =
+    scored.length + "/" + DATA.cases.length + " notés · moyenne " + mean + " · " + wow + " wow";
+  document.querySelectorAll(".card").forEach(card => {
+    const n = notes[card.dataset.id];
+    card.classList.toggle("rated", !!(n && n.score));
+  });
+  applyFilter();
+}
+
+function caption(c, video) {
+  const box = el("div", "caption");
+  const spans = c.words.map(w => {
+    const s = el("span", null, w.text);
+    box.append(s, " ");
+    return s;
+  });
+  let raf = 0;
+  const update = () => {
+    const t = video.currentTime;
+    let now = -1;
+    c.words.forEach((w, i) => { if (w.t <= t) now = i; });
+    spans.forEach((s, i) => {
+      s.classList.toggle("on", i < now);
+      s.classList.toggle("now", i === now);
+    });
+    if (!video.paused) raf = requestAnimationFrame(update);
+  };
+  video.addEventListener("play", () => { cancelAnimationFrame(raf); update(); });
+  video.addEventListener("seeked", update);
+  video.addEventListener("pause", update);
+  return box;
+}
+
+function card(c, i) {
+  const n = note(c.id);
+  const root = el("article", "card");
+  root.dataset.id = c.id;
+
+  const head = el("div", "head");
+  head.append(el("span", "num", String(i + 1).padStart(2, "0")), el("span", "id", c.id),
+    el("span", "chip", c.style_name || "style libre"), el("span", "chip", c.aspect),
+    el("span", "chip", c.language), el("span", "chip", c.duration.toFixed(1) + " s"),
+    el("span", "theme", c.theme));
+  root.append(head);
+
+  const stage = el("div", "stage");
+  let video = null;
+  if (c.video) {
+    video = el("video");
+    video.src = c.video;
+    if (c.poster) video.poster = c.poster;
+    video.controls = true; video.loop = true; video.muted = true; video.playsInline = true;
+    video.preload = "metadata";
+    stage.append(video);
+  } else if (c.error) {
+    stage.append(el("div", "error", c.error));
+  } else {
+    stage.append(el("div", "missing", "pas encore produit"));
+  }
+  root.append(stage);
+  root.append(video ? caption(c, video) : el("div", "caption", c.text));
+
+  if (c.concept || c.intent) {
+    const d = el("details");
+    d.append(el("summary", null, "Direction"));
+    if (c.concept) d.append(el("p", null, "Concept : " + c.concept));
+    if (c.intent) d.append(el("p", null, "Intention : " + c.intent));
+    d.append(el("p", null, "Contexte : " + c.context));
+    root.append(d);
+  }
+
+  const rate = el("div", "rate");
+  const scores = el("div", "scores");
+  const label = el("span", "label", n.score ? SCALE[n.score] : "");
+  for (let s = 1; s <= 5; s++) {
+    const b = el("button", n.score === s ? "on" : null, String(s));
+    b.title = SCALE[s];
+    b.onclick = () => {
+      n.score = n.score === s ? null : s;
+      scores.querySelectorAll("button").forEach((x, k) => x.classList.toggle("on", k + 1 === n.score));
+      label.textContent = n.score ? SCALE[n.score] : "";
+      save();
+    };
+    scores.append(b);
+  }
+  scores.append(label);
+  const tags = el("div", "tags");
+  TAGS.forEach(t => {
+    const b = el("button", n.tags.includes(t) ? "on" : null, t);
+    b.onclick = () => {
+      n.tags = n.tags.includes(t) ? n.tags.filter(x => x !== t) : n.tags.concat(t);
+      b.classList.toggle("on");
+      save();
+    };
+    tags.append(b);
+  });
+  const comment = el("textarea");
+  comment.placeholder = "Ce qui marche, ce qui manque…";
+  comment.value = n.comment || "";
+  comment.oninput = () => { n.comment = comment.value; save(); };
+  rate.append(scores, tags, comment);
+  if (c.video) root.append(rate);
+  return root;
+}
+
+function applyFilter() {
+  const f = document.getElementById("filter").value;
+  document.querySelectorAll(".card").forEach(card => {
+    const n = notes[card.dataset.id];
+    const s = n && n.score;
+    const show = f === "all" || (f === "todo" && !s) || (f === "low" && s && s <= 2);
+    card.classList.toggle("hidden", !show);
+  });
+}
+document.getElementById("filter").onchange = applyFilter;
+
+document.getElementById("export").onclick = () => {
+  const scores = {};
+  DATA.cases.forEach(c => {
+    const n = notes[c.id];
+    if (n && (n.score || n.tags.length || n.comment)) scores[c.id] = n;
+  });
+  const values = Object.values(scores).map(n => n.score).filter(Boolean);
+  const out = {
+    fingerprint: run.fingerprint || null,
+    created: run.created || null,
+    quality: run.quality || null,
+    mean: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
+    scores,
+  };
+  const a = el("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+  a.download = "notes.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+const main = document.getElementById("cases");
+DATA.cases.forEach((c, i) => main.append(card(c, i)));
+progress();
+</script>
+</body>
+</html>

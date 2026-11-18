@@ -1,0 +1,70 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+
+[workspace.dependencies]
+enfait-core = { path = "crates/enfait-core" }
+enfait-config = { path = "crates/enfait-config" }
+enfait-motion = { path = "crates/enfait-motion" }
+enfait-speech = { path = "crates/enfait-speech" }
+enfait-ai = { path = "crates/enfait-ai" }
+enfait-media = { path = "crates/enfait-media" }
+enfait-studio = { path = "crates/enfait-studio" }
+enfait-assets = { path = "crates/enfait-assets" }
+enfait-mcp = { path = "crates/enfait-mcp" }
+
+anyhow = "1"
+base64 = "0.22"
+blake3 = "1"
+chromiumoxide = "0.9"
+cpal = "0.18"
+clap = { version = "4", features = ["derive"] }
+directories = "6"
+eventsource-stream = "0.2"
+futures = "0.3"
+keyring = "4"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+rust-i18n = "4"
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "io-util", "sync", "time"] }
+url = "2"
+whisper-rs = "0.16"
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+gpui-kit = "=0.10.0"
+proptest = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+thiserror = "2"
+tracing = "0.1"
+tray-icon = { version = "0.26", default-features = false, features = ["ksni"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+skrifa = "0.50"
+tract-onnx = "0.23"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+unwrap_used = "deny"
+print_stdout = "warn"
+print_stderr = "warn"
+
+[profile.dev.package."*"]
+opt-level = 2

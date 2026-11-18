@@ -1,0 +1,13 @@
+{"page": 1, "per_page": 20, "total_results": 1, "url": "https://www.pexels.com/videos/", "videos": [
+ {"id": 2034115, "width": 3840, "height": 2160, "duration": 14,
+  "url": "https://www.pexels.com/video/train-passing-through-a-station-2034115/",
+  "image": "https://images.pexels.com/videos/2034115/free-video-2034115.jpg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200",
+  "user": {"id": 1, "name": "Pressmaster", "url": "https://www.pexels.com/@pressmaster"},
+  "video_files": [
+   {"id": 1, "quality": "sd", "file_type": "video/mp4", "width": 640, "height": 360, "fps": 25, "link": "https://videos.pexels.com/video-files/2034115/sd_640_360_25fps.mp4"},
+   {"id": 2, "quality": "uhd", "file_type": "video/mp4", "width": 3840, "height": 2160, "fps": 25, "link": "https://videos.pexels.com/video-files/2034115/uhd_3840_2160_25fps.mp4"},
+   {"id": 3, "quality": "hd", "file_type": "video/mp4", "width": 1920, "height": 1080, "fps": 25, "link": "https://videos.pexels.com/video-files/2034115/hd_1920_1080_25fps.mp4"},
+   {"id": 4, "quality": "hls", "file_type": "application/x-mpegURL", "width": null, "height": null, "link": "https://player.vimeo.com/x.m3u8"}
+  ],
+  "video_pictures": [{"id": 1, "picture": "https://images.pexels.com/videos/2034115/pictures/preview-0.jpg", "nr": 0}]}
+]}

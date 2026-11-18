@@ -1,0 +1,22 @@
+[package]
+name = "enfait-speech"
+description = "Parole : décodage audio, transcription mot à mot (whisper), découpage en blocs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+# Accélération GPU de whisper.cpp (nécessite le SDK Vulkan à la compilation).
+vulkan = ["whisper-rs/vulkan"]
+
+[dependencies]
+enfait-config.workspace = true
+enfait-core.workspace = true
+
+thiserror.workspace = true
+tracing.workspace = true
+whisper-rs.workspace = true
+
+[lints]
+workspace = true

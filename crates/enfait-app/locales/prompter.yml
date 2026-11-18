@@ -1,0 +1,13 @@
+_version: 2
+"prompter.empty":
+  en: "The script is empty."
+  fr: "Le script est vide."
+"prompter.running":
+  en: "scrolling"
+  fr: "défile"
+"prompter.status":
+  en: "%{state} · %{speed} px/s · Space, ↑ ↓, + −, Esc"
+  fr: "%{state} · %{speed} px/s · Espace, ↑ ↓, + −, Échap"
+"prompter.stopped":
+  en: "stopped"
+  fr: "arrêté"

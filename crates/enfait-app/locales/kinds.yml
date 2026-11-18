@@ -1,0 +1,16 @@
+_version: 2
+"kinds.animation":
+  en: "Animation"
+  fr: "Animation"
+"kinds.broll":
+  en: "B-roll"
+  fr: "B-roll"
+"kinds.effect":
+  en: "Effect"
+  fr: "Effet"
+"kinds.mixed":
+  en: "Mixed"
+  fr: "Mixte"
+"kinds.rush":
+  en: "Rush"
+  fr: "Rush"

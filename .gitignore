@@ -1,0 +1,7 @@
+/target
+/essais
+
+# Références tierces (transcript de la démo de hum.studio) : à garder en local,
+# pas à publier.
+/docs/ref/
+/docs/PLAN.md

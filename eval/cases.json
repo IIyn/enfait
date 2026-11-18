@@ -1,0 +1,1950 @@
+[
+ {
+  "id": "chiffre-choc",
+  "theme": "un grand nombre isolé",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo de vulgarisation sur l'eau douce.",
+  "text": "Chaque année, nous prélevons 4000 milliards de mètres cubes d'eau douce.",
+  "duration": 5.18,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Chaque"
+   },
+   {
+    "t": 0.73,
+    "text": "année,"
+   },
+   {
+    "t": 1.39,
+    "text": "nous"
+   },
+   {
+    "t": 1.6,
+    "text": "prélevons"
+   },
+   {
+    "t": 2.15,
+    "text": "4000"
+   },
+   {
+    "t": 3.12,
+    "text": "milliards"
+   },
+   {
+    "t": 3.5,
+    "text": "de"
+   },
+   {
+    "t": 3.72,
+    "text": "mètres"
+   },
+   {
+    "t": 3.93,
+    "text": "cubes"
+   },
+   {
+    "t": 4.15,
+    "text": "d'eau"
+   },
+   {
+    "t": 4.36,
+    "text": "douce."
+   }
+  ]
+ },
+ {
+  "id": "pourcentage",
+  "theme": "une proportion à rendre visible",
+  "style": "suisse",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur la consommation d'énergie des centres de données.",
+  "text": "Les centres de données consomment déjà près de 2 % de l'électricité mondiale.",
+  "duration": 4.92,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Les"
+   },
+   {
+    "t": 0.56,
+    "text": "centres"
+   },
+   {
+    "t": 0.78,
+    "text": "de"
+   },
+   {
+    "t": 1.0,
+    "text": "données"
+   },
+   {
+    "t": 1.38,
+    "text": "consomment"
+   },
+   {
+    "t": 1.75,
+    "text": "déjà"
+   },
+   {
+    "t": 2.13,
+    "text": "près"
+   },
+   {
+    "t": 2.35,
+    "text": "de"
+   },
+   {
+    "t": 2.56,
+    "text": "2 %"
+   },
+   {
+    "t": 2.85,
+    "text": "de"
+   },
+   {
+    "t": 3.06,
+    "text": "l'électricité"
+   },
+   {
+    "t": 3.94,
+    "text": "mondiale."
+   }
+  ]
+ },
+ {
+  "id": "liste-trois",
+  "theme": "une énumération de trois éléments",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Tutoriel sur le pain au levain.",
+  "text": "Il ne faut que trois ingrédients : de la farine, de l'eau, et du sel.",
+  "duration": 5.29,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Il"
+   },
+   {
+    "t": 0.56,
+    "text": "ne"
+   },
+   {
+    "t": 0.78,
+    "text": "faut"
+   },
+   {
+    "t": 1.0,
+    "text": "que"
+   },
+   {
+    "t": 1.21,
+    "text": "trois"
+   },
+   {
+    "t": 1.43,
+    "text": "ingrédients :"
+   },
+   {
+    "t": 2.25,
+    "text": "de"
+   },
+   {
+    "t": 2.46,
+    "text": "la"
+   },
+   {
+    "t": 2.68,
+    "text": "farine,"
+   },
+   {
+    "t": 3.34,
+    "text": "de"
+   },
+   {
+    "t": 3.55,
+    "text": "l'eau,"
+   },
+   {
+    "t": 4.05,
+    "text": "et"
+   },
+   {
+    "t": 4.26,
+    "text": "du"
+   },
+   {
+    "t": 4.48,
+    "text": "sel."
+   }
+  ]
+ },
+ {
+  "id": "etapes",
+  "theme": "un processus en étapes",
+  "style": "craie",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Cours d'introduction à la photosynthèse.",
+  "text": "La plante capte la lumière, absorbe le gaz carbonique, puis rejette de l'oxygène.",
+  "duration": 5.62,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "La"
+   },
+   {
+    "t": 0.56,
+    "text": "plante"
+   },
+   {
+    "t": 0.78,
+    "text": "capte"
+   },
+   {
+    "t": 1.0,
+    "text": "la"
+   },
+   {
+    "t": 1.21,
+    "text": "lumière,"
+   },
+   {
+    "t": 1.87,
+    "text": "absorbe"
+   },
+   {
+    "t": 2.25,
+    "text": "le"
+   },
+   {
+    "t": 2.47,
+    "text": "gaz"
+   },
+   {
+    "t": 2.68,
+    "text": "carbonique,"
+   },
+   {
+    "t": 3.67,
+    "text": "puis"
+   },
+   {
+    "t": 3.88,
+    "text": "rejette"
+   },
+   {
+    "t": 4.26,
+    "text": "de"
+   },
+   {
+    "t": 4.48,
+    "text": "l'oxygène."
+   }
+  ]
+ },
+ {
+  "id": "citation",
+  "theme": "une citation attribuée",
+  "style": "gravure",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Documentaire sur l'histoire des sciences.",
+  "text": "Newton écrivait : si j'ai vu plus loin, c'est en montant sur les épaules de géants.",
+  "duration": 5.56,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Newton"
+   },
+   {
+    "t": 0.73,
+    "text": "écrivait :"
+   },
+   {
+    "t": 1.55,
+    "text": "si"
+   },
+   {
+    "t": 1.77,
+    "text": "j'ai"
+   },
+   {
+    "t": 1.99,
+    "text": "vu"
+   },
+   {
+    "t": 2.2,
+    "text": "plus"
+   },
+   {
+    "t": 2.42,
+    "text": "loin,"
+   },
+   {
+    "t": 2.91,
+    "text": "c'est"
+   },
+   {
+    "t": 3.12,
+    "text": "en"
+   },
+   {
+    "t": 3.34,
+    "text": "montant"
+   },
+   {
+    "t": 3.72,
+    "text": "sur"
+   },
+   {
+    "t": 3.93,
+    "text": "les"
+   },
+   {
+    "t": 4.15,
+    "text": "épaules"
+   },
+   {
+    "t": 4.53,
+    "text": "de"
+   },
+   {
+    "t": 4.74,
+    "text": "géants."
+   }
+  ]
+ },
+ {
+  "id": "date-histoire",
+  "theme": "une date et un événement",
+  "style": "gravure",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Documentaire sur les grandes expéditions.",
+  "text": "Le 14 décembre 1911, Roald Amundsen atteint le pôle Sud, cinq semaines avant Scott.",
+  "duration": 6.57,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Le"
+   },
+   {
+    "t": 0.56,
+    "text": "14"
+   },
+   {
+    "t": 1.08,
+    "text": "décembre"
+   },
+   {
+    "t": 1.46,
+    "text": "1911,"
+   },
+   {
+    "t": 2.71,
+    "text": "Roald"
+   },
+   {
+    "t": 2.93,
+    "text": "Amundsen"
+   },
+   {
+    "t": 3.47,
+    "text": "atteint"
+   },
+   {
+    "t": 3.85,
+    "text": "le"
+   },
+   {
+    "t": 4.07,
+    "text": "pôle"
+   },
+   {
+    "t": 4.28,
+    "text": "Sud,"
+   },
+   {
+    "t": 4.78,
+    "text": "cinq"
+   },
+   {
+    "t": 4.99,
+    "text": "semaines"
+   },
+   {
+    "t": 5.37,
+    "text": "avant"
+   },
+   {
+    "t": 5.75,
+    "text": "Scott."
+   }
+  ]
+ },
+ {
+  "id": "abstrait",
+  "theme": "une idée abstraite sans objet concret",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Essai vidéo sur la prise de décision.",
+  "text": "Choisir, c'est toujours renoncer à quelque chose.",
+  "duration": 3.56,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Choisir,"
+   },
+   {
+    "t": 1.01,
+    "text": "c'est"
+   },
+   {
+    "t": 1.23,
+    "text": "toujours"
+   },
+   {
+    "t": 1.6,
+    "text": "renoncer"
+   },
+   {
+    "t": 2.15,
+    "text": "à"
+   },
+   {
+    "t": 2.36,
+    "text": "quelque"
+   },
+   {
+    "t": 2.74,
+    "text": "chose."
+   }
+  ]
+ },
+ {
+  "id": "emotion",
+  "theme": "une émotion, de la retenue",
+  "style": "papier",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Récit personnel sur un déménagement.",
+  "text": "Quand j'ai fermé la porte pour la dernière fois, la maison m'a semblé minuscule.",
+  "duration": 5.23,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Quand"
+   },
+   {
+    "t": 0.56,
+    "text": "j'ai"
+   },
+   {
+    "t": 0.78,
+    "text": "fermé"
+   },
+   {
+    "t": 1.16,
+    "text": "la"
+   },
+   {
+    "t": 1.38,
+    "text": "porte"
+   },
+   {
+    "t": 1.59,
+    "text": "pour"
+   },
+   {
+    "t": 1.81,
+    "text": "la"
+   },
+   {
+    "t": 2.02,
+    "text": "dernière"
+   },
+   {
+    "t": 2.4,
+    "text": "fois,"
+   },
+   {
+    "t": 2.9,
+    "text": "la"
+   },
+   {
+    "t": 3.11,
+    "text": "maison"
+   },
+   {
+    "t": 3.49,
+    "text": "m'a"
+   },
+   {
+    "t": 3.71,
+    "text": "semblé"
+   },
+   {
+    "t": 4.08,
+    "text": "minuscule."
+   }
+  ]
+ },
+ {
+  "id": "question",
+  "theme": "une question rhétorique",
+  "style": null,
+  "aspect": "9:16",
+  "language": "fr",
+  "context": "Vidéo courte pour les réseaux sur le sommeil.",
+  "text": "Pourquoi est-ce qu'on se réveille toujours juste avant le réveil ?",
+  "duration": 3.37,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Pourquoi"
+   },
+   {
+    "t": 0.73,
+    "text": "est-ce"
+   },
+   {
+    "t": 0.95,
+    "text": "qu'on"
+   },
+   {
+    "t": 1.16,
+    "text": "se"
+   },
+   {
+    "t": 1.38,
+    "text": "réveille"
+   },
+   {
+    "t": 1.76,
+    "text": "toujours"
+   },
+   {
+    "t": 2.14,
+    "text": "juste"
+   },
+   {
+    "t": 2.35,
+    "text": "avant"
+   },
+   {
+    "t": 2.73,
+    "text": "le"
+   },
+   {
+    "t": 2.94,
+    "text": "réveil ?"
+   }
+  ]
+ },
+ {
+  "id": "avant-apres",
+  "theme": "un contraste avant / après",
+  "style": "suisse",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Présentation d'une refonte de site.",
+  "text": "Avant, il fallait onze clics pour payer. Aujourd'hui, il en faut deux.",
+  "duration": 5.3,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Avant,"
+   },
+   {
+    "t": 1.01,
+    "text": "il"
+   },
+   {
+    "t": 1.23,
+    "text": "fallait"
+   },
+   {
+    "t": 1.6,
+    "text": "onze"
+   },
+   {
+    "t": 1.82,
+    "text": "clics"
+   },
+   {
+    "t": 2.04,
+    "text": "pour"
+   },
+   {
+    "t": 2.25,
+    "text": "payer."
+   },
+   {
+    "t": 3.01,
+    "text": "Aujourd'hui,"
+   },
+   {
+    "t": 3.84,
+    "text": "il"
+   },
+   {
+    "t": 4.05,
+    "text": "en"
+   },
+   {
+    "t": 4.27,
+    "text": "faut"
+   },
+   {
+    "t": 4.48,
+    "text": "deux."
+   }
+  ]
+ },
+ {
+  "id": "geographie",
+  "theme": "un lieu, une carte",
+  "style": "papier",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo de voyage sur l'Islande.",
+  "text": "L'Islande se trouve exactement sur la frontière entre deux plaques tectoniques.",
+  "duration": 4.63,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "L'Islande"
+   },
+   {
+    "t": 0.73,
+    "text": "se"
+   },
+   {
+    "t": 0.95,
+    "text": "trouve"
+   },
+   {
+    "t": 1.16,
+    "text": "exactement"
+   },
+   {
+    "t": 1.71,
+    "text": "sur"
+   },
+   {
+    "t": 1.92,
+    "text": "la"
+   },
+   {
+    "t": 2.14,
+    "text": "frontière"
+   },
+   {
+    "t": 2.52,
+    "text": "entre"
+   },
+   {
+    "t": 2.73,
+    "text": "deux"
+   },
+   {
+    "t": 2.94,
+    "text": "plaques"
+   },
+   {
+    "t": 3.32,
+    "text": "tectoniques."
+   }
+  ]
+ },
+ {
+  "id": "personne",
+  "theme": "présenter une personne",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Portrait d'une chercheuse.",
+  "text": "Rosalind Franklin a photographié l'ADN avant que quiconque ne comprenne sa forme.",
+  "duration": 5.18,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Rosalind"
+   },
+   {
+    "t": 0.9,
+    "text": "Franklin"
+   },
+   {
+    "t": 1.27,
+    "text": "a"
+   },
+   {
+    "t": 1.49,
+    "text": "photographié"
+   },
+   {
+    "t": 2.2,
+    "text": "l'ADN"
+   },
+   {
+    "t": 2.42,
+    "text": "avant"
+   },
+   {
+    "t": 2.79,
+    "text": "que"
+   },
+   {
+    "t": 3.01,
+    "text": "quiconque"
+   },
+   {
+    "t": 3.55,
+    "text": "ne"
+   },
+   {
+    "t": 3.77,
+    "text": "comprenne"
+   },
+   {
+    "t": 4.15,
+    "text": "sa"
+   },
+   {
+    "t": 4.36,
+    "text": "forme."
+   }
+  ]
+ },
+ {
+  "id": "explication",
+  "theme": "un mécanisme scientifique",
+  "style": "craie",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Cours de physique sur les arcs-en-ciel.",
+  "text": "Chaque goutte de pluie agit comme un petit prisme : elle sépare la lumière blanche en couleurs.",
+  "duration": 5.66,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Chaque"
+   },
+   {
+    "t": 0.73,
+    "text": "goutte"
+   },
+   {
+    "t": 0.95,
+    "text": "de"
+   },
+   {
+    "t": 1.16,
+    "text": "pluie"
+   },
+   {
+    "t": 1.38,
+    "text": "agit"
+   },
+   {
+    "t": 1.76,
+    "text": "comme"
+   },
+   {
+    "t": 1.97,
+    "text": "un"
+   },
+   {
+    "t": 2.19,
+    "text": "petit"
+   },
+   {
+    "t": 2.57,
+    "text": "prisme :"
+   },
+   {
+    "t": 3.06,
+    "text": "elle"
+   },
+   {
+    "t": 3.28,
+    "text": "sépare"
+   },
+   {
+    "t": 3.66,
+    "text": "la"
+   },
+   {
+    "t": 3.87,
+    "text": "lumière"
+   },
+   {
+    "t": 4.25,
+    "text": "blanche"
+   },
+   {
+    "t": 4.46,
+    "text": "en"
+   },
+   {
+    "t": 4.68,
+    "text": "couleurs."
+   }
+  ]
+ },
+ {
+  "id": "metaphore",
+  "theme": "une métaphore filée",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur la mémoire humaine.",
+  "text": "La mémoire n'est pas un disque dur. C'est plutôt un conteur qui réécrit l'histoire à chaque fois.",
+  "duration": 6.31,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "La"
+   },
+   {
+    "t": 0.56,
+    "text": "mémoire"
+   },
+   {
+    "t": 0.94,
+    "text": "n'est"
+   },
+   {
+    "t": 1.16,
+    "text": "pas"
+   },
+   {
+    "t": 1.38,
+    "text": "un"
+   },
+   {
+    "t": 1.59,
+    "text": "disque"
+   },
+   {
+    "t": 1.97,
+    "text": "dur."
+   },
+   {
+    "t": 2.74,
+    "text": "C'est"
+   },
+   {
+    "t": 2.95,
+    "text": "plutôt"
+   },
+   {
+    "t": 3.33,
+    "text": "un"
+   },
+   {
+    "t": 3.54,
+    "text": "conteur"
+   },
+   {
+    "t": 3.92,
+    "text": "qui"
+   },
+   {
+    "t": 4.14,
+    "text": "réécrit"
+   },
+   {
+    "t": 4.52,
+    "text": "l'histoire"
+   },
+   {
+    "t": 4.9,
+    "text": "à"
+   },
+   {
+    "t": 5.11,
+    "text": "chaque"
+   },
+   {
+    "t": 5.49,
+    "text": "fois."
+   }
+  ]
+ },
+ {
+  "id": "tres-court",
+  "theme": "un bloc très court et percutant",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Introduction d'une vidéo sur la procrastination.",
+  "text": "Demain. Toujours demain.",
+  "duration": 2.64,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Demain."
+   },
+   {
+    "t": 1.28,
+    "text": "Toujours"
+   },
+   {
+    "t": 1.66,
+    "text": "demain."
+   }
+  ]
+ },
+ {
+  "id": "long",
+  "theme": "un bloc long avec beaucoup d'information",
+  "style": "suisse",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Explication du fonctionnement d'une élection.",
+  "text": "Le scrutin se déroule en deux tours. Si aucun candidat n'obtient la majorité absolue au premier tour, les deux premiers s'affrontent quinze jours plus tard, et celui qui recueille le plus de voix l'emporte.",
+  "duration": 12.17,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Le"
+   },
+   {
+    "t": 0.56,
+    "text": "scrutin"
+   },
+   {
+    "t": 0.94,
+    "text": "se"
+   },
+   {
+    "t": 1.16,
+    "text": "déroule"
+   },
+   {
+    "t": 1.54,
+    "text": "en"
+   },
+   {
+    "t": 1.76,
+    "text": "deux"
+   },
+   {
+    "t": 1.97,
+    "text": "tours."
+   },
+   {
+    "t": 2.74,
+    "text": "Si"
+   },
+   {
+    "t": 2.95,
+    "text": "aucun"
+   },
+   {
+    "t": 3.33,
+    "text": "candidat"
+   },
+   {
+    "t": 3.88,
+    "text": "n'obtient"
+   },
+   {
+    "t": 4.25,
+    "text": "la"
+   },
+   {
+    "t": 4.47,
+    "text": "majorité"
+   },
+   {
+    "t": 5.18,
+    "text": "absolue"
+   },
+   {
+    "t": 5.72,
+    "text": "au"
+   },
+   {
+    "t": 5.94,
+    "text": "premier"
+   },
+   {
+    "t": 6.32,
+    "text": "tour,"
+   },
+   {
+    "t": 6.81,
+    "text": "les"
+   },
+   {
+    "t": 7.03,
+    "text": "deux"
+   },
+   {
+    "t": 7.24,
+    "text": "premiers"
+   },
+   {
+    "t": 7.62,
+    "text": "s'affrontent"
+   },
+   {
+    "t": 8.0,
+    "text": "quinze"
+   },
+   {
+    "t": 8.22,
+    "text": "jours"
+   },
+   {
+    "t": 8.43,
+    "text": "plus"
+   },
+   {
+    "t": 8.65,
+    "text": "tard,"
+   },
+   {
+    "t": 9.14,
+    "text": "et"
+   },
+   {
+    "t": 9.36,
+    "text": "celui"
+   },
+   {
+    "t": 9.74,
+    "text": "qui"
+   },
+   {
+    "t": 9.95,
+    "text": "recueille"
+   },
+   {
+    "t": 10.33,
+    "text": "le"
+   },
+   {
+    "t": 10.55,
+    "text": "plus"
+   },
+   {
+    "t": 10.76,
+    "text": "de"
+   },
+   {
+    "t": 10.98,
+    "text": "voix"
+   },
+   {
+    "t": 11.19,
+    "text": "l'emporte."
+   }
+  ]
+ },
+ {
+  "id": "classement",
+  "theme": "un classement, un podium",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur les langues les plus parlées.",
+  "text": "En tête, l'anglais. Juste derrière, le mandarin. Et en troisième position, l'hindi.",
+  "duration": 6.79,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "En"
+   },
+   {
+    "t": 0.56,
+    "text": "tête,"
+   },
+   {
+    "t": 1.06,
+    "text": "l'anglais."
+   },
+   {
+    "t": 1.99,
+    "text": "Juste"
+   },
+   {
+    "t": 2.21,
+    "text": "derrière,"
+   },
+   {
+    "t": 2.87,
+    "text": "le"
+   },
+   {
+    "t": 3.08,
+    "text": "mandarin."
+   },
+   {
+    "t": 4.17,
+    "text": "Et"
+   },
+   {
+    "t": 4.39,
+    "text": "en"
+   },
+   {
+    "t": 4.6,
+    "text": "troisième"
+   },
+   {
+    "t": 4.98,
+    "text": "position,"
+   },
+   {
+    "t": 5.81,
+    "text": "l'hindi."
+   }
+  ]
+ },
+ {
+  "id": "frise",
+  "theme": "une chronologie",
+  "style": "gravure",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Histoire de l'écriture.",
+  "text": "L'écriture apparaît vers 3300 avant notre ère, l'alphabet vers 1 200, et l'imprimerie en 1450.",
+  "duration": 8.66,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "L'écriture"
+   },
+   {
+    "t": 0.9,
+    "text": "apparaît"
+   },
+   {
+    "t": 1.44,
+    "text": "vers"
+   },
+   {
+    "t": 1.66,
+    "text": "3300"
+   },
+   {
+    "t": 2.63,
+    "text": "avant"
+   },
+   {
+    "t": 3.01,
+    "text": "notre"
+   },
+   {
+    "t": 3.22,
+    "text": "ère,"
+   },
+   {
+    "t": 3.88,
+    "text": "l'alphabet"
+   },
+   {
+    "t": 4.43,
+    "text": "vers"
+   },
+   {
+    "t": 4.64,
+    "text": "1"
+   },
+   {
+    "t": 4.92,
+    "text": "200,"
+   },
+   {
+    "t": 5.95,
+    "text": "et"
+   },
+   {
+    "t": 6.16,
+    "text": "l'imprimerie"
+   },
+   {
+    "t": 6.87,
+    "text": "en"
+   },
+   {
+    "t": 7.09,
+    "text": "1450."
+   }
+  ]
+ },
+ {
+  "id": "cause-effet",
+  "theme": "une chaîne de causes",
+  "style": "papier",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur les écosystèmes.",
+  "text": "Moins d'abeilles, c'est moins de fleurs pollinisées, et donc moins de fruits.",
+  "duration": 4.75,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Moins"
+   },
+   {
+    "t": 0.56,
+    "text": "d'abeilles,"
+   },
+   {
+    "t": 1.23,
+    "text": "c'est"
+   },
+   {
+    "t": 1.44,
+    "text": "moins"
+   },
+   {
+    "t": 1.66,
+    "text": "de"
+   },
+   {
+    "t": 1.87,
+    "text": "fleurs"
+   },
+   {
+    "t": 2.09,
+    "text": "pollinisées,"
+   },
+   {
+    "t": 3.08,
+    "text": "et"
+   },
+   {
+    "t": 3.29,
+    "text": "donc"
+   },
+   {
+    "t": 3.5,
+    "text": "moins"
+   },
+   {
+    "t": 3.72,
+    "text": "de"
+   },
+   {
+    "t": 3.93,
+    "text": "fruits."
+   }
+  ]
+ },
+ {
+  "id": "avertissement",
+  "theme": "une mise en garde",
+  "style": null,
+  "aspect": "1:1",
+  "language": "fr",
+  "context": "Conseils de cybersécurité.",
+  "text": "Ne réutilisez jamais le même mot de passe sur deux sites différents.",
+  "duration": 4.52,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Ne"
+   },
+   {
+    "t": 0.56,
+    "text": "réutilisez"
+   },
+   {
+    "t": 1.27,
+    "text": "jamais"
+   },
+   {
+    "t": 1.65,
+    "text": "le"
+   },
+   {
+    "t": 1.87,
+    "text": "même"
+   },
+   {
+    "t": 2.08,
+    "text": "mot"
+   },
+   {
+    "t": 2.3,
+    "text": "de"
+   },
+   {
+    "t": 2.51,
+    "text": "passe"
+   },
+   {
+    "t": 2.73,
+    "text": "sur"
+   },
+   {
+    "t": 2.94,
+    "text": "deux"
+   },
+   {
+    "t": 3.16,
+    "text": "sites"
+   },
+   {
+    "t": 3.37,
+    "text": "différents."
+   }
+  ]
+ },
+ {
+  "id": "appel-action",
+  "theme": "une fin de vidéo, un appel",
+  "style": null,
+  "aspect": "9:16",
+  "language": "fr",
+  "context": "Fin d'une vidéo de cuisine.",
+  "text": "Essayez la recette ce week-end, et dites-moi ce que vous en pensez.",
+  "duration": 4.8,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Essayez"
+   },
+   {
+    "t": 0.73,
+    "text": "la"
+   },
+   {
+    "t": 0.95,
+    "text": "recette"
+   },
+   {
+    "t": 1.33,
+    "text": "ce"
+   },
+   {
+    "t": 1.54,
+    "text": "week-end,"
+   },
+   {
+    "t": 2.2,
+    "text": "et"
+   },
+   {
+    "t": 2.42,
+    "text": "dites-moi"
+   },
+   {
+    "t": 2.96,
+    "text": "ce"
+   },
+   {
+    "t": 3.17,
+    "text": "que"
+   },
+   {
+    "t": 3.39,
+    "text": "vous"
+   },
+   {
+    "t": 3.6,
+    "text": "en"
+   },
+   {
+    "t": 3.82,
+    "text": "pensez."
+   }
+  ]
+ },
+ {
+  "id": "definition",
+  "theme": "définir un mot",
+  "style": "suisse",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Lexique de l'économie.",
+  "text": "L'inflation, c'est la hausse générale et durable des prix.",
+  "duration": 3.99,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "L'inflation,"
+   },
+   {
+    "t": 1.18,
+    "text": "c'est"
+   },
+   {
+    "t": 1.39,
+    "text": "la"
+   },
+   {
+    "t": 1.61,
+    "text": "hausse"
+   },
+   {
+    "t": 1.82,
+    "text": "générale"
+   },
+   {
+    "t": 2.37,
+    "text": "et"
+   },
+   {
+    "t": 2.58,
+    "text": "durable"
+   },
+   {
+    "t": 2.96,
+    "text": "des"
+   },
+   {
+    "t": 3.17,
+    "text": "prix."
+   }
+  ]
+ },
+ {
+  "id": "compteur",
+  "theme": "un nombre qui monte",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur la croissance d'une ville.",
+  "text": "En cinquante ans, la ville est passée de 20000 à plus de 2 millions d'habitants.",
+  "duration": 6.34,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "En"
+   },
+   {
+    "t": 0.56,
+    "text": "cinquante"
+   },
+   {
+    "t": 0.94,
+    "text": "ans,"
+   },
+   {
+    "t": 1.44,
+    "text": "la"
+   },
+   {
+    "t": 1.66,
+    "text": "ville"
+   },
+   {
+    "t": 1.87,
+    "text": "est"
+   },
+   {
+    "t": 2.08,
+    "text": "passée"
+   },
+   {
+    "t": 2.46,
+    "text": "de"
+   },
+   {
+    "t": 2.68,
+    "text": "20000"
+   },
+   {
+    "t": 3.88,
+    "text": "à"
+   },
+   {
+    "t": 4.1,
+    "text": "plus"
+   },
+   {
+    "t": 4.31,
+    "text": "de"
+   },
+   {
+    "t": 4.53,
+    "text": "2"
+   },
+   {
+    "t": 4.81,
+    "text": "millions"
+   },
+   {
+    "t": 5.19,
+    "text": "d'habitants."
+   }
+  ]
+ },
+ {
+  "id": "argent",
+  "theme": "une somme d'argent",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur l'économie du jeu vidéo.",
+  "text": "Ce jeu a coûté 300 millions de dollars, plus que la plupart des films hollywoodiens.",
+  "duration": 6.14,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Ce"
+   },
+   {
+    "t": 0.56,
+    "text": "jeu"
+   },
+   {
+    "t": 0.78,
+    "text": "a"
+   },
+   {
+    "t": 1.0,
+    "text": "coûté"
+   },
+   {
+    "t": 1.38,
+    "text": "300"
+   },
+   {
+    "t": 2.12,
+    "text": "millions"
+   },
+   {
+    "t": 2.5,
+    "text": "de"
+   },
+   {
+    "t": 2.71,
+    "text": "dollars,"
+   },
+   {
+    "t": 3.37,
+    "text": "plus"
+   },
+   {
+    "t": 3.59,
+    "text": "que"
+   },
+   {
+    "t": 3.8,
+    "text": "la"
+   },
+   {
+    "t": 4.02,
+    "text": "plupart"
+   },
+   {
+    "t": 4.4,
+    "text": "des"
+   },
+   {
+    "t": 4.61,
+    "text": "films"
+   },
+   {
+    "t": 4.83,
+    "text": "hollywoodiens."
+   }
+  ]
+ },
+ {
+  "id": "echelle",
+  "theme": "une différence d'échelle",
+  "style": "craie",
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur l'infiniment petit.",
+  "text": "Si un atome avait la taille d'un stade, son noyau serait une bille posée au centre.",
+  "duration": 5.49,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Si"
+   },
+   {
+    "t": 0.56,
+    "text": "un"
+   },
+   {
+    "t": 0.78,
+    "text": "atome"
+   },
+   {
+    "t": 1.16,
+    "text": "avait"
+   },
+   {
+    "t": 1.54,
+    "text": "la"
+   },
+   {
+    "t": 1.76,
+    "text": "taille"
+   },
+   {
+    "t": 1.97,
+    "text": "d'un"
+   },
+   {
+    "t": 2.19,
+    "text": "stade,"
+   },
+   {
+    "t": 2.68,
+    "text": "son"
+   },
+   {
+    "t": 2.89,
+    "text": "noyau"
+   },
+   {
+    "t": 3.11,
+    "text": "serait"
+   },
+   {
+    "t": 3.49,
+    "text": "une"
+   },
+   {
+    "t": 3.87,
+    "text": "bille"
+   },
+   {
+    "t": 4.08,
+    "text": "posée"
+   },
+   {
+    "t": 4.46,
+    "text": "au"
+   },
+   {
+    "t": 4.68,
+    "text": "centre."
+   }
+  ]
+ },
+ {
+  "id": "vitesse",
+  "theme": "une vitesse, du mouvement",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Vidéo sur les animaux les plus rapides.",
+  "text": "Le faucon pèlerin plonge à plus de 380 kilomètres à l'heure.",
+  "duration": 4.67,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Le"
+   },
+   {
+    "t": 0.56,
+    "text": "faucon"
+   },
+   {
+    "t": 0.94,
+    "text": "pèlerin"
+   },
+   {
+    "t": 1.49,
+    "text": "plonge"
+   },
+   {
+    "t": 1.71,
+    "text": "à"
+   },
+   {
+    "t": 1.92,
+    "text": "plus"
+   },
+   {
+    "t": 2.14,
+    "text": "de"
+   },
+   {
+    "t": 2.35,
+    "text": "380"
+   },
+   {
+    "t": 3.09,
+    "text": "kilomètres"
+   },
+   {
+    "t": 3.64,
+    "text": "à"
+   },
+   {
+    "t": 3.85,
+    "text": "l'heure."
+   }
+  ]
+ },
+ {
+  "id": "technique",
+  "theme": "un concept logiciel",
+  "style": null,
+  "aspect": "16:9",
+  "language": "fr",
+  "context": "Tutoriel de programmation.",
+  "text": "Un cache garde une copie des données récentes, pour éviter de les recalculer.",
+  "duration": 5.51,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Un"
+   },
+   {
+    "t": 0.56,
+    "text": "cache"
+   },
+   {
+    "t": 0.78,
+    "text": "garde"
+   },
+   {
+    "t": 1.0,
+    "text": "une"
+   },
+   {
+    "t": 1.38,
+    "text": "copie"
+   },
+   {
+    "t": 1.75,
+    "text": "des"
+   },
+   {
+    "t": 1.97,
+    "text": "données"
+   },
+   {
+    "t": 2.35,
+    "text": "récentes,"
+   },
+   {
+    "t": 3.01,
+    "text": "pour"
+   },
+   {
+    "t": 3.22,
+    "text": "éviter"
+   },
+   {
+    "t": 3.77,
+    "text": "de"
+   },
+   {
+    "t": 3.98,
+    "text": "les"
+   },
+   {
+    "t": 4.2,
+    "text": "recalculer."
+   }
+  ]
+ },
+ {
+  "id": "en-sport",
+  "theme": "anglais, un exploit sportif",
+  "style": null,
+  "aspect": "16:9",
+  "language": "en",
+  "context": "Sports history short.",
+  "text": "In 1954, Roger Bannister ran a mile in under four minutes, something doctors called impossible.",
+  "duration": 7.47,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "In"
+   },
+   {
+    "t": 0.56,
+    "text": "1954,"
+   },
+   {
+    "t": 1.82,
+    "text": "Roger"
+   },
+   {
+    "t": 2.2,
+    "text": "Bannister"
+   },
+   {
+    "t": 2.74,
+    "text": "ran"
+   },
+   {
+    "t": 2.96,
+    "text": "a"
+   },
+   {
+    "t": 3.17,
+    "text": "mile"
+   },
+   {
+    "t": 3.39,
+    "text": "in"
+   },
+   {
+    "t": 3.6,
+    "text": "under"
+   },
+   {
+    "t": 3.98,
+    "text": "four"
+   },
+   {
+    "t": 4.2,
+    "text": "minutes,"
+   },
+   {
+    "t": 5.02,
+    "text": "something"
+   },
+   {
+    "t": 5.57,
+    "text": "doctors"
+   },
+   {
+    "t": 5.95,
+    "text": "called"
+   },
+   {
+    "t": 6.33,
+    "text": "impossible."
+   }
+  ]
+ },
+ {
+  "id": "en-nature",
+  "theme": "anglais, la nature",
+  "style": "papier",
+  "aspect": "9:16",
+  "language": "en",
+  "context": "Nature short about forests.",
+  "text": "Beneath every forest lies a hidden network of fungi, quietly sharing food between the trees.",
+  "duration": 6.1,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Beneath"
+   },
+   {
+    "t": 0.73,
+    "text": "every"
+   },
+   {
+    "t": 1.27,
+    "text": "forest"
+   },
+   {
+    "t": 1.65,
+    "text": "lies"
+   },
+   {
+    "t": 1.87,
+    "text": "a"
+   },
+   {
+    "t": 2.08,
+    "text": "hidden"
+   },
+   {
+    "t": 2.46,
+    "text": "network"
+   },
+   {
+    "t": 2.84,
+    "text": "of"
+   },
+   {
+    "t": 3.06,
+    "text": "fungi,"
+   },
+   {
+    "t": 3.72,
+    "text": "quietly"
+   },
+   {
+    "t": 4.1,
+    "text": "sharing"
+   },
+   {
+    "t": 4.48,
+    "text": "food"
+   },
+   {
+    "t": 4.69,
+    "text": "between"
+   },
+   {
+    "t": 5.07,
+    "text": "the"
+   },
+   {
+    "t": 5.29,
+    "text": "trees."
+   }
+  ]
+ },
+ {
+  "id": "en-produit",
+  "theme": "anglais, présentation de produit",
+  "style": "suisse",
+  "aspect": "16:9",
+  "language": "en",
+  "context": "Launch video for a note-taking app.",
+  "text": "Write it once. Find it anywhere. Your notes, finally organised.",
+  "duration": 5.8,
+  "words": [
+   {
+    "t": 0.35,
+    "text": "Write"
+   },
+   {
+    "t": 0.56,
+    "text": "it"
+   },
+   {
+    "t": 0.78,
+    "text": "once."
+   },
+   {
+    "t": 1.55,
+    "text": "Find"
+   },
+   {
+    "t": 1.76,
+    "text": "it"
+   },
+   {
+    "t": 1.98,
+    "text": "anywhere."
+   },
+   {
+    "t": 3.07,
+    "text": "Your"
+   },
+   {
+    "t": 3.29,
+    "text": "notes,"
+   },
+   {
+    "t": 3.95,
+    "text": "finally"
+   },
+   {
+    "t": 4.49,
+    "text": "organised."
+   }
+  ]
+ }
+]

@@ -1,0 +1,116 @@
+{
+ "batchcomplete": "",
+ "query": {
+  "pages": {
+   "36434595": {
+    "pageid": 36434595,
+    "ns": 6,
+    "title": "File:GO Train at level crossing.webm",
+    "index": 1,
+    "imagerepository": "local",
+    "imageinfo": [
+     {
+      "size": 13254459,
+      "width": 1280,
+      "height": 720,
+      "duration": 20.053,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/GO_Train_at_level_crossing.webm/500px--GO_Train_at_level_crossing.webm.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo",
+      "thumbwidth": 400,
+      "thumbheight": 225,
+      "responsiveUrls": {
+       "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/GO_Train_at_level_crossing.webm/960px--GO_Train_at_level_crossing.webm.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo"
+      },
+      "thumbattribs": [],
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/29/GO_Train_at_level_crossing.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:GO_Train_at_level_crossing.webm",
+      "descriptionshorturl": "https://commons.wikimedia.org/wiki/Special:Redirect/page/36434595",
+      "extmetadata": {
+       "ObjectName": {
+        "value": "GO Train at level crossing",
+        "source": "mediawiki-metadata"
+       },
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Whpq\" title=\"User:Whpq\">Whpq</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 3.0",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "LicenseUrl": {
+        "value": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source": "commons-desc-page"
+       }
+      },
+      "mime": "video/webm"
+     }
+    ]
+   },
+   "122381325": {
+    "pageid": 122381325,
+    "ns": 6,
+    "title": "File:Montreal public transit icons - Train.svg",
+    "index": 3,
+    "imagerepository": "local",
+    "imageinfo": [
+     {
+      "size": 1966,
+      "width": 512,
+      "height": 512,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Montreal_public_transit_icons_-_Train.svg/500px-Montreal_public_transit_icons_-_Train.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 400,
+      "thumbheight": 400,
+      "responsiveUrls": {
+       "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Montreal_public_transit_icons_-_Train.svg/960px-Montreal_public_transit_icons_-_Train.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "thumbattribs": {
+       "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Montreal_public_transit_icons_-_Train.svg/500px-Montreal_public_transit_icons_-_Train.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+       "decoding": "async",
+       "loading": "lazy",
+       "width": 400,
+       "height": 400,
+       "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Montreal_public_transit_icons_-_Train.svg/960px-Montreal_public_transit_icons_-_Train.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Montreal_public_transit_icons_-_Train.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Montreal_public_transit_icons_-_Train.svg",
+      "descriptionshorturl": "https://commons.wikimedia.org/wiki/Special:Redirect/page/122381325",
+      "extmetadata": {
+       "ObjectName": {
+        "value": "Montreal public transit icons - Train",
+        "source": "mediawiki-metadata"
+       },
+       "Artist": {
+        "value": "Autorité régionale de transport métropolitain",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "Public domain",
+        "source": "commons-desc-page",
+        "hidden": ""
+       }
+      },
+      "mime": "image/svg+xml"
+     }
+    ]
+   },
+   "999": {
+    "pageid": 999,
+    "ns": 6,
+    "title": "File:Scan.tif",
+    "index": 2,
+    "imageinfo": [
+     {
+      "size": 1000,
+      "width": 10,
+      "height": 10,
+      "url": "https://upload.wikimedia.org/x/Scan.tif",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Scan.tif",
+      "mime": "image/tiff",
+      "extmetadata": {}
+     }
+    ]
+   }
+  }
+ }
+}

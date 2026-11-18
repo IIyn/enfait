@@ -1,0 +1,91 @@
+_version: 2
+"board.after_cut":
+  en: "The storyboard appears after the cut."
+  fr: "Le storyboard apparaît après la découpe."
+"board.describe_or_suggest":
+  en: "Describe what we see, or let enfait suggest."
+  fr: "Décris ce qu'on voit, ou laisse enfait proposer."
+"board.description_placeholder":
+  en: "What we see during this block. Leave empty and enfait will suggest."
+  fr: "Ce qu'on voit pendant ce bloc. Laisse vide pour qu'enfait propose."
+"board.failed":
+  en: "Cannot build the storyboard: %{error}"
+  fr: "Storyboard impossible : %{error}"
+"board.import_first":
+  en: "Import a take (Voice screen): the storyboard is built from the edit of the Cut step."
+  fr: "Importe une prise (écran Voix) : le storyboard se construit à partir du montage de la Découpe."
+"board.label.moments":
+  en: "MOMENTS"
+  fr: "MOMENTS"
+"board.label.transition":
+  en: "TRANSITION TO THE NEXT BLOCK"
+  fr: "TRANSITION VERS LE BLOC SUIVANT"
+"board.label.type":
+  en: "TYPE"
+  fr: "TYPE"
+"board.label.visual":
+  en: "ON SCREEN"
+  fr: "ON VOIT"
+"board.label.words":
+  en: "WORDS — click to cut or set a moment"
+  fr: "MOTS — clique pour couper ou poser un moment"
+"board.merge":
+  en: "Merge with the next one"
+  fr: "Fusionner avec le suivant"
+"board.moment_line":
+  en: "◆ %{word}: %{note}"
+  fr: "◆ %{word} : %{note}"
+"board.moment_on":
+  en: "Moment on%{word}"
+  fr: "Moment sur%{word}"
+"board.moment_placeholder":
+  en: "What happens at this moment, then Enter"
+  fr: "Ce qui se passe à cet instant, puis Entrée"
+"board.no_note":
+  en: "(no note)"
+  fr: "(sans note)"
+"board.none_yet":
+  en: "No storyboard yet."
+  fr: "Pas encore de storyboard."
+"board.nothing_found":
+  en: "No sentence of the script was found in the take."
+  fr: "Aucune phrase du script n'a été retrouvée dans la prise."
+"board.retouch_placeholder":
+  en: "What is wrong at this moment, then Enter"
+  fr: "Ce qui ne va pas à cet instant, puis Entrée"
+"board.scene":
+  en: "SC %{n}"
+  fr: "SC %{n}"
+"board.select_block":
+  en: "Select a block."
+  fr: "Sélectionne un bloc."
+"board.split_before":
+  en: "Cut before%{word}"
+  fr: "Couper avant%{word}"
+"board.stats":
+  en: "%{blocks} blocks · %{duration}"
+  fr: "%{blocks} blocs · %{duration}"
+"board.title":
+  en: "Storyboard"
+  fr: "Storyboard"
+"board.transcribing":
+  en: "Transcribing the take…"
+  fr: "Transcription de la prise en cours…"
+"board.transition.auto":
+  en: "Auto"
+  fr: "Auto"
+"board.transition.cut":
+  en: "Cut"
+  fr: "Coupe"
+"board.transition.described":
+  en: "Described"
+  fr: "Décrite"
+"board.transition_auto":
+  en: "Transition · enfait chooses"
+  fr: "Transition · enfait choisit"
+"board.transition_placeholder":
+  en: "Describe the transition, then Enter"
+  fr: "Décris la transition, puis Entrée"
+"board.transition_text":
+  en: "Transition · %{text}"
+  fr: "Transition · %{text}"

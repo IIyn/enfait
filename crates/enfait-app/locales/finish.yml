@@ -1,0 +1,154 @@
+_version: 2
+"finish.as_music":
+  en: "Music"
+  fr: "Musique"
+"finish.audition_failed":
+  en: "playback: %{error}"
+  fr: "écoute : %{error}"
+"finish.ducking":
+  en: "Music dips under the voice"
+  fr: "La musique baisse sous la voix"
+"finish.ducking_note":
+  en: "Computed from the words of the voice: the music dips just before speech and comes back up in the silences."
+  fr: "Calculé sur les mots de la voix : la musique descend juste avant de parler et remonte dans les silences."
+"finish.ducking_off":
+  en: "off"
+  fr: "coupé"
+"finish.export.premiere":
+  en: "Premiere edit"
+  fr: "Montage Premiere"
+"finish.export.video":
+  en: "Exporting the video"
+  fr: "Export de la vidéo"
+"finish.export_failed":
+  en: "Export failed: %{error}"
+  fr: "Export impossible : %{error}"
+"finish.export_mp4":
+  en: "MP4 video…"
+  fr: "Vidéo MP4…"
+"finish.export_progress":
+  en: "%{what}: %{pct} %"
+  fr: "%{what} : %{pct} %"
+"finish.export_summary":
+  en: "%{format} · %{width}×%{height} · %{fps} fps · sound at −14 LUFS"
+  fr: "%{format} · %{width}×%{height} · %{fps} i/s · son à −14 LUFS"
+"finish.export_xml":
+  en: "Premiere (XML)…"
+  fr: "Premiere (XML)…"
+"finish.from":
+  en: "Start"
+  fr: "Début"
+"finish.kind.lost":
+  en: "LOST"
+  fr: "PERDU"
+"finish.kind.music":
+  en: "MUSIC"
+  fr: "MUSIQUE"
+"finish.kind.sfx":
+  en: "SFX"
+  fr: "SFX"
+"finish.knob.depth":
+  en: "Dip under the voice"
+  fr: "Baisse sous la voix"
+"finish.knob.fade_in":
+  en: "Fade in"
+  fr: "Fondu d'entrée"
+"finish.knob.fade_out":
+  en: "Fade out"
+  fr: "Fondu de sortie"
+"finish.knob.gain":
+  en: "Volume"
+  fr: "Volume"
+"finish.knob.voice":
+  en: "Voice volume"
+  fr: "Volume de la voix"
+"finish.label.ducking":
+  en: "VOICE AND DUCKING"
+  fr: "VOIX ET DUCKING"
+"finish.label.export":
+  en: "EXPORT"
+  fr: "EXPORT"
+"finish.label.music":
+  en: "SELECTED MUSIC"
+  fr: "MUSIQUE CHOISIE"
+"finish.label.sfx":
+  en: "SELECTED SFX"
+  fr: "SFX CHOISI"
+"finish.label.sounds":
+  en: "LIBRARY SOUNDS"
+  fr: "SONS DE LA BIBLIOTHÈQUE"
+"finish.lane.blocks":
+  en: "BLOCKS"
+  fr: "BLOCS"
+"finish.lane.music":
+  en: "MUSIC"
+  fr: "MUSIQUE"
+"finish.lane.sfx":
+  en: "SFX"
+  fr: "SFX"
+"finish.listen":
+  en: "▶ Listen"
+  fr: "▶ Écouter"
+"finish.lost":
+  en: "its block no longer exists"
+  fr: "son bloc n'existe plus"
+"finish.needs_board":
+  en: "The finish works on the storyboard edit: import and cut a take first."
+  fr: "La finition se fait sur le montage du storyboard : importe et découpe une prise d'abord."
+"finish.no_cues":
+  en: "Add music or sound effects from the right panel. Search royalty-free sounds in the left column (\"Sounds\")."
+  fr: "Ajoute une musique ou des effets sonores depuis le panneau de droite. Cherche des sons libres de droits dans la colonne de gauche (« Sons »)."
+"finish.no_sounds":
+  en: "No sound yet. Search royalty-free music and effects (left column, \"Sounds\"), or add your files (MP3, WAV, OGG, FLAC)."
+  fr: "Aucun son pour l'instant. Cherche des musiques et des effets libres de droits (colonne de gauche, « Sons »), ou ajoute tes fichiers (MP3, WAV, OGG, FLAC)."
+"finish.no_transition":
+  en: "No transition: choose some on the storyboard (Auto or Described)."
+  fr: "Aucune transition : choisis-en au storyboard (Auto ou Décrite)."
+"finish.nudge_back":
+  en: "−0.1 s"
+  fr: "−0,1 s"
+"finish.nudge_fwd":
+  en: "+0.1 s"
+  fr: "+0,1 s"
+"finish.offset":
+  en: "starts %{seconds} s into the track"
+  fr: "départ dans le morceau %{seconds} s"
+"finish.ok":
+  en: "OK"
+  fr: "OK"
+"finish.on_transitions":
+  en: "On the transitions"
+  fr: "Sur les transitions"
+"finish.remove":
+  en: "Remove"
+  fr: "Retirer"
+"finish.reveal":
+  en: "Show the file"
+  fr: "Afficher le fichier"
+"finish.seconds":
+  en: "%{value} s"
+  fr: "%{value} s"
+"finish.sfx_here":
+  en: "SFX here"
+  fr: "SFX ici"
+"finish.stats":
+  en: "%{music} music · %{sfx} SFX · ducking %{ducking}"
+  fr: "%{music} musique(s) · %{sfx} SFX · ducking %{ducking}"
+"finish.stop":
+  en: "■ Stop"
+  fr: "■ Arrêter"
+"finish.title":
+  en: "Finish"
+  fr: "Finition"
+"finish.to":
+  en: "End"
+  fr: "Fin"
+"finish.to_playhead":
+  en: "At the playhead"
+  fr: "À la tête de lecture"
+"finish.too_long":
+  en: "Over 3 min: too long for Shorts and Reels (TikTok accepts it)."
+  fr: "Plus de 3 min : trop long pour les Shorts et les Reels (TikTok l'accepte)."
+"finish.with_sfx":
+  en: "With the sound effects"
+  fr: "Avec les effets sonores"

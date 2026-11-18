@@ -1,0 +1,28 @@
+_version: 2
+"voice.import":
+  en: "Import the take…"
+  fr: "Importer la prise…"
+"voice.import_prompt":
+  en: "Import the take"
+  fr: "Importer la prise"
+"voice.magic":
+  en: "Magic mode"
+  fr: "Mode magique"
+"voice.prompter":
+  en: "Prompter  F5"
+  fr: "Prompteur  F5"
+"voice.script_placeholder":
+  en: "Write here what you are going to say. One sentence per idea; headings (#) and [directions] are not read."
+  fr: "Écris ici ce que tu vas dire. Une phrase par idée ; les titres (#) et les [indications] ne sont pas lus."
+"voice.see_cut":
+  en: "see the cut →"
+  fr: "voir la découpe →"
+"voice.stats":
+  en: "%{sentences} sentence(s) · %{words} words · ≈ %{duration}"
+  fr: "%{sentences} phrase(s) · %{words} mots · ≈ %{duration}"
+"voice.take":
+  en: "Take: %{name}"
+  fr: "Prise : %{name}"
+"voice.title":
+  en: "Script"
+  fr: "Script"

@@ -1,0 +1,124 @@
+_version: 2
+"side.add_files":
+  en: "Add files…"
+  fr: "Ajouter des fichiers…"
+"side.add_to_library":
+  en: "Add to the library"
+  fr: "Ajouter à la bibliothèque"
+"side.asset_purpose":
+  en: "What is this file for? (Enter)"
+  fr: "À quoi sert ce fichier ? (Entrée)"
+"side.free":
+  en: "Free"
+  fr: "Libre"
+"side.free_summary":
+  en: "Free: enfait chooses a direction for each video."
+  fr: "Libre : enfait choisit une direction pour chaque vidéo."
+"side.fx.aberration":
+  en: "Aberration"
+  fr: "Aberration"
+"side.fx.contrast":
+  en: "Contrast"
+  fr: "Contraste"
+"side.fx.grain":
+  en: "Grain"
+  fr: "Grain"
+"side.fx.saturation":
+  en: "Saturation"
+  fr: "Saturation"
+"side.fx.temperature":
+  en: "Temperature"
+  fr: "Température"
+"side.fx.vignette":
+  en: "Vignette"
+  fr: "Vignettage"
+"side.fx_preset.0":
+  en: "Neutral"
+  fr: "Neutre"
+"side.fx_preset.1":
+  en: "Film"
+  fr: "Pellicule"
+"side.fx_preset.2":
+  en: "Archive"
+  fr: "Archive"
+"side.fx_preset.3":
+  en: "Neon"
+  fr: "Néon"
+"side.fx_preset.4":
+  en: "Soft"
+  fr: "Doux"
+"side.fx_preset.5":
+  en: "Black & white"
+  fr: "Noir et blanc"
+"side.import_error":
+  en: "%{name}: %{error}"
+  fr: "%{name} : %{error}"
+"side.kind.audio":
+  en: "sound"
+  fr: "son"
+"side.kind.font":
+  en: "font"
+  fr: "police"
+"side.kind.image":
+  en: "image"
+  fr: "image"
+"side.kind.svg":
+  en: "SVG"
+  fr: "SVG"
+"side.kind.video":
+  en: "video"
+  fr: "vidéo"
+"side.label.credits":
+  en: "CREDITS — to publish with the video"
+  fr: "CRÉDITS — à publier avec la vidéo"
+"side.label.library":
+  en: "LIBRARY"
+  fr: "BIBLIOTHÈQUE"
+"side.label.look":
+  en: "LOOK — applied to the whole video"
+  fr: "LOOK — appliqué à toute la vidéo"
+"side.label.rules":
+  en: "REMEMBERED RULES"
+  fr: "RÈGLES MÉMORISÉES"
+"side.label.style":
+  en: "STYLE"
+  fr: "STYLE"
+"side.library_empty":
+  en: "Logo, images, SVG, short videos, fonts: the animators can use them."
+  fr: "Logo, images, SVG, courtes vidéos, polices : les animateurs pourront s'en servir."
+"side.rules_empty":
+  en: "Tick \"Remember as a rule\" when sending a retouche: it will apply to every animation."
+  fr: "Coche « Retenir comme règle » en envoyant une retouche : elle vaudra pour toutes les animations."
+"side.rules_placeholder":
+  en: "\"Always black and white\", \"no text on screen\"…"
+  fr: "« Toujours en noir et blanc », « pas de texte à l'écran »…"
+"side.style.chalk.name":
+  en: "Chalkboard"
+  fr: "Tableau à la craie"
+"side.style.chalk.summary":
+  en: "hand-drawn diagrams on a slate"
+  fr: "schémas dessinés à la main sur ardoise"
+"side.style.engraving.name":
+  en: "Archive engraving"
+  fr: "Gravure d'archives"
+"side.style.engraving.summary":
+  en: "19th-century plates, hatching, a single vermilion"
+  fr: "planches du XIXᵉ siècle, hachures, un seul vermillon"
+"side.style.paper.name":
+  en: "Paper cut-out"
+  fr: "Papier découpé"
+"side.style.paper.summary":
+  en: "paper shapes, short shadows, animated on twos (12 fps)"
+  fr: "formes en papier, ombres courtes, animé à 12 images/s"
+"side.style.swiss.name":
+  en: "Swiss typography"
+  fr: "Typographie suisse"
+"side.style.swiss.summary":
+  en: "grid, asymmetry, text only, one red"
+  fr: "grille, asymétrie, texte seul, un rouge"
+"side.style_toggle":
+  en: "Style"
+  fr: "Style"
+"side.your_rules":
+  en: "Your rules (take precedence):"
+  fr: "Tes règles (prioritaires) :"

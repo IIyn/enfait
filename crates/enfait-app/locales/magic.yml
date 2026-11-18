@@ -1,0 +1,64 @@
+_version: 2
+"magic.apply_failed":
+  en: "Storyboard written but cannot be applied: %{error}"
+  fr: "Storyboard écrit mais impossible à appliquer : %{error}"
+"magic.banner":
+  en: "MAGIC MODE"
+  fr: "MODE MAGIQUE"
+"magic.board_failed":
+  en: "Cannot write the storyboard: %{error}"
+  fr: "Storyboard impossible : %{error}"
+"magic.close":
+  en: "Close"
+  fr: "Fermer"
+"magic.edit_changed":
+  en: "The edit changed while writing: run \"Write the storyboard\" again."
+  fr: "Le montage a changé pendant l'écriture : relance « Écrire le storyboard »."
+"magic.export_failed":
+  en: "Export failed: %{error}"
+  fr: "Export impossible : %{error}"
+"magic.exporting":
+  en: "Exporting the video…"
+  fr: "Export de la vidéo…"
+"magic.exporting_pct":
+  en: "Exporting the video… %{pct} %"
+  fr: "Export de la vidéo… %{pct} %"
+"magic.failed_blocks":
+  en: "%{message} %{count} block(s) failed: regenerate them on the storyboard."
+  fr: "%{message} %{count} bloc(s) en échec : à regénérer au storyboard."
+"magic.generating":
+  en: "Animations: %{running} running, %{queued} queued"
+  fr: "Animations : %{running} en cours, %{queued} en attente"
+"magic.no_board":
+  en: "No storyboard: nothing was applied."
+  fr: "Storyboard absent : rien n'a été appliqué."
+"magic.no_rush":
+  en: "No take imported."
+  fr: "Aucune prise importée."
+"magic.preparing":
+  en: "Cleaning the take: transcription, last takes…"
+  fr: "Nettoyage de la prise : transcription, dernières prises…"
+"magic.reveal":
+  en: "Show the video"
+  fr: "Afficher la vidéo"
+"magic.stop":
+  en: "Stop"
+  fr: "Arrêter"
+"magic.summary.blocks":
+  en: "Storyboard written: %{count} block(s) described"
+  fr: "Storyboard écrit : %{count} bloc(s) décrit(s)"
+"magic.summary.brolls":
+  en: ", %{count} real shot(s)"
+  fr: ", %{count} plan(s) réel(s)"
+"magic.summary.missing":
+  en: " Not found: %{list}."
+  fr: " Introuvable : %{list}."
+"magic.summary.nothing":
+  en: " (nothing to change)"
+  fr: " (rien à changer)"
+"magic.summary.sounds":
+  en: ", %{count} sound(s) placed"
+  fr: ", %{count} son(s) posé(s)"
+"magic.writing":
+  en: "Writing the storyboard…"
+  fr: "Écriture du storyboard…"

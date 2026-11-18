@@ -1,0 +1,7 @@
+{"count": 2, "next": null, "previous": null, "results": [
+ {"id": 60013, "name": "Whoosh 01.wav", "username": "qubodup", "license": "https://creativecommons.org/licenses/by/4.0/",
+  "duration": 1.2, "url": "https://freesound.org/people/qubodup/sounds/60013/",
+  "previews": {"preview-hq-mp3": "https://cdn.freesound.org/previews/60/60013_71257-hq.mp3", "preview-lq-mp3": "https://cdn.freesound.org/previews/60/60013_71257-lq.mp3"},
+  "images": {"waveform_m": "https://cdn.freesound.org/displays/60/60013_71257_wave_M.png"}},
+ {"id": 1, "name": "sans aperçu", "username": "x", "license": "http://creativecommons.org/publicdomain/zero/1.0/", "duration": 3.0, "url": "https://freesound.org/s/1/", "previews": {}}
+]}

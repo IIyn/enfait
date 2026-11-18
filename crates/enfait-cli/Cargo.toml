@@ -1,0 +1,40 @@
+[package]
+name = "enfait-cli"
+description = "Chaîne complète en ligne de commande : voix off → vidéo en motion design."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "enfait-cli"
+path = "src/main.rs"
+
+[features]
+vulkan = ["enfait-speech/vulkan"]
+
+[dependencies]
+enfait-config.workspace = true
+enfait-ai.workspace = true
+enfait-assets.workspace = true
+enfait-core.workspace = true
+enfait-mcp.workspace = true
+enfait-media.workspace = true
+enfait-motion.workspace = true
+enfait-speech.workspace = true
+enfait-studio.workspace = true
+
+anyhow.workspace = true
+blake3.workspace = true
+clap.workspace = true
+directories.workspace = true
+futures.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

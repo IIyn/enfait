@@ -1,0 +1,97 @@
+_version: 2
+"worker.activity":
+  en: "%{what}: %{text}"
+  fr: "%{what} : %{text}"
+"worker.animation":
+  en: "animation…"
+  fr: "animation…"
+"worker.block_gone":
+  en: "this block no longer exists (storyboard rebuilt)"
+  fr: "ce bloc n'existe plus (storyboard reconstruit)"
+"worker.block_missing":
+  en: "block not found"
+  fr: "bloc introuvable"
+"worker.broll_block":
+  en: "\"B-roll\" block: the shot is edited without a model"
+  fr: "bloc « B-roll » : le plan est monté sans modèle"
+"worker.cutout_model":
+  en: "cutout model…"
+  fr: "modèle de détourage…"
+"worker.cutout_progress":
+  en: "cutting the person out (%{done}/%{count})…"
+  fr: "détourage de la personne (%{done}/%{count})…"
+"worker.direction":
+  en: "art direction…"
+  fr: "direction artistique…"
+"worker.editor_writing":
+  en: "the editor is writing the storyboard…"
+  fr: "le monteur écrit le storyboard…"
+"worker.hard_cut":
+  en: "hard cut: no transition to create"
+  fr: "coupe nette : pas de transition à créer"
+"worker.loudness":
+  en: ", sound brought from %{lufs} to −14 LUFS"
+  fr: ", son ramené de %{lufs} à −14 LUFS"
+"worker.missing_many":
+  en: " %{count} blocks have no animation yet (the take covers them): %{list}."
+  fr: " %{count} blocs n'ont pas encore d'animation (la prise les couvre) : %{list}."
+"worker.missing_one":
+  en: " Block %{n} has no animation yet: the take covers it."
+  fr: " Le bloc %{n} n'a pas encore d'animation : la prise le couvre."
+"worker.mixing":
+  en: "mixing…"
+  fr: "mixage…"
+"worker.mounting":
+  en: "Block %{n}: editing the shot…"
+  fr: "Bloc %{n} : montage du plan…"
+"worker.needs_video":
+  en: "\"Mixed\" and \"Effect\" blocks need a filmed take"
+  fr: "les blocs « Mixte » et « Effet » demandent une prise filmée"
+"worker.no_next":
+  en: "no next block"
+  fr: "pas de bloc suivant"
+"worker.no_picture":
+  en: "take without picture: no transition"
+  fr: "prise sans image : pas de transition"
+"worker.premiere_done":
+  en: "Premiere edit written, media in %{media}.%{missing}"
+  fr: "Montage Premiere écrit, médias dans %{media}.%{missing}"
+"worker.preparing_render":
+  en: "preparing the renderer…"
+  fr: "préparation du rendu…"
+"worker.preview":
+  en: "assembling the preview…"
+  fr: "assemblage de l'aperçu…"
+"worker.render_clip":
+  en: "rendering the clip…"
+  fr: "rendu du clip…"
+"worker.restore":
+  en: "back to version %{version}…"
+  fr: "retour à la version %{version}…"
+"worker.retouch":
+  en: "retouching…"
+  fr: "retouche…"
+"worker.rush_block":
+  en: "\"Rush\" block: the take is shown as is"
+  fr: "bloc « Rush » : la prise est montrée telle quelle"
+"worker.rush_frames":
+  en: "frames of the take…"
+  fr: "images de la prise…"
+"worker.starting":
+  en: "starting…"
+  fr: "en route…"
+"worker.transition":
+  en: "transition…"
+  fr: "transition…"
+"worker.update_transitions":
+  en: "updating the transitions…"
+  fr: "mise à jour des transitions…"
+"worker.video_done":
+  en: "Video exported (%{min} min %{sec} s%{loudness}).%{missing}"
+  fr: "Vidéo exportée (%{min} min %{sec} s%{loudness}).%{missing}"
+"worker.what_block":
+  en: "Block %{n}"
+  fr: "Bloc %{n}"
+"worker.what_transition":
+  en: "Transition %{from}→%{to}"
+  fr: "Transition %{from}→%{to}"

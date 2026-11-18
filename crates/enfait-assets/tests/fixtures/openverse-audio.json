@@ -1,0 +1,5 @@
+{"result_count": 1, "page_count": 1, "page_size": 20, "page": 1, "results": [
+ {"id": "f1", "title": "Calm piano", "foreign_landing_url": "https://www.jamendo.com/track/1", "url": "https://prod-1.storage.jamendo.com/?trackid=1&format=mp32",
+  "creator": "Someone", "license": "by", "license_version": "3.0", "license_url": "https://creativecommons.org/licenses/by/3.0/",
+  "provider": "jamendo", "source": "jamendo", "category": "music", "filetype": "mp3", "duration": 95500, "thumbnail": null}
+]}

@@ -1,0 +1,41 @@
+[package]
+name = "enfait-app"
+description = "enfait desktop app (gpui)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "enfait"
+path = "src/main.rs"
+
+[dependencies]
+enfait-config.workspace = true
+enfait-ai.workspace = true
+enfait-assets.workspace = true
+enfait-core.workspace = true
+enfait-mcp.workspace = true
+enfait-media.workspace = true
+enfait-motion.workspace = true
+enfait-speech.workspace = true
+enfait-studio.workspace = true
+
+anyhow.workspace = true
+blake3.workspace = true
+directories.workspace = true
+gpui-kit.workspace = true
+image.workspace = true
+rust-i18n.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tray-icon.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,10 @@
+_version: 2
+"tray.open":
+  en: "Open enfait"
+  fr: "Ouvrir enfait"
+"tray.quit":
+  en: "Quit enfait"
+  fr: "Quitter enfait"
+"tray.settings":
+  en: "Settings…"
+  fr: "Réglages…"

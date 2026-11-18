@@ -1,0 +1,49 @@
+_version: 2
+"cut.derived":
+  en: "No script: sentences and retakes found in the take. \"Write the script\" turns them into a script to correct (remove a sentence, split one in two)."
+  fr: "Pas de script : phrases et reprises déduites de la prise. « Écrire le script » en fait un script à corriger (retirer une phrase, en séparer deux)."
+"cut.incomplete":
+  en: " ·inc."
+  fr: " ·inc."
+"cut.last_takes":
+  en: "Last takes"
+  fr: "Dernières prises"
+"cut.montage":
+  en: "Edit"
+  fr: "Montage"
+"cut.no_model":
+  en: "Transcription model missing: download it in Settings → Tools (or run `enfait-cli setup`)."
+  fr: "Modèle de transcription absent : télécharge-le dans Réglages → Outils (ou lance `enfait-cli setup`)."
+"cut.no_rush":
+  en: "No take: import it from the Voice screen (or %{key})."
+  fr: "Aucune prise : importe-la depuis l'écran Voix (ou %{key})."
+"cut.no_sentence":
+  en: "No sentence recognised in the take."
+  fr: "Aucune phrase reconnue dans la prise."
+"cut.not_found":
+  en: "not found"
+  fr: "non trouvée"
+"cut.summary":
+  en: "%{found}/%{total} sentences · %{discarded} take(s) discarded · edit %{montage} of %{rush}"
+  fr: "%{found}/%{total} phrases · %{discarded} prise(s) écartée(s) · montage %{montage} sur %{rush}"
+"cut.take_chip":
+  en: "T%{n}"
+  fr: "P%{n}"
+"cut.title":
+  en: "Cut"
+  fr: "Découpe"
+"cut.transcribing":
+  en: "Transcribing the take… (one to two minutes for ten minutes of sound)"
+  fr: "Transcription de la prise… (une à deux minutes pour dix minutes de son)"
+"cut.transcription_failed":
+  en: "Transcription failed: %{error}"
+  fr: "Transcription impossible : %{error}"
+"cut.unreadable_take":
+  en: "Unreadable take: %{error}"
+  fr: "Prise illisible : %{error}"
+"cut.whole_take":
+  en: "Whole take"
+  fr: "Prise entière"
+"cut.write_script":
+  en: "Write the script"
+  fr: "Écrire le script"

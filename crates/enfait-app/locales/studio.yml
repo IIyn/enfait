@@ -1,0 +1,142 @@
+_version: 2
+"studio.cancel_queue":
+  en: "Cancel the queue"
+  fr: "Annuler l'attente"
+"studio.counts":
+  en: "%{running} running · %{queued} queued"
+  fr: "%{running} en cours · %{queued} en attente"
+"studio.current_version":
+  en: "current"
+  fr: "actuelle"
+"studio.format.landscape":
+  en: "Landscape"
+  fr: "Grand format"
+"studio.format.square":
+  en: "Square"
+  fr: "Carré"
+"studio.format.vertical":
+  en: "Vertical short"
+  fr: "Court vertical"
+"studio.framing.fill":
+  en: "Crop"
+  fr: "Rogner"
+"studio.framing.fit":
+  en: "Bars"
+  fr: "Bandes"
+"studio.generate":
+  en: "Generate"
+  fr: "Générer"
+"studio.generate_all":
+  en: "Generate all"
+  fr: "Tout générer"
+"studio.generate_transition":
+  en: "Generate the transition"
+  fr: "Générer la transition"
+"studio.label.animation":
+  en: "ANIMATION"
+  fr: "ANIMATION"
+"studio.label.animations":
+  en: "ANIMATIONS"
+  fr: "ANIMATIONS"
+"studio.label.format":
+  en: "FORMAT"
+  fr: "FORMAT"
+"studio.label.models":
+  en: "MODELS"
+  fr: "MODÈLES"
+"studio.label.retouches":
+  en: "RETOUCHES — at the playhead"
+  fr: "RETOUCHES — à l'instant de lecture"
+"studio.label.versions":
+  en: "PREVIOUS VERSIONS — click to go back"
+  fr: "VERSIONS PRÉCÉDENTES — clique pour y revenir"
+"studio.missing.api":
+  en: "no Anthropic key — add one in Settings"
+  fr: "pas de clé Anthropic — à ajouter dans les Réglages"
+"studio.missing.claude":
+  en: "Claude Code (`claude`) not found"
+  fr: "Claude Code (`claude`) introuvable"
+"studio.missing.local":
+  en: "no local model — configure it in Settings"
+  fr: "pas de modèle local — à configurer dans les Réglages"
+"studio.overlay_note":
+  en: "\"Mixed\" and \"Effect\" blocks: rendered over the take."
+  fr: "Blocs « Mixte » et « Effet » : rendus par-dessus la prise."
+"studio.pan.center":
+  en: "centre"
+  fr: "centre"
+"studio.pan.left":
+  en: "%{pct} % left"
+  fr: "%{pct} % à gauche"
+"studio.pan.right":
+  en: "%{pct} % right"
+  fr: "%{pct} % à droite"
+"studio.provider.api":
+  en: "API"
+  fr: "API"
+"studio.provider.auto":
+  en: "Auto"
+  fr: "Auto"
+"studio.provider.claude_code":
+  en: "Claude Code"
+  fr: "Claude Code"
+"studio.provider.local":
+  en: "Local"
+  fr: "Local"
+"studio.quality.fast":
+  en: "Fast"
+  fr: "Rapide"
+"studio.quality.polished":
+  en: "Polished"
+  fr: "Soigné"
+"studio.quality.ultra":
+  en: "Ultra"
+  fr: "Ultra"
+"studio.regenerate":
+  en: "Regenerate"
+  fr: "Regénérer"
+"studio.regenerate_transition":
+  en: "Regenerate the transition"
+  fr: "Regénérer la transition"
+"studio.remember":
+  en: "Remember as a rule"
+  fr: "Retenir comme règle"
+"studio.rush_note":
+  en: "\"Rush\" block: the take is shown as is."
+  fr: "Bloc « Rush » : la prise est montrée telle quelle."
+"studio.send_retouches":
+  en: "Send %{count} retouche(s)"
+  fr: "Envoyer %{count} retouche(s)"
+"studio.state.failed":
+  en: "failed"
+  fr: "échec"
+"studio.state.mounted":
+  en: "shot ready"
+  fr: "plan monté"
+"studio.state.mounting":
+  en: "editing…"
+  fr: "montage…"
+"studio.state.needs_broll":
+  en: "shot to choose"
+  fr: "plan à choisir"
+"studio.state.queued":
+  en: "queued"
+  fr: "en attente"
+"studio.state.ready":
+  en: "animated"
+  fr: "animée"
+"studio.state.running":
+  en: "running…"
+  fr: "en cours…"
+"studio.state.to_generate":
+  en: "to generate"
+  fr: "à générer"
+"studio.transition_ready":
+  en: "transition ready"
+  fr: "transition prête"
+"studio.write_board":
+  en: "Write the storyboard"
+  fr: "Écrire le storyboard"
+"studio.writing":
+  en: "Storyboard: %{what}"
+  fr: "Storyboard : %{what}"

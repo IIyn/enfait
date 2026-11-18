@@ -1,0 +1,235 @@
+_version: 2
+"settings.accent":
+  en: "Accent colour"
+  fr: "Couleur d'accent"
+"settings.accent.amber":
+  en: "Amber"
+  fr: "Ambre"
+"settings.accent.chartreuse":
+  en: "Chartreuse"
+  fr: "Chartreuse"
+"settings.accent.lavender":
+  en: "Lavender"
+  fr: "Lavande"
+"settings.accent.mint":
+  en: "Mint"
+  fr: "Menthe"
+"settings.accent.rose":
+  en: "Rose"
+  fr: "Rose"
+"settings.accent.sky":
+  en: "Sky"
+  fr: "Ciel"
+"settings.accent_help":
+  en: "Main buttons, playhead, selection."
+  fr: "Boutons principaux, tête de lecture, sélection."
+"settings.banks_help":
+  en: "Wikimedia Commons and Openverse work without a key. These banks add more videos, photos and sounds."
+  fr: "Wikimedia Commons et Openverse fonctionnent sans clé. Ces banques ajoutent des vidéos, des photos et des sons."
+"settings.claude_help":
+  en: "Uses your Claude subscription through the `claude` command."
+  fr: "Utilise ton abonnement Claude par la commande `claude`."
+"settings.claude_missing":
+  en: "Not found. Install Claude Code from claude.com/claude-code, then reopen this page."
+  fr: "Introuvable. Installe Claude Code depuis claude.com/claude-code, puis rouvre cette page."
+"settings.close":
+  en: "Close  Esc"
+  fr: "Fermer  Échap"
+"settings.close_quit":
+  en: "Quit"
+  fr: "Quitter"
+"settings.close_tray":
+  en: "Keep running in the tray"
+  fr: "Rester dans la barre système"
+"settings.close_window":
+  en: "Closing the window"
+  fr: "Fermeture de la fenêtre"
+"settings.close_window_help":
+  en: "In the system tray, enfait keeps generating and exporting; open it again from the tray icon."
+  fr: "Dans la barre système, enfait continue de générer et d'exporter ; rouvre-le depuis l'icône."
+"settings.found_at":
+  en: "Found: %{path}"
+  fr: "Trouvé : %{path}"
+"settings.get_key":
+  en: "Get a key ↗"
+  fr: "Obtenir une clé ↗"
+"settings.key.anthropic":
+  en: "Anthropic API key"
+  fr: "Clé API Anthropic"
+"settings.key.local":
+  en: "Local server key (optional)"
+  fr: "Clé du serveur local (facultative)"
+"settings.key_failed":
+  en: "Cannot save the key: %{error}"
+  fr: "Impossible d'enregistrer la clé : %{error}"
+"settings.key_help.anthropic":
+  en: "Used by the \"API\" provider (and by \"Auto\" when present). Billed per use by Anthropic."
+  fr: "Utilisée par le fournisseur « API » (et par « Auto » si elle existe). Facturée à l'usage par Anthropic."
+"settings.key_help.freesound":
+  en: "Free key: sound effects and music."
+  fr: "Clé gratuite : effets sonores et musiques."
+"settings.key_help.local":
+  en: "Only if your server asks for one (vLLM, LM Studio with authentication…)."
+  fr: "Seulement si ton serveur en demande une (vLLM, LM Studio avec authentification…)."
+"settings.key_help.pexels":
+  en: "Free key: photos and videos."
+  fr: "Clé gratuite : photos et vidéos."
+"settings.key_help.pixabay":
+  en: "Free key: photos and videos."
+  fr: "Clé gratuite : photos et vidéos."
+"settings.key_placeholder":
+  en: "Paste the key, then Enter"
+  fr: "Colle la clé, puis Entrée"
+"settings.key_removed":
+  en: "%{name} removed."
+  fr: "%{name} supprimée."
+"settings.key_saved":
+  en: "%{name} saved."
+  fr: "%{name} enregistrée."
+"settings.key_status.checking":
+  en: "Checking…"
+  fr: "Vérification…"
+"settings.key_status.env":
+  en: "Set by the %{var} environment variable (takes precedence)"
+  fr: "Définie par la variable d'environnement %{var} (prioritaire)"
+"settings.key_status.file":
+  en: "Set — stored in a private file (no keychain available)"
+  fr: "Enregistrée dans un fichier privé (pas de trousseau disponible)"
+"settings.key_status.keychain":
+  en: "Set — stored in the system keychain"
+  fr: "Enregistrée dans le trousseau du système"
+"settings.key_status.none":
+  en: "Not set"
+  fr: "Pas de clé"
+"settings.language":
+  en: "Language"
+  fr: "Langue"
+"settings.local":
+  en: "Local model"
+  fr: "Modèle local"
+"settings.local_help":
+  en: "Replaces Opus and Sonnet. Critiques send images: choose a model that reads them."
+  fr: "Remplace Opus et Sonnet. Les critiques envoient des images : choisis un modèle qui les lit."
+"settings.local_model":
+  en: "Model name"
+  fr: "Nom du modèle"
+"settings.local_model_placeholder":
+  en: "qwen3-coder:30b"
+  fr: "qwen3-coder:30b"
+"settings.local_url":
+  en: "Server address"
+  fr: "Adresse du serveur"
+"settings.no_tray":
+  en: "No system tray was found on this desktop: closing the window quits enfait."
+  fr: "Aucune barre système trouvée sur ce bureau : fermer la fenêtre quitte enfait."
+"settings.onboarding":
+  en: "First-launch setup"
+  fr: "Configuration du premier lancement"
+"settings.onboarding_again":
+  en: "Run it again"
+  fr: "Recommencer"
+"settings.provider":
+  en: "Model provider"
+  fr: "Fournisseur des modèles"
+"settings.provider_help":
+  en: "Auto: the Anthropic API if a key is set, otherwise Claude Code (your subscription). Local: an OpenAI-compatible server (Ollama, llama.cpp, LM Studio, vLLM)."
+  fr: "Auto : l'API Anthropic si une clé existe, sinon Claude Code (ton abonnement). Local : un serveur compatible OpenAI (Ollama, llama.cpp, LM Studio, vLLM)."
+"settings.quality":
+  en: "Default animation quality"
+  fr: "Soin des animations par défaut"
+"settings.quality_help":
+  en: "Fast: Sonnet, one pass. Polished: Opus, two critiques on rendered frames. Ultra: Opus, four critiques."
+  fr: "Rapide : Sonnet, une passe. Soigné : Opus, deux critiques sur images rendues. Ultra : Opus, quatre critiques."
+"settings.remove":
+  en: "Remove"
+  fr: "Supprimer"
+"settings.save":
+  en: "Save"
+  fr: "Enregistrer"
+"settings.section.appearance":
+  en: "Appearance"
+  fr: "Apparence"
+"settings.section.banks":
+  en: "Asset banks"
+  fr: "Banques de médias"
+"settings.section.general":
+  en: "General"
+  fr: "Général"
+"settings.section.models":
+  en: "Models"
+  fr: "Modèles"
+"settings.section.tools":
+  en: "Tools"
+  fr: "Outils"
+"settings.session":
+  en: "Session folder"
+  fr: "Dossier de la session"
+"settings.session_help":
+  en: "Script, storyboard, library and animations. ENFAIT_SESSION chooses another folder."
+  fr: "Script, storyboard, bibliothèque et animations. ENFAIT_SESSION permet d'en choisir un autre."
+"settings.show_folder":
+  en: "Show the folder"
+  fr: "Afficher le dossier"
+"settings.theme":
+  en: "Theme"
+  fr: "Thème"
+"settings.theme.dark":
+  en: "Dark"
+  fr: "Sombre"
+"settings.theme.light":
+  en: "Light"
+  fr: "Clair"
+"settings.theme.system":
+  en: "System"
+  fr: "Système"
+"settings.theme_help":
+  en: "\"System\" follows the light or dark appearance of the desktop."
+  fr: "« Système » suit l'apparence claire ou sombre du bureau."
+"settings.title":
+  en: "Settings"
+  fr: "Réglages"
+"settings.title_caps":
+  en: "SETTINGS"
+  fr: "RÉGLAGES"
+"settings.tools.browser":
+  en: "Animation renderer"
+  fr: "Moteur de rendu des animations"
+"settings.tools.browser_help":
+  en: "chrome-headless-shell renders the animations frame by frame. Downloaded on first use otherwise."
+  fr: "chrome-headless-shell rend les animations image par image. Sinon téléchargé au premier usage."
+"settings.tools.download":
+  en: "Download (%{size})"
+  fr: "Télécharger (%{size})"
+"settings.tools.downloading":
+  en: "Downloading…"
+  fr: "Téléchargement…"
+"settings.tools.downloading_pct":
+  en: "Downloading… %{pct} %"
+  fr: "Téléchargement… %{pct} %"
+"settings.tools.failed":
+  en: "Download failed: %{error}"
+  fr: "Échec du téléchargement : %{error}"
+"settings.tools.ffmpeg_help":
+  en: "Reads and writes every video and sound. Must be installed on the system."
+  fr: "Lit et écrit toutes les vidéos et tous les sons. À installer sur le système."
+"settings.tools.ffmpeg_linux":
+  en: "Not found. Install it with your package manager (apt, dnf, pacman: ffmpeg)."
+  fr: "Introuvable. Installe-le avec ton gestionnaire de paquets (apt, dnf, pacman : ffmpeg)."
+"settings.tools.ffmpeg_macos":
+  en: "Not found. Install it with Homebrew: brew install ffmpeg"
+  fr: "Introuvable. Installe-le avec Homebrew : brew install ffmpeg"
+"settings.tools.ffmpeg_windows":
+  en: "Not found. Install it with: winget install Gyan.FFmpeg, then restart enfait."
+  fr: "Introuvable. Installe-le avec : winget install Gyan.FFmpeg, puis relance enfait."
+"settings.tools.installed":
+  en: "Installed"
+  fr: "Installé"
+"settings.tools.missing":
+  en: "Not installed"
+  fr: "Pas installé"
+"settings.tools.whisper":
+  en: "Transcription model"
+  fr: "Modèle de transcription"
+"settings.tools.whisper_help":
+  en: "whisper large-v3-turbo, runs on this computer: needed to cut the takes."
+  fr: "whisper large-v3-turbo, exécuté sur cet ordinateur : nécessaire pour découper les prises."

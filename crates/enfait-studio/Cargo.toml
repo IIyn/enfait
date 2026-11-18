@@ -1,0 +1,31 @@
+[package]
+name = "enfait-studio"
+description = "Atelier d'animation : réalisateur, animateurs, retouches et rendu, commun au CLI et à l'interface."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+enfait-config.workspace = true
+enfait-ai.workspace = true
+enfait-assets.workspace = true
+enfait-core.workspace = true
+enfait-media.workspace = true
+enfait-motion.workspace = true
+
+anyhow.workspace = true
+blake3.workspace = true
+futures.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+directories.workspace = true
+tempfile.workspace = true

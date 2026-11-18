@@ -1,0 +1,10 @@
+{"total": 1, "totalHits": 1, "hits": [
+ {"id": 125, "pageURL": "https://pixabay.com/videos/id-125/", "type": "film", "tags": "train, station", "duration": 12,
+  "videos": {
+   "large": {"url": "https://cdn.pixabay.com/video/2015/08/08/125-135736646_large.mp4", "width": 1920, "height": 1080, "size": 6615235, "thumbnail": "https://cdn.pixabay.com/video/2015/08/08/125-135736646_large.jpg"},
+   "medium": {"url": "https://cdn.pixabay.com/video/2015/08/08/125-135736646_medium.mp4", "width": 1280, "height": 720, "size": 3562083, "thumbnail": "https://cdn.pixabay.com/video/2015/08/08/125-135736646_medium.jpg"},
+   "small": {"url": "https://cdn.pixabay.com/video/2015/08/08/125-135736646_small.mp4", "width": 960, "height": 540, "size": 2030736, "thumbnail": ""},
+   "tiny": {"url": "", "width": 0, "height": 0, "size": 0, "thumbnail": ""}
+  },
+  "views": 1, "downloads": 1, "likes": 1, "comments": 1, "user_id": 1, "user": "Coverr-Free-Footage", "userImageURL": ""}
+]}
