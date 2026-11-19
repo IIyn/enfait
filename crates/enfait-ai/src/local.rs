@@ -1,14 +1,14 @@
-//! Modèles locaux : tout serveur qui parle l'API « chat completions »
-//! d'OpenAI (Ollama, llama.cpp `llama-server`, LM Studio, vLLM…).
+//! Local models: any server speaking OpenAI's "chat completions" API
+//! (Ollama, llama.cpp `llama-server`, LM Studio, vLLM…).
 //!
-//! Le modèle demandé par la chaîne (Opus, Sonnet) est remplacé par celui du
-//! serveur local ; l'effort n'a pas d'équivalent et est ignoré. Les images
-//! (critiques sur rendu) sont envoyées en `data:` URL : il faut un modèle
-//! qui les lit, sinon le serveur répond par une erreur.
+//! The model asked by the pipeline (Opus, Sonnet) is replaced by the local
+//! server's; effort has no equivalent and is ignored. Images (critiques on
+//! renders) are sent as `data:` URLs: the model must read them, otherwise
+//! the server answers with an error.
 //!
-//! Réglages : `ENFAIT_LOCAL_URL` (par défaut `http://localhost:11434/v1`,
-//! Ollama), `ENFAIT_LOCAL_MODEL` (obligatoire), `ENFAIT_LOCAL_KEY`
-//! (facultative, pour un serveur protégé).
+//! Settings: Settings → Models, or `ENFAIT_LOCAL_URL` (default
+//! `http://localhost:11434/v1`, Ollama), `ENFAIT_LOCAL_MODEL`,
+//! `ENFAIT_LOCAL_KEY` (optional, for a protected server).
 
 use crate::llm::{AiError, Part, Reply, Request, Usage};
 use base64::Engine as _;
@@ -20,7 +20,7 @@ const MAX_ATTEMPTS: u32 = 3;
 
 pub struct LocalClient {
     http: reqwest::Client,
-    /// Adresse de base, sans `/` final (`…/v1`).
+    /// Base address, without a trailing `/` (`…/v1`).
     base_url: String,
     model: String,
     api_key: Option<String>,
@@ -30,7 +30,7 @@ impl LocalClient {
     pub fn new(base_url: &str, model: &str, api_key: Option<String>) -> Result<Self, AiError> {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
-            // Un gros modèle sur une petite machine peut mettre longtemps.
+            // A big model on a small machine can take a long time.
             .read_timeout(Duration::from_secs(1800))
             .build()?;
         Ok(Self {
@@ -74,7 +74,7 @@ impl LocalClient {
             attempt = attempt.saturating_add(1);
             match self.send(&body).await {
                 Err(e) if attempt < MAX_ATTEMPTS && retryable(&e) => {
-                    tracing::warn!("modèle local : {e}, nouvel essai");
+                    tracing::warn!("local model: {e}, retrying");
                     tokio::time::sleep(Duration::from_secs(3)).await;
                 }
                 other => return other,
@@ -101,7 +101,7 @@ impl LocalClient {
                 }
             });
         }
-        // Texte seul : une chaîne, que tous les serveurs comprennent.
+        // Text only: a string, which every server understands.
         let user = if request.user.iter().all(|p| matches!(p, Part::Text(_))) {
             Value::String(
                 request
@@ -166,11 +166,11 @@ fn retryable(error: &AiError) -> bool {
     }
 }
 
-/// Lit une réponse « chat completions ».
+/// Reads a "chat completions" reply.
 pub fn parse_reply(value: &Value, model: &str) -> Result<Reply, AiError> {
     let choice = value
         .pointer("/choices/0")
-        .ok_or_else(|| AiError::Unexpected("réponse sans `choices`".into()))?;
+        .ok_or_else(|| AiError::Unexpected("reply without `choices`".into()))?;
     let text = choice
         .pointer("/message/content")
         .and_then(Value::as_str)
@@ -182,7 +182,9 @@ pub fn parse_reply(value: &Value, model: &str) -> Result<Reply, AiError> {
         _ => {}
     }
     if text.trim().is_empty() {
-        return Err(AiError::Unexpected("réponse vide du modèle local".into()));
+        return Err(AiError::Unexpected(
+            "empty reply from the local model".into(),
+        ));
     }
     let tokens = |key: &str| {
         value
@@ -232,7 +234,7 @@ mod tests {
             ]))
             .await
             .unwrap();
-        assert_eq!(body["model"], "qwen3", "le modèle local remplace Opus");
+        assert_eq!(body["model"], "qwen3", "the local model replaces Opus");
         assert_eq!(body["messages"][0]["role"], "system");
         assert_eq!(body["messages"][1]["content"], "a\n\nb");
 
@@ -264,7 +266,7 @@ mod tests {
         assert!(matches!(parse_reply(&cut, "m"), Err(AiError::Truncated)));
     }
 
-    /// Un vrai échange HTTP avec un faux serveur local.
+    /// A real HTTP exchange with a fake local server.
     #[tokio::test]
     async fn talks_to_a_server() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -273,7 +275,7 @@ mod tests {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut seen = Vec::new();
             let mut buf = [0_u8; 4096];
-            // Lire jusqu'à la fin du corps JSON.
+            // Read up to the end of the JSON body.
             loop {
                 let n = socket.read(&mut buf).await.unwrap();
                 seen.extend_from_slice(&buf[..n]);

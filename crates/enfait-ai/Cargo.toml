@@ -1,6 +1,6 @@
 [package]
 name = "enfait-ai"
-description = "IA d'enfait : fournisseurs de modèles (API Anthropic, Claude Code), prompts, réalisateur et animateurs."
+description = "enfait's AI: model providers (Anthropic API, Claude Code, local), prompts, editor, director and animators."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

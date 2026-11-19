@@ -1,15 +1,15 @@
-//! Moteur média d'enfait.
+//! enfait's media engine.
 //!
-//! ffmpeg et ffprobe tournent en sous-processus : pas de liaison C, et le
-//! même binaire sert à l'analyse, aux proxys, à l'audio et au décodage.
+//! ffmpeg and ffprobe run as subprocesses: no C binding, and the same
+//! binary serves analysis, proxies, audio and decoding.
 //!
-//! - [`probe`] : durée, flux vidéo et audio d'un fichier ;
-//! - [`cache`] : préparation d'un média (proxy, audio, forme d'onde), mise
-//!   en cache sur disque ;
-//! - [`audio`] et [`waveform`] : échantillons en mémoire et crêtes ;
-//! - [`video`] : décodage des images du proxy, à la demande de l'horloge ;
-//! - [`transport`] : horloge de lecture partagée et commandes J/K/L ;
-//! - [`output`] : sortie audio (cpal) qui fait avancer l'horloge.
+//! - [`probe`]: duration, video and audio streams of a file;
+//! - [`cache`]: preparation of a media (proxy, audio, waveform), cached on
+//!   disk;
+//! - [`audio`] and [`waveform`]: samples in memory and peaks;
+//! - [`video`]: decoding proxy frames, as the clock asks;
+//! - [`transport`]: shared playback clock and J/K/L commands;
+//! - [`output`]: audio output (cpal) driving the clock.
 
 pub mod audio;
 pub mod cache;

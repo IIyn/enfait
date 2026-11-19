@@ -1,12 +1,12 @@
-//! Bibliothèque de l'utilisateur sur disque : copie d'un fichier sous un nom
-//! sûr et unique, commune à l'interface et au serveur MCP.
+//! The user's library on disk: copying a file under a safe, unique name,
+//! shared by the interface and the MCP server.
 
 use enfait_core::{Asset, AssetKind, Origin};
 use std::path::Path;
 
-/// Copie `source` dans le dossier `dir` sous un nom tiré de `stem` (sûr,
-/// 60 caractères au plus, numéroté s'il existe déjà) et renvoie l'entrée de
-/// bibliothèque. `name` : nom affiché (sinon `stem`).
+/// Copies `source` into folder `dir` under a name taken from `stem` (safe,
+/// 60 characters at most, numbered if it already exists) and returns the
+/// library entry. `name`: displayed name (else `stem`).
 pub fn add_file(
     dir: &Path,
     source: &Path,
@@ -18,9 +18,8 @@ pub fn add_file(
         .extension()
         .map(|e| e.to_string_lossy().to_lowercase())
         .unwrap_or_default();
-    let kind = AssetKind::from_extension(&ext).ok_or_else(|| {
-        format!("format .{ext} non pris en charge (images, SVG, vidéos, polices, sons)")
-    })?;
+    let kind = AssetKind::from_extension(&ext)
+        .ok_or_else(|| format!("unsupported format .{ext} (images, SVG, videos, fonts, sounds)"))?;
     let safe: String = stem
         .chars()
         .map(|c| {
@@ -33,7 +32,7 @@ pub fn add_file(
         .take(60)
         .collect();
     let safe = safe.trim_matches('-');
-    let safe = if safe.is_empty() { "fichier" } else { safe };
+    let safe = if safe.is_empty() { "file" } else { safe };
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let mut file = format!("{safe}.{ext}");
     let mut n = 2_u32;

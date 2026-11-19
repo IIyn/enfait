@@ -1,61 +1,61 @@
-//! Prises : alignement d'un rush transcrit sur le script, et règle
-//! « dernière prise ».
+//! Takes: aligning a transcribed rush on the script, and the "last take"
+//! rule.
 //!
-//! Le rush est lu de gauche à droite. À chaque mot, on cherche une phrase du
-//! script qui commence là (ses deux premiers mots, à une faute près) et on
-//! l'aligne sur la suite de la transcription (alignement local : mots
-//! identiques ou proches, mots sautés, mots ajoutés). Si la même phrase
-//! recommence avant la fin de l'alignement, c'est un faux départ : la prise
-//! s'arrête là et la suivante commence. Les mots qui ne correspondent à
-//! aucune phrase (apartés, « euh ») ne font partie d'aucune prise.
+//! The rush is read left to right. At each word, look for a sentence of the
+//! script starting there (its first two words, one typo allowed) and align
+//! it on the rest of the transcript (local alignment: identical or close
+//! words, skipped words, added words). If the same sentence starts again
+//! before the end of the alignment, it is a false start: the take stops
+//! there and the next one begins. Words matching no sentence (asides,
+//! "um") belong to no take.
 //!
-//! Pour chaque phrase, on garde la dernière prise complète (ou, à défaut, la
-//! plus complète) ; l'utilisateur peut en choisir une autre. Le montage met
-//! les phrases dans l'ordre du script, en gardant d'un seul tenant les
-//! phrases dites à la suite.
+//! For each sentence, the last complete take is kept (or, failing that,
+//! the most complete one); the user can pick another one. The edit puts
+//! the sentences in script order, keeping in one piece the sentences said
+//! in a row.
 
 use crate::script::{Sentence, sentences, tokens};
 use enfait_core::{Flicks, TimeError, TimeRange, Transcript};
 use std::ops::Range;
 
-/// Marge gardée avant le premier mot d'une prise (secondes).
+/// Margin kept before the first word of a take (seconds).
 const PAD_BEFORE: f64 = 0.12;
-/// Marge gardée avant une prise dont le premier mot n'a pas été reconnu.
+/// Margin kept before a take whose first word was not recognised.
 const PAD_MISSING_START: f64 = 0.9;
-/// Marge gardée après le dernier mot.
+/// Margin kept after the last word.
 const PAD_AFTER: f64 = 0.25;
-/// Au-delà de ce silence, deux phrases dites à la suite sont coupées.
+/// Beyond this silence, two sentences said in a row are cut apart.
 const MAX_JOINED_GAP: f64 = 1.5;
-/// Silence après lequel une phrase qui recommence est une reprise.
+/// Silence after which a sentence starting again is a retake.
 const RESTART_PAUSE: f64 = 0.5;
-/// Part des mots d'une phrase qu'une prise doit contenir pour être complète.
+/// Share of the words of a sentence a take must contain to be complete.
 const COMPLETE: f32 = 0.8;
 
-/// Une prise d'une phrase.
+/// A take of a sentence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Take {
-    /// Index de la phrase dans le script.
+    /// Index of the sentence in the script.
     pub sentence: usize,
-    /// Mots de la transcription, du premier au dernier mot reconnu.
+    /// Words of the transcript, from the first to the last recognised word.
     pub words: Range<usize>,
-    /// Part des mots de la phrase retrouvés, entre 0 et 1.
+    /// Share of the sentence's words found, from 0 to 1.
     pub coverage: f32,
-    /// Assez de mots, jusqu'à la fin de la phrase.
+    /// Enough words, up to the end of the sentence.
     pub complete: bool,
-    /// Le premier mot de la phrase manque (mal entendu ou avalé) : il est
-    /// sans doute juste avant, le montage garde plus de marge.
+    /// The first word of the sentence is missing (misheard or swallowed): it
+    /// is probably just before, the edit keeps more margin.
     pub missing_start: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct Analysis {
     pub sentences: Vec<Sentence>,
-    /// Prises dans l'ordre du rush.
+    /// Takes in rush order.
     pub takes: Vec<Take>,
 }
 
 impl Analysis {
-    /// Prises d'une phrase : (index dans [`Analysis::takes`], prise).
+    /// Takes of a sentence: (index in [`Analysis::takes`], take).
     pub fn takes_of(&self, sentence: usize) -> impl Iterator<Item = (usize, &Take)> {
         self.takes
             .iter()
@@ -63,8 +63,8 @@ impl Analysis {
             .filter(move |(_, t)| t.sentence == sentence)
     }
 
-    /// Règle « dernière prise » : pour chaque phrase, la dernière prise
-    /// complète, sinon la plus complète (la dernière à égalité), sinon rien.
+    /// "Last take" rule: for each sentence, the last complete take, else the
+    /// most complete (the last one on a tie), else nothing.
     pub fn default_choice(&self) -> Vec<Option<usize>> {
         (0..self.sentences.len())
             .map(|s| {
@@ -86,23 +86,23 @@ impl Analysis {
     }
 }
 
-/// Un mot normalisé de la transcription et le mot dont il vient.
+/// A normalised word of the transcript and the word it comes from.
 struct Token {
     text: String,
     word: usize,
-    /// Silence avant ce jeton (0 à l'intérieur d'un mot), en secondes.
+    /// Silence before this token (0 inside a word), in seconds.
     pause: f64,
 }
 
-/// Alignement d'une phrase à partir d'une position du rush.
+/// Alignment of a sentence from a position of the rush.
 #[derive(Debug, Clone, Copy)]
 struct Alignment {
     score: i32,
     matches: usize,
-    /// Premier et dernier jeton du rush reconnus.
+    /// First and last recognised tokens of the rush.
     first: usize,
     last: usize,
-    /// Premier et dernier mots de la phrase reconnus.
+    /// First and last recognised words of the sentence.
     first_script: usize,
     last_script: usize,
 }
@@ -140,12 +140,12 @@ pub fn analyze(script: &str, transcript: &Transcript) -> Analysis {
         let Some(script) = sentences.get(sentence).map(|s| s.tokens.as_slice()) else {
             break;
         };
-        // Faux départ : la même phrase recommence avant la fin de la prise,
-        // et la reprise va au moins aussi loin.
+        // False start: the same sentence starts again before the end of the
+        // take, and the retake goes at least as far.
         let restart = ((found.first.saturating_add(1))..=found.last).find(|&q| {
-            // La reprise peut avoir perdu son premier mot (mal entendu) ; elle
-            // doit revenir en arrière dans la phrase (plus de `j0` mots de la
-            // prise déjà dits avant elle) ou suivre un silence.
+            // The retake may have lost its first word (misheard); it must go back
+            // in the sentence (more than `j0` words of the take already said
+            // before it) or follow a silence.
             let after_pause = rush.get(q).is_some_and(|t| t.pause >= RESTART_PAUSE);
             [0, 1].into_iter().any(|j0| {
                 (q.saturating_sub(found.first) > j0 || after_pause)
@@ -186,13 +186,13 @@ pub fn analyze(script: &str, transcript: &Transcript) -> Analysis {
     Analysis { sentences, takes }
 }
 
-/// Indice du premier mot de `script` reconnu en `p` (0, ou 1 si le premier
-/// mot de la phrase a été avalé).
+/// Index of the first word of `script` recognised at `p` (0, or 1 if the
+/// first word of the sentence was swallowed).
 fn start_offset(script: &[String], rush: &[Token], p: usize) -> usize {
     usize::from(!starts(script, rush, p, 0))
 }
 
-/// La phrase commence-t-elle (à partir de son mot `j0`) au jeton `p` ?
+/// Does the sentence start (from its word `j0`) at token `p`?
 fn starts(script: &[String], rush: &[Token], p: usize, j0: usize) -> bool {
     let word = |i: usize| rush.get(i).map(|t| t.text.as_str());
     let (Some(first), Some(here)) = (script.get(j0), word(p)) else {
@@ -202,7 +202,7 @@ fn starts(script: &[String], rush: &[Token], p: usize, j0: usize) -> bool {
         return false;
     }
     match script.get(j0.saturating_add(1)) {
-        // Le deuxième mot suit, éventuellement après un mot parasite.
+        // The second word follows, possibly after a filler word.
         Some(second) => [1_usize, 2]
             .iter()
             .any(|d| word(p.saturating_add(*d)).is_some_and(|w| similar(second, w))),
@@ -210,7 +210,7 @@ fn starts(script: &[String], rush: &[Token], p: usize, j0: usize) -> bool {
     }
 }
 
-/// Meilleure phrase qui commence en `p`.
+/// Best sentence starting at `p`.
 fn best_start(
     sentences: &[Sentence],
     rush: &[Token],
@@ -239,12 +239,12 @@ fn best_start(
 struct Cell {
     score: i32,
     matches: usize,
-    /// (mot de la phrase, jeton du rush) du premier et du dernier accord.
+    /// (sentence word, rush token) of the first and last match.
     first: Option<(usize, usize)>,
     last: Option<(usize, usize)>,
 }
 
-/// Alignement local de `script[j0..]` sur `rush[p..end]`, ancré au début.
+/// Local alignment of `script[j0..]` on `rush[p..end]`, anchored at the start.
 fn align(script: &[String], rush: &[Token], p: usize, j0: usize, end: usize) -> Option<Alignment> {
     let s = script.get(j0..)?;
     let m = s.len();
@@ -258,8 +258,8 @@ fn align(script: &[String], rush: &[Token], p: usize, j0: usize, end: usize) -> 
     let width = n.saturating_add(1);
     let mut dp = vec![Cell::default(); m.saturating_add(1).saturating_mul(width)];
     let at = |j: usize, k: usize| j.saturating_mul(width).saturating_add(k);
-    // Ancrage : la prise commence au jeton `p`, sans sauter de mot du rush
-    // avant le premier mot de la phrase.
+    // Anchoring: the take starts at token `p`, without skipping a rush word
+    // before the first word of the sentence.
     for k in 1..=n {
         if let Some(c) = dp.get_mut(at(0, k)) {
             c.score = i32::MIN / 2;
@@ -317,7 +317,7 @@ fn align(script: &[String], rush: &[Token], p: usize, j0: usize, end: usize) -> 
     })
 }
 
-/// Mots identiques, ou à une faute près (deux pour les mots longs).
+/// Identical words, or one typo apart (two for long words).
 pub(crate) fn similar(a: &str, b: &str) -> bool {
     if a == b {
         return true;
@@ -355,8 +355,8 @@ fn levenshtein(a: &str, b: &str) -> usize {
     row.last().copied().unwrap_or(0)
 }
 
-/// Parties du rush à garder, dans l'ordre du montage. `choice` : prise
-/// retenue pour chaque phrase (index dans [`Analysis::takes`]).
+/// Parts of the rush to keep, in edit order. `choice`: take kept for each
+/// sentence (index in [`Analysis::takes`]).
 pub fn cut(
     analysis: &Analysis,
     transcript: &Transcript,
@@ -366,7 +366,7 @@ pub fn cut(
     let start_of = |i: usize| words.get(i).map(|w| w.range.start().as_secs_f64());
     let end_of = |i: usize| words.get(i).map(|w| w.range.end().as_secs_f64());
     let total = transcript.media_duration.as_secs_f64();
-    // (premier mot, dernier mot, début de phrase manquant) de chaque partie.
+    // (first word, last word, missing sentence start) of each part.
     let mut parts: Vec<(usize, usize, bool)> = Vec::new();
     for take in choice
         .iter()
@@ -391,9 +391,9 @@ pub fn cut(
         .filter_map(|(first, last, missing_start)| {
             let start = start_of(first)?;
             let end = end_of(last)?;
-            // Marges réduites de moitié du silence voisin, pour ne jamais
-            // reprendre un bout de mot qui n'est pas dans la prise. Si le
-            // premier mot manque, on remonte presque jusqu'au mot précédent.
+            // Margins cut down to half of the neighbouring silence, never to take
+            // a bit of a word that is not in the take. If the first word is
+            // missing, go back almost to the previous word.
             let previous = first.checked_sub(1).and_then(end_of);
             let before = if missing_start {
                 previous.map_or(PAD_MISSING_START, |e| {
@@ -416,8 +416,8 @@ pub fn cut(
         .collect()
 }
 
-/// Transcription du montage : les mots des morceaux gardés (dans l'ordre),
-/// recalés sur le temps du montage.
+/// Transcript of the edit: the words of the kept pieces (in order),
+/// shifted onto edit time.
 pub fn montage_transcript(
     transcript: &Transcript,
     parts: &[TimeRange],
@@ -450,7 +450,7 @@ pub fn montage_transcript(
 }
 
 fn secs(t: f64) -> Result<Flicks, TimeError> {
-    // Instant d'un média : positif et borné.
+    // Time of a media: positive and bounded.
     #[allow(clippy::cast_possible_truncation)]
     let millis = (t * 1000.0).round() as i64;
     Flicks::from_millis(millis)
@@ -461,8 +461,8 @@ mod tests {
     use super::*;
     use enfait_core::Word;
 
-    /// Transcription : mots séparés par des espaces, `|` marque une pause
-    /// d'une seconde. 0,3 s par mot.
+    /// Transcript: words separated by spaces, `|` marks a one-second pause.
+    /// 0.3 s per word.
     fn rush(text: &str) -> Transcript {
         let mut t = 0.0;
         let mut words = Vec::new();
@@ -513,7 +513,7 @@ mod tests {
         assert_eq!(a.takes.len(), 3);
         assert!(a.takes.iter().all(|t| t.complete));
         let parts = cut(&a, &t, &a.default_choice()).unwrap();
-        assert_eq!(parts.len(), 1, "phrases dites à la suite : un seul morceau");
+        assert_eq!(parts.len(), 1, "sentences said in a row: one piece");
     }
 
     #[test]
@@ -531,8 +531,8 @@ mod tests {
             Some("Les deux premiers s'affrontent ensuite.")
         );
         let parts = cut(&a, &t, &a.default_choice()).unwrap();
-        assert_eq!(parts.len(), 2, "le faux départ est retiré");
-        // Le « euh » n'est dans aucune prise.
+        assert_eq!(parts.len(), 2, "the false start is removed");
+        // The "euh" is in no take.
         assert!(
             a.takes
                 .iter()
@@ -542,7 +542,7 @@ mod tests {
 
     #[test]
     fn retake_missing_its_first_word_is_still_a_retake() {
-        // Faux départ, puis reprise dont whisper a perdu le premier mot.
+        // False start, then a retake whose first word whisper lost.
         let t = rush(
             "Les deux premiers | deux premiers s'affrontent ensuite. | \
              Celui qui recueille le plus de voix l'emporte.",
@@ -566,16 +566,16 @@ mod tests {
         assert_eq!(first.len(), 2);
         assert_eq!(
             t.words[first[0].1.words.start].text, "le",
-            "bégaiement retiré"
+            "stutter removed"
         );
         assert_eq!(first[0].1.words.start, 1);
-        assert_eq!(a.default_choice()[0], Some(first[1].0), "la dernière gagne");
-        assert_eq!(a.default_choice()[2], None, "phrase jamais dite");
+        assert_eq!(a.default_choice()[0], Some(first[1].0), "the last one wins");
+        assert_eq!(a.default_choice()[2], None, "sentence never said");
     }
 
     #[test]
     fn redone_sentence_keeps_script_order() {
-        // 1, 2, 3 d'un trait, puis la 2 refaite à la fin.
+        // 1, 2, 3 in one go, then 2 redone at the end.
         let t = rush(
             "Le scrutin se déroule en deux tours. Les deux premiers s'affrontent ensuite. \
              Celui qui recueille le plus de voix l'emporte. | \
@@ -584,12 +584,12 @@ mod tests {
         let a = analyze(SCRIPT, &t);
         let choice = a.default_choice();
         let parts = cut(&a, &t, &choice).unwrap();
-        assert_eq!(parts.len(), 3, "1, puis la 2 refaite, puis la 3");
+        assert_eq!(parts.len(), 3, "1, then 2 redone, then 3");
         assert!(
             parts[1].start() > parts[2].start(),
-            "la 2 vient de la fin du rush"
+            "2 comes from the end of the rush"
         );
-        // Choisir à la main la première prise de la 2 recolle tout.
+        // Choosing by hand the first take of 2 glues everything back.
         let mut manual = choice.clone();
         manual[1] = a.takes_of(1).next().map(|(i, _)| i);
         assert_eq!(cut(&a, &t, &manual).unwrap().len(), 1);
@@ -610,7 +610,7 @@ mod tests {
         let a = analyze(SCRIPT, &t);
         let parts = cut(&a, &t, &a.default_choice()).unwrap();
         let end = parts[0].end().as_secs_f64();
-        // Dernier mot : 1,8 → 2,05 s ; « Bon. » commence à 2,1 s.
+        // Last word: 1.8 → 2.05 s; "Bon." starts at 2.1 s.
         assert!(end > 2.05 && end <= 2.075 + 1e-9, "{end}");
     }
 
@@ -635,7 +635,7 @@ mod tests {
                 .windows(2)
                 .all(|w| w[0].range.end() <= w[1].range.start())
         );
-        // Le premier mot de la 2e partie commence juste après la marge.
+        // The first word of the 2nd part starts right after the margin.
         let second = &m.words[7];
         assert!(
             (second.range.start().as_secs_f64() - (parts[0].duration().as_secs_f64() + 0.12)).abs()

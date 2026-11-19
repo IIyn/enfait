@@ -1,19 +1,19 @@
-//! Export vers Premiere Pro (et tout logiciel qui lit le XML de Final Cut
-//! Pro 7, `xmeml` version 4 : DaVinci Resolve, Final Cut Pro 7).
+//! Export to Premiere Pro (and any software reading Final Cut Pro 7 XML,
+//! `xmeml` version 4: DaVinci Resolve, Final Cut Pro 7).
 //!
-//! La séquence garde le montage ouvert :
+//! The sequence keeps the edit open:
 //!
-//! - V1 : la prise montée (chaque morceau gardé), mise au cadre du projet ;
-//! - V2 : animations et plans de b-roll, sur leurs blocs ;
-//! - V3 : transitions rendues, à cheval sur les coupes ;
-//! - A1-A2 : la voix (son de la prise, une piste par voie) ;
-//! - puis les musiques (fondus et ducking en images clés de niveau) et, si
-//!   on le veut, les SFX, une paire de pistes par couche.
+//! - V1: the edited take (each kept piece), framed to the project;
+//! - V2: animations and b-roll shots, on their blocks;
+//! - V3: rendered transitions, straddling the cuts;
+//! - A1-A2: the voice (sound of the take, one track per channel);
+//! - then the music (fades and ducking as level keyframes) and, if wanted,
+//!   the SFX, a pair of tracks per layer.
 //!
-//! Les clips et les sons sont copiés à côté du XML (`<nom>-medias/`) : un
-//! clip regénéré ensuite ne change pas un montage déjà envoyé. La prise est
-//! désignée à sa place d'origine. Les post-FX ne sont pas transmis (à
-//! refaire dans le logiciel d'arrivée) : `LISEZMOI.txt` les décrit.
+//! Clips and sounds are copied next to the XML (`<name>-media/`): a clip
+//! regenerated later does not change an edit already sent. The take is
+//! referenced at its original place. Post-FX are not passed on (to redo in
+//! the target software): `README.txt` describes them.
 
 use crate::session::{Sources, Visuals};
 use anyhow::{Context as _, Result};
@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PremiereOptions {
-    /// Garder les effets sonores.
+    /// Keep the sound effects.
     pub sfx: bool,
 }
 
@@ -39,53 +39,53 @@ impl Default for PremiereOptions {
 pub struct PremiereReport {
     pub xml: PathBuf,
     pub media: PathBuf,
-    /// Blocs (rang à partir de 1) sans animation ni plan : seule la prise
-    /// les couvre.
+    /// Blocks (rank from 1) with neither animation nor shot: only the take
+    /// covers them.
     pub missing: Vec<usize>,
 }
 
-/// Un fichier désigné par la séquence.
+/// A file referenced by the sequence.
 #[derive(Debug, Clone)]
 struct FileRef {
     name: String,
     path: PathBuf,
-    /// Durée, en images de la séquence.
+    /// Duration, in sequence frames.
     frames: i64,
     video: Option<(u32, u32)>,
     channels: u16,
 }
 
-/// Un clip posé sur une piste, en images de la séquence.
+/// A clip placed on a track, in sequence frames.
 #[derive(Debug, Clone)]
 struct Clip {
     name: String,
     file: usize,
     start: i64,
     end: i64,
-    /// Point d'entrée dans le fichier.
+    /// In point in the file.
     source_in: i64,
-    /// Voie du fichier (pistes son), à partir de 1.
+    /// Channel of the file (sound tracks), from 1.
     channel: Option<u16>,
-    /// Filtres (`<filter>…</filter>`) déjà écrits.
+    /// Filters (`<filter>…</filter>`) already written.
     filters: String,
-    /// Clips liés (image et son d'un même plan, voies d'un même son).
+    /// Linked clips (picture and sound of a shot, channels of a sound).
     group: usize,
 }
 
 #[derive(Debug, Clone, Default)]
 struct Track {
     clips: Vec<Clip>,
-    /// Voie de sortie (1 gauche, 2 droite) d'une piste son.
+    /// Output channel (1 left, 2 right) of a sound track.
     output: Option<u16>,
 }
 
-/// La séquence avant écriture.
+/// The sequence before writing.
 #[derive(Debug, Clone, Default)]
 struct Sequence {
     name: String,
     width: u32,
     height: u32,
-    /// Cadence : `(timebase, ntsc)`.
+    /// Frame rate: `(timebase, ntsc)`.
     rate: (u32, bool),
     duration: i64,
     files: Vec<FileRef>,
@@ -109,8 +109,8 @@ impl Sequence {
     }
 }
 
-/// Couches de pistes son : chaque couche est une paire (gauche, droite) ;
-/// un son va dans la première couche libre sur son intervalle.
+/// Layers of sound tracks: each layer is a pair (left, right); a sound
+/// goes into the first layer free over its interval.
 struct Layers {
     first: usize,
     busy: Vec<Vec<(i64, i64)>>,
@@ -124,7 +124,7 @@ impl Layers {
         }
     }
 
-    /// Indices des deux pistes (dans `seq.audio`) qui reçoivent `[a, b)`.
+    /// Indices of the two tracks (in `seq.audio`) receiving `[a, b)`.
     fn place(&mut self, seq: &mut Sequence, a: i64, b: i64) -> (usize, usize) {
         let free = self
             .busy
@@ -151,7 +151,7 @@ impl Layers {
 }
 
 fn frames(t: f64, fps: f64) -> i64 {
-    // Durées d'une vidéo : la conversion ne déborde pas.
+    // Durations of a video: the conversion does not overflow.
     #[allow(clippy::cast_possible_truncation)]
     let f = (t * fps).round() as i64;
     f
@@ -176,7 +176,7 @@ fn escape(text: &str) -> String {
     out
 }
 
-/// `file://localhost/…`, chemin encodé octet par octet.
+/// `file://localhost/…`, path encoded byte by byte.
 fn path_url(path: &Path) -> String {
     let mut out = String::from("file://localhost");
     let text = path.to_string_lossy();
@@ -197,9 +197,9 @@ fn path_url(path: &Path) -> String {
     out
 }
 
-/// Filtre « Audio Levels » : niveaux linéaires aux images `when` (depuis le
-/// début du clip). Toujours au moins deux images clés : sans elles, certains
-/// imports lisent le niveau à −∞.
+/// "Audio Levels" filter: linear levels at frames `when` (from the start
+/// of the clip). Always at least two keyframes: without them, some
+/// importers read the level as −∞.
 fn audio_levels(keys: &[(i64, f64)], length: i64) -> String {
     let mut keys: Vec<(i64, f64)> = keys
         .iter()
@@ -232,7 +232,7 @@ fn audio_levels(keys: &[(i64, f64)], length: i64) -> String {
     s
 }
 
-/// Filtre « Basic Motion » : échelle (%) et centre (fraction de l'image).
+/// "Basic Motion" filter: scale (%) and centre (fraction of the picture).
 fn basic_motion(scale: f64, center: (f64, f64)) -> String {
     format!(
         "<filter><effect><name>Basic Motion</name><effectid>basic</effectid>\
@@ -247,7 +247,7 @@ fn basic_motion(scale: f64, center: (f64, f64)) -> String {
     )
 }
 
-/// Mise au cadre de la prise `(w, h)` dans la séquence `(sw, sh)`.
+/// Framing of take `(w, h)` in sequence `(sw, sh)`.
 fn rush_motion(rush: (u32, u32), seq: (u32, u32), framing: Framing, pan: i8) -> Option<String> {
     let (w, h) = (f64::from(rush.0.max(1)), f64::from(rush.1.max(1)));
     let (sw, sh) = (f64::from(seq.0), f64::from(seq.1));
@@ -256,7 +256,7 @@ fn rush_motion(rush: (u32, u32), seq: (u32, u32), framing: Framing, pan: i8) -> 
         Framing::Fit => fit,
         Framing::Fill => fill,
     };
-    // Décalage de l'image rognée : `pan` % de la marge.
+    // Shift of the cropped picture: `pan` % of the margin.
     let k = f64::from(pan) / 100.0;
     let center = match framing {
         Framing::Fill => (
@@ -276,10 +276,10 @@ fn rate_xml((timebase, ntsc): (u32, bool)) -> String {
     )
 }
 
-/// Écrit la séquence en XML.
+/// Writes the sequence as XML.
 fn render(seq: &Sequence) -> String {
     let rate = rate_xml(seq.rate);
-    // Identifiants et places (piste, rang) de chaque clip, pour les liens.
+    // Ids and places (track, rank) of each clip, for the links.
     let mut places: BTreeMap<usize, Vec<(String, &str, usize, usize)>> = BTreeMap::new();
     let mut ids: Vec<Vec<String>> = Vec::new();
     let mut n = 0_usize;
@@ -419,10 +419,10 @@ fn render(seq: &Sequence) -> String {
     x
 }
 
-/// Informations d'un fichier pour la séquence (ffprobe).
+/// Information of a file for the sequence (ffprobe).
 fn file_ref(path: &Path, name: &str, fps: f64) -> Result<FileRef> {
     let info = enfait_media::probe::probe(path)
-        .with_context(|| format!("fichier illisible : {}", path.display()))?;
+        .with_context(|| format!("unreadable file: {}", path.display()))?;
     Ok(FileRef {
         name: name.to_owned(),
         path: path.to_path_buf(),
@@ -432,14 +432,14 @@ fn file_ref(path: &Path, name: &str, fps: f64) -> Result<FileRef> {
     })
 }
 
-/// Copie `from` dans `dir` sous le nom `name` ; renvoie le chemin absolu.
+/// Copies `from` into `dir` under the name `name`; returns the absolute path.
 fn copy_into(from: &Path, dir: &Path, name: &str) -> Result<PathBuf> {
     let to = dir.join(name);
     std::fs::copy(from, &to).with_context(|| format!("copie de {}", from.display()))?;
     Ok(std::path::absolute(&to).unwrap_or(to))
 }
 
-/// Ajoute un son stéréo ou mono (`file`) sur une couche de `layers`.
+/// Adds a stereo or mono sound (`file`) on a layer of `layers`.
 #[allow(clippy::too_many_arguments)]
 fn place_sound(
     seq: &mut Sequence,
@@ -458,7 +458,7 @@ fn place_sound(
     let (left, right) = layers.place(seq, start, end);
     let group = seq.group();
     for (channel, track) in [(1_u16, left), (2, right)] {
-        // Un son mono va sur les deux pistes de la couche (même voie).
+        // A mono sound goes on both tracks of the layer (same channel).
         let source = if channels == 1 { 1 } else { channel };
         if let Some(t) = seq.audio.get_mut(track) {
             t.clips.push(Clip {
@@ -475,7 +475,7 @@ fn place_sound(
     }
 }
 
-/// Construit la séquence et copie les médias dans `media`.
+/// Builds the sequence and copies the media into `media`.
 fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Result<Sequence> {
     let project = sources.project;
     let settings = project.settings();
@@ -496,14 +496,14 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
     let rush_path = std::path::absolute(sources.rush).unwrap_or_else(|_| sources.rush.into());
     let rush_name = rush_path
         .file_name()
-        .map_or_else(|| "prise".to_owned(), |n| n.to_string_lossy().into_owned());
+        .map_or_else(|| "take".to_owned(), |n| n.to_string_lossy().into_owned());
     let rush = seq.file(file_ref(&rush_path, &rush_name, fps)?);
     let (rush_video, rush_channels) = seq
         .files
         .get(rush)
         .map_or((None, 0), |f| (f.video, f.channels));
 
-    // V1 et voix : la prise montée.
+    // V1 and voice: the edited take.
     let mut v1 = Track::default();
     let voice_tracks = usize::from(rush_channels.clamp(1, 2));
     let mut voice: Vec<Track> = (0..voice_tracks)
@@ -551,7 +551,7 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
     seq.video.push(v1);
     seq.audio.extend(voice);
 
-    // V2 : animations et plans ; V3 : transitions.
+    // V2: animations and shots; V3: transitions.
     let visuals = Visuals::of(sources.studio, project);
     let mut v2 = Track::default();
     for (i, (block, (a, b, clip))) in project.blocks().iter().zip(&visuals.blocks).enumerate() {
@@ -562,7 +562,7 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
             BlockKind::Effect => "effet",
             _ => "animation",
         };
-        let name = format!("bloc-{:02}-{kind}.mp4", i.saturating_add(1));
+        let name = format!("block-{:02}-{kind}.mp4", i.saturating_add(1));
         let copied = copy_into(clip, media, &name)?;
         let file = seq.file(file_ref(&copied, &name, fps)?);
         let group = seq.group();
@@ -602,7 +602,7 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
     }
     seq.video.push(v3);
 
-    // Musiques : niveau, fondus et ducking en images clés.
+    // Music: level, fades and ducking as keyframes.
     let plan = crate::mix::plan(sources, options.sfx);
     let mut sounds: BTreeMap<String, usize> = BTreeMap::new();
     let mut sound_file = |seq: &mut Sequence, file: &str, path: &Path| -> Result<usize> {
@@ -631,7 +631,7 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
             }
             v
         };
-        // Instants où la courbe change de pente.
+        // Times where the curve changes slope.
         let (attack, release) = (
             plan.ducking.attack.max(0.01),
             plan.ducking.release.max(0.01),
@@ -644,7 +644,7 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
         }
         corners.retain(|t| (m.start..=m.end).contains(t));
         corners.sort_by(f64::total_cmp);
-        // Morceau trop court : repris au début, un clip par passage.
+        // Track too short: looped, one clip per pass.
         let (mut at, mut pos) = (
             frames(m.start, fps),
             frames(m.offset, fps).checked_rem(file_len).unwrap_or(0),
@@ -704,20 +704,20 @@ fn build(sources: &Sources<'_>, options: PremiereOptions, media: &Path) -> Resul
     Ok(seq)
 }
 
-/// Notes jointes au XML : contenu des pistes, post-FX à refaire, crédits.
+/// Notes attached to the XML: track contents, post-FX to redo, credits.
 fn readme(sources: &Sources<'_>, seq: &Sequence, options: PremiereOptions) -> String {
     let fx = sources.look.fx;
     let mut s = format!(
-        "Montage enfait : {}\n\n\
-         Ouvrir dans Premiere Pro : Fichier > Importer, choisir le fichier .xml.\n\n\
-         Pistes\n\
-         - V1 : la prise montée\n\
-         - V2 : animations et plans de b-roll\n\
-         - V3 : transitions\n\
-         - A1{} : la voix\n\
-         - puis les musiques (fondus et ducking en images clés de niveau){}\n\n\
-         Les clips et les sons sont copiés dans ce dossier ; la prise est désignée à sa \
-         place d'origine.\n",
+        "enfait edit: {}\n\n\
+         Open in Premiere Pro: File > Import, choose the .xml file.\n\n\
+         Tracks\n\
+         - V1: the edited take\n\
+         - V2: animations and b-roll shots\n\
+         - V3: transitions\n\
+         - A1{}: the voice\n\
+         - then the music (fades and ducking as level keyframes){}\n\n\
+         Clips and sounds are copied into this folder; the take is referenced at its \
+         original place.\n",
         seq.name,
         if seq.audio.len() > 1 && seq.audio.first().is_some_and(|t| t.output.is_some()) {
             "-A2"
@@ -725,46 +725,45 @@ fn readme(sources: &Sources<'_>, seq: &Sequence, options: PremiereOptions) -> St
             ""
         },
         if options.sfx {
-            ", puis les SFX"
+            ", then the SFX"
         } else {
-            " (sans les SFX)"
+            " (without the SFX)"
         }
     );
     if !fx.is_neutral() {
         let _ = write!(
             s,
-            "\nPost-FX à refaire (non transmis par le XML), réglages de -1 à 1 :\n\
-             contraste {:.2}, saturation {:.2}, température {:.2}, grain {:.2}, \
-             vignettage {:.2}, aberration {:.2}\n",
+            "\nPost-FX to redo (not passed on by the XML), settings from -1 to 1:\n\
+             contrast {:.2}, saturation {:.2}, temperature {:.2}, grain {:.2}, \
+             vignette {:.2}, aberration {:.2}\n",
             fx.contrast, fx.saturation, fx.temperature, fx.grain, fx.vignette, fx.aberration
         );
     }
     let credits = enfait_core::license::credits(&sources.look.assets);
     if !credits.trim().is_empty() {
-        let _ = write!(s, "\nCrédits\n{credits}\n");
+        let _ = write!(s, "\nCredits\n{credits}\n");
     }
     s
 }
 
-/// Écrit `xml` et copie les médias à côté, dans `<nom>-medias/`.
+/// Writes `xml` and copies the media next to it, in `<name>-media/`.
 pub fn export(
     sources: &Sources<'_>,
     options: PremiereOptions,
     xml: &Path,
 ) -> Result<PremiereReport> {
-    let stem = xml.file_stem().map_or_else(
-        || "montage".to_owned(),
-        |s| s.to_string_lossy().into_owned(),
-    );
-    let media = xml.with_file_name(format!("{stem}-medias"));
+    let stem = xml
+        .file_stem()
+        .map_or_else(|| "edit".to_owned(), |s| s.to_string_lossy().into_owned());
+    let media = xml.with_file_name(format!("{stem}-media"));
     if media.exists() {
         std::fs::remove_dir_all(&media)
-            .with_context(|| format!("remplacement de {}", media.display()))?;
+            .with_context(|| format!("replacing {}", media.display()))?;
     }
     std::fs::create_dir_all(&media)?;
     let seq = build(sources, options, &media)?;
-    std::fs::write(xml, render(&seq)).with_context(|| format!("écriture de {}", xml.display()))?;
-    std::fs::write(media.join("LISEZMOI.txt"), readme(sources, &seq, options))?;
+    std::fs::write(xml, render(&seq)).with_context(|| format!("writing {}", xml.display()))?;
+    std::fs::write(media.join("README.txt"), readme(sources, &seq, options))?;
     Ok(PremiereReport {
         xml: xml.to_path_buf(),
         media,
@@ -789,7 +788,7 @@ mod tests {
         let f = audio_levels(&[(0, 0.5)], 100);
         assert!(f.contains("<keyframe><when>0</when><value>0.50000</value></keyframe>"));
         assert!(f.contains("<keyframe><when>100</when><value>0.50000</value></keyframe>"));
-        // Bornes : au-delà de +12 dB, ramené ; instants hors du clip, ramenés.
+        // Bounds: beyond +12 dB, brought back; times outside the clip, brought back.
         let f = audio_levels(&[(-5, 9.0), (300, 0.1)], 100);
         assert!(f.contains("<when>0</when><value>3.98100</value>"), "{f}");
         assert!(f.contains("<when>100</when><value>0.10000</value>"), "{f}");
@@ -797,15 +796,15 @@ mod tests {
 
     #[test]
     fn rush_is_framed_like_the_render() {
-        // Prise 16:9 dans une vidéo verticale, rognée : 1920/1080 → 177,8 %.
+        // 16:9 take in a vertical video, cropped: 1920/1080 → 177.8 %.
         let m = rush_motion((1920, 1080), (1080, 1920), Framing::Fill, 0).unwrap();
         assert!(m.contains("<value>177.778</value>"), "{m}");
-        // Bandes noires : 1080/1920 → 56,25 %.
+        // Black bars: 1080/1920 → 56.25 %.
         let m = rush_motion((1920, 1080), (1080, 1920), Framing::Fit, 0).unwrap();
         assert!(m.contains("<value>56.250</value>"), "{m}");
-        // Même format : rien à faire.
+        // Same format: nothing to do.
         assert!(rush_motion((1920, 1080), (1920, 1080), Framing::Fill, 0).is_none());
-        // Décalage vers la droite de l'image : le centre part à gauche.
+        // Shift to the right of the picture: the centre moves left.
         let m = rush_motion((1920, 1080), (1080, 1920), Framing::Fill, 50).unwrap();
         assert!(m.contains("<horiz>-1.08025"), "{m}");
     }
@@ -858,7 +857,7 @@ mod tests {
         });
         let x = render(&seq);
         assert!(x.contains("<name>Essai &amp; co</name>"));
-        assert_eq!(x.matches("<pathurl>").count(), 1, "fichier décrit une fois");
+        assert_eq!(x.matches("<pathurl>").count(), 1, "file described once");
         assert!(x.contains("<file id=\"file-1\"/>"));
         assert!(x.contains("<in>30</in><out>120</out>"));
         assert!(x.contains("<linkclipref>clipitem-2</linkclipref><mediatype>audio</mediatype>"));

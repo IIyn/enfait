@@ -1,9 +1,9 @@
-//! Modèle de projet d'enfait.
+//! enfait's project model.
 //!
-//! Ce crate ne dépend d'aucune couche média, IA ou interface : il porte le
-//! temps ([`time`]), les blocs du storyboard ([`block`]), le projet
-//! ([`project`]), la transcription ([`transcript`]) et l'historique annuler /
-//! rétablir ([`history`]).
+//! This crate depends on no media, AI or interface layer: it holds time
+//! ([`time`]), storyboard blocks ([`block`]), the project ([`project`]),
+//! the transcript ([`transcript`]) and the undo / redo history
+//! ([`history`]).
 
 #![warn(clippy::arithmetic_side_effects)]
 

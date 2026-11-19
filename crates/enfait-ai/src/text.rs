@@ -1,6 +1,6 @@
-//! Petits outils sur le texte des réponses.
+//! Small tools on the text of the replies.
 
-/// Contenu du dernier bloc de code ```` ```lang ````.
+/// Content of the last ```` ```lang ```` code block.
 pub fn last_fenced<'a>(text: &'a str, lang: &str) -> Option<&'a str> {
     let open = format!("```{lang}");
     let start = text.rfind(&open)?;
@@ -10,7 +10,7 @@ pub fn last_fenced<'a>(text: &'a str, lang: &str) -> Option<&'a str> {
     body.get(..end)
 }
 
-/// Remplace les `{{CLÉS}}` d'un modèle de prompt.
+/// Replaces the `{{KEYS}}` of a prompt template.
 pub fn fill(template: &str, values: &[(&str, &str)]) -> String {
     values
         .iter()

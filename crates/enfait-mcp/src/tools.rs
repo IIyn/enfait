@@ -1,6 +1,6 @@
-//! Les outils proposés aux agents. Chacun lit la session sur disque,
-//! modifie ce qu'il faut et réécrit les fichiers (l'interface ouverte les
-//! relit). Les réponses sont du texte en français, lisible par un modèle.
+//! The tools offered to agents. Each one reads the session from disk,
+//! changes what it must and writes the files back (the open interface
+//! reloads them). Answers are plain English text, readable by a model.
 
 use crate::bridge::{self, Request, RequestKind};
 use enfait_assets::search::{Hit, Media};
@@ -15,14 +15,20 @@ use std::path::PathBuf;
 
 type Outcome = Result<String, String>;
 
-/// État des outils : la session, et les derniers résultats de recherche
-/// (`ajouter_media` les désigne par leur numéro).
+/// State of a block that still has its animation to make.
+const TO_GENERATE: &str = "to generate";
+const QUEUED: &str = "queued";
+const RUNNING: &str = "running";
+const DONE: &str = "done";
+
+/// State of the tools: the session, and the last search results
+/// (`add_media` refers to them by number).
 pub struct Tools {
     dir: PathBuf,
     found: Vec<Hit>,
 }
 
-/// Fichier accompagnant `project.json` : la transcription du montage.
+/// File next to `project.json`: the transcript of the edit.
 #[derive(serde::Deserialize)]
 struct Montage {
     transcript: Transcript,
@@ -31,9 +37,9 @@ struct Montage {
 fn kind_name(kind: BlockKind) -> &'static str {
     match kind {
         BlockKind::Animation => "animation",
-        BlockKind::Mixed => "mixte",
+        BlockKind::Mixed => "mixed",
         BlockKind::Rush => "rush",
-        BlockKind::Effect => "effet",
+        BlockKind::Effect => "effect",
         BlockKind::Broll => "broll",
     }
 }
@@ -41,16 +47,39 @@ fn kind_name(kind: BlockKind) -> &'static str {
 fn parse_kind(text: &str) -> Result<BlockKind, String> {
     Ok(match text.trim().to_lowercase().as_str() {
         "animation" => BlockKind::Animation,
-        "mixte" | "mixed" => BlockKind::Mixed,
+        "mixed" | "mixte" => BlockKind::Mixed,
         "rush" => BlockKind::Rush,
-        "effet" | "effect" => BlockKind::Effect,
+        "effect" | "effet" => BlockKind::Effect,
         "broll" | "b-roll" => BlockKind::Broll,
         other => {
             return Err(format!(
-                "type inconnu : {other} (animation, mixte, rush, effet, broll)"
+                "unknown type: {other} (animation, mixed, rush, effect, broll)"
             ));
         }
     })
+}
+
+/// Tool names of the first versions, still answered.
+fn current_name(name: &str) -> &str {
+    match name {
+        "modifier_bloc" => "edit_block",
+        "ajouter_moment" => "add_moment",
+        "retirer_moment" => "remove_moment",
+        "bibliotheque" => "library",
+        "chercher_medias" => "search_media",
+        "ajouter_media" => "add_media",
+        "decrire_fichier" => "describe_file",
+        "finition" => "finish",
+        "ajouter_musique" => "add_music",
+        "ajouter_sfx" => "add_sfx",
+        "retirer_son" => "remove_sound",
+        "regler_ducking" => "set_ducking",
+        "generer" => "generate",
+        "ecrire_storyboard" => "write_storyboard",
+        "mode_magique" => "magic_mode",
+        "exporter" => "export",
+        other => other,
+    }
 }
 
 /// `M:SS.d`.
@@ -60,7 +89,7 @@ fn at(t: f64) -> String {
 }
 
 fn millis(seconds: f64) -> Result<Flicks, String> {
-    // Secondes raisonnables : la conversion en millisecondes ne déborde pas.
+    // Reasonable seconds: the conversion to milliseconds does not overflow.
     #[allow(clippy::cast_possible_truncation)]
     let ms = (seconds * 1000.0).round() as i64;
     Flicks::from_millis(ms).map_err(|e| e.to_string())
@@ -82,15 +111,15 @@ impl Tools {
         }
     }
 
-    // --- Lecture et écriture de la session. ---
+    // --- Reading and writing the session. ---
 
     fn project(&self) -> Result<Project, String> {
         let json = std::fs::read_to_string(self.dir.join("project.json")).map_err(|_| {
-            "pas encore de storyboard : dans l'interface, importe une prise (écran Voix) puis \
-             ouvre le Storyboard"
+            "no storyboard yet: in the app, import a take (Voice screen) then open the \
+             Storyboard"
                 .to_owned()
         })?;
-        Project::from_json(&json).map_err(|e| format!("project.json illisible : {e}"))
+        Project::from_json(&json).map_err(|e| format!("unreadable project.json: {e}"))
     }
 
     fn save_project(&self, project: &Project) -> Result<(), String> {
@@ -135,8 +164,7 @@ impl Tools {
         self.dir.join("studio")
     }
 
-    /// Le bloc désigné par `value` : son numéro (à partir de 1) ou son
-    /// identifiant.
+    /// The block pointed to by `value`: its number (from 1) or its id.
     fn block<'p>(project: &'p Project, value: Option<&Value>) -> Result<&'p Block, String> {
         let blocks = project.blocks();
         match value {
@@ -145,7 +173,7 @@ impl Tools {
                 .and_then(|n| usize::try_from(n).ok())
                 .and_then(|n| n.checked_sub(1))
                 .and_then(|i| blocks.get(i))
-                .ok_or_else(|| format!("pas de bloc {n} (il y en a {})", blocks.len())),
+                .ok_or_else(|| format!("no block {n} (there are {})", blocks.len())),
             Some(Value::String(s)) => {
                 if let Ok(n) = s.trim().parse::<usize>() {
                     return Self::block(project, Some(&json!(n)));
@@ -153,9 +181,9 @@ impl Tools {
                 blocks
                     .iter()
                     .find(|b| b.id.to_string() == s.trim())
-                    .ok_or_else(|| format!("bloc introuvable : {s}"))
+                    .ok_or_else(|| format!("block not found: {s}"))
             }
-            _ => Err("indique le bloc (`bloc` : son numéro, à partir de 1)".into()),
+            _ => Err("give the block (`block`: its number, from 1)".into()),
         }
     }
 
@@ -167,7 +195,7 @@ impl Tools {
             .map_or_else(|| "?".to_owned(), |i| (i.saturating_add(1)).to_string())
     }
 
-    /// Dernier état connu des jobs d'un bloc, d'après `studio/jobs.json`.
+    /// Last known state of the jobs of a block, from `studio/jobs.json`.
     fn job_status(&self, id: BlockId, transition: bool) -> Option<String> {
         let jobs: Value =
             serde_json::from_slice(&std::fs::read(self.studio().join("jobs.json")).ok()?).ok()?;
@@ -184,16 +212,16 @@ impl Tools {
             .and_then(|j| {
                 let status = j.pointer("/status/status").and_then(Value::as_str)?;
                 Some(match status {
-                    "queued" => "en attente".to_owned(),
-                    "running" => "en cours".to_owned(),
+                    "queued" => QUEUED.to_owned(),
+                    "running" => RUNNING.to_owned(),
                     "failed" => format!(
-                        "échec ({})",
+                        "failed ({})",
                         j.pointer("/status/message")
                             .and_then(Value::as_str)
                             .unwrap_or("")
                     ),
-                    "cancelled" => "annulé".to_owned(),
-                    _ => "fait".to_owned(),
+                    "cancelled" => "cancelled".to_owned(),
+                    _ => DONE.to_owned(),
                 })
             })
     }
@@ -201,169 +229,169 @@ impl Tools {
     fn block_state(&self, block: &Block) -> String {
         let clips = self.studio().join("clips");
         match block.kind {
-            BlockKind::Rush => "prise montrée telle quelle".to_owned(),
+            BlockKind::Rush => "take shown as is".to_owned(),
             BlockKind::Broll => match &block.broll {
-                None => "plan à choisir".to_owned(),
+                None => "shot to choose".to_owned(),
                 Some(_) if clips.join(format!("broll-{}.mp4", block.id)).is_file() => {
-                    "plan monté".to_owned()
+                    "shot edited".to_owned()
                 }
-                Some(_) => "plan à monter (aperçu)".to_owned(),
+                Some(_) => "shot to edit (preview)".to_owned(),
             },
             _ => {
                 let job = self.job_status(block.id, false);
                 let ready = clips.join(format!("bloc-{}.mp4", block.id)).is_file();
                 match (job.as_deref(), ready) {
-                    (Some(j @ ("en attente" | "en cours")), _) => j.to_owned(),
-                    (_, true) => "animée".to_owned(),
+                    (Some(j @ (QUEUED | RUNNING)), _) => j.to_owned(),
+                    (_, true) => "animated".to_owned(),
                     (Some(j), false) => j.to_owned(),
-                    (None, false) => "à générer".to_owned(),
+                    (None, false) => TO_GENERATE.to_owned(),
                 }
             }
         }
     }
 
-    // --- Les outils. ---
+    // --- The tools. ---
 
-    /// Description des outils (`tools/list`).
+    /// Description of the tools (`tools/list`).
     pub fn list() -> Vec<Value> {
-        let bloc = json!({
-            "description": "Numéro du bloc (1, 2…) tel que le donne `storyboard`.",
+        let block = json!({
+            "description": "Number of the block (1, 2…) as given by `storyboard`.",
             "type": ["integer", "string"],
         });
         vec![
             json!({
                 "name": "storyboard",
-                "description": "Le storyboard de la vidéo : format, et pour chaque bloc son numéro, \
-                    ses instants, son type, le texte dit par la voix, ce qu'on doit y voir, ses \
-                    moments précis, la transition qui suit, et l'état de son animation.",
+                "description": "The storyboard of the video: format, and for each block its number, \
+                    its times, its type, the text spoken by the voice, what must be seen, its \
+                    precise moments, the transition after it, and the state of its animation.",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
-                "name": "modifier_bloc",
-                "description": "Modifie un bloc. Types : animation (motion design seul), mixte \
-                    (face cam + animation), rush (prise telle quelle), effet (effet sur la prise), \
-                    broll (vidéo ou image de la bibliothèque). Transition : « coupe », « auto » ou \
-                    une description libre. Une animation déjà faite n'est pas refaite : utilise \
-                    `generer` ensuite.",
+                "name": "edit_block",
+                "description": "Edits a block. Types: animation (motion design only), mixed \
+                    (face cam + animation), rush (take as is), effect (effect on the take), \
+                    broll (video or image of the library). Transition: \"cut\", \"auto\" or a \
+                    free description. An animation already made is not redone: use `generate` \
+                    afterwards.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "bloc": bloc,
-                        "type": { "type": "string", "enum": ["animation", "mixte", "rush", "effet", "broll"] },
-                        "description": { "type": "string", "description": "Ce qu'on voit pendant le bloc." },
-                        "transition": { "type": "string", "description": "Vers le bloc suivant." },
-                        "broll": { "type": "string", "description": "Fichier de la bibliothèque montré par un bloc broll." },
-                        "broll_depart": { "type": "number", "description": "Instant de la vidéo où commence le plan, en secondes." },
-                        "detourage": { "type": "boolean", "description": "Bloc mixte : détourer la personne (l'animation passe derrière)." },
+                        "block": block,
+                        "type": { "type": "string", "enum": ["animation", "mixed", "rush", "effect", "broll"] },
+                        "description": { "type": "string", "description": "What is seen during the block." },
+                        "transition": { "type": "string", "description": "To the next block." },
+                        "broll": { "type": "string", "description": "Library file shown by a broll block." },
+                        "broll_start": { "type": "number", "description": "Time of the video where the shot starts, in seconds." },
+                        "cutout": { "type": "boolean", "description": "Mixed block: cut the person out (the animation passes behind)." },
                     },
-                    "required": ["bloc"],
+                    "required": ["block"],
                 },
             }),
             json!({
-                "name": "ajouter_moment",
-                "description": "Pose un moment précis dans un bloc : ce qui doit se passer à \
-                    l'écran quand la voix dit un mot.",
+                "name": "add_moment",
+                "description": "Sets a precise moment in a block: what must happen on screen \
+                    when the voice says a word.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "bloc": bloc,
-                        "mot": { "type": "string", "description": "Mot du bloc (le premier qui correspond)." },
-                        "note": { "type": "string", "description": "Ce qui se passe à cet instant." },
+                        "block": block,
+                        "word": { "type": "string", "description": "Word of the block (the first one matching)." },
+                        "note": { "type": "string", "description": "What happens at that time." },
                     },
-                    "required": ["bloc", "mot", "note"],
+                    "required": ["block", "word", "note"],
                 },
             }),
             json!({
-                "name": "retirer_moment",
-                "description": "Retire le moment posé sur un mot d'un bloc.",
+                "name": "remove_moment",
+                "description": "Removes the moment set on a word of a block.",
                 "inputSchema": {
                     "type": "object",
-                    "properties": { "bloc": bloc, "mot": { "type": "string" } },
-                    "required": ["bloc", "mot"],
+                    "properties": { "block": block, "word": { "type": "string" } },
+                    "required": ["block", "word"],
                 },
             }),
             json!({
-                "name": "bibliotheque",
-                "description": "Les fichiers de la bibliothèque (images, SVG, vidéos, polices, sons), \
-                    avec leur usage et leur licence.",
+                "name": "library",
+                "description": "The files of the library (images, SVG, videos, fonts, sounds), \
+                    with their use and their licence.",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
-                "name": "chercher_medias",
-                "description": "Cherche des images, vidéos ou sons libres de droits (Wikimedia \
-                    Commons, Openverse ; Pexels, Pixabay, Freesound avec une clé). Mots en anglais \
-                    de préférence. Les résultats sont numérotés pour `ajouter_media`.",
+                "name": "search_media",
+                "description": "Searches royalty-free images, videos or sounds (Wikimedia \
+                    Commons, Openverse; Pexels, Pixabay, Freesound with a key). English words \
+                    preferably. Results are numbered for `add_media`.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "requete": { "type": "string" },
-                        "type": { "type": "string", "enum": ["image", "video", "son"] },
+                        "query": { "type": "string" },
+                        "media": { "type": "string", "enum": ["image", "video", "sound"] },
                     },
-                    "required": ["requete"],
+                    "required": ["query"],
                 },
             }),
             json!({
-                "name": "ajouter_media",
-                "description": "Télécharge un résultat de la dernière recherche dans la \
-                    bibliothèque, avec son auteur et sa licence.",
+                "name": "add_media",
+                "description": "Downloads a result of the last search into the library, with \
+                    its author and licence.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "resultat": { "type": "integer", "description": "Numéro du résultat." },
-                        "description": { "type": "string", "description": "À quoi il sert, pour les animateurs." },
+                        "result": { "type": "integer", "description": "Number of the result." },
+                        "description": { "type": "string", "description": "What it is for, for the animators." },
                     },
-                    "required": ["resultat"],
+                    "required": ["result"],
                 },
             }),
             json!({
-                "name": "decrire_fichier",
-                "description": "Dit à quoi sert un fichier de la bibliothèque (les animateurs le lisent).",
+                "name": "describe_file",
+                "description": "Says what a library file is for (the animators read it).",
                 "inputSchema": {
                     "type": "object",
-                    "properties": { "fichier": { "type": "string" }, "description": { "type": "string" } },
-                    "required": ["fichier", "description"],
+                    "properties": { "file": { "type": "string" }, "description": { "type": "string" } },
+                    "required": ["file", "description"],
                 },
             }),
             json!({
-                "name": "finition",
-                "description": "La finition sonore : musiques, effets sonores (SFX), ducking.",
+                "name": "finish",
+                "description": "The sound finish: music, sound effects (SFX), ducking.",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
-                "name": "ajouter_musique",
-                "description": "Pose une musique de la bibliothèque du début d'un bloc à la fin \
-                    d'un autre (par défaut toute la vidéo). Elle baisse sous la voix (ducking).",
+                "name": "add_music",
+                "description": "Places a library music from the start of a block to the end \
+                    of another (by default the whole video). It dips under the voice (ducking).",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "fichier": { "type": "string" },
-                        "du_bloc": bloc,
-                        "au_bloc": bloc,
-                        "volume_db": { "type": "number", "description": "−14 par défaut." },
+                        "file": { "type": "string" },
+                        "from_block": block,
+                        "to_block": block,
+                        "volume_db": { "type": "number", "description": "−14 by default." },
                     },
-                    "required": ["fichier"],
+                    "required": ["file"],
                 },
             }),
             json!({
-                "name": "ajouter_sfx",
-                "description": "Pose un effet sonore de la bibliothèque dans un bloc, à un \
-                    décalage depuis son début (négatif : avant le bloc, pour un whoosh sur une \
-                    coupe), ou sur le mot donné.",
+                "name": "add_sfx",
+                "description": "Places a library sound effect in a block, at an offset from \
+                    its start (negative: before the block, for a whoosh on a cut), or on the \
+                    given word.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "fichier": { "type": "string" },
-                        "bloc": bloc,
-                        "decalage": { "type": "number", "description": "Secondes depuis le début du bloc." },
-                        "mot": { "type": "string", "description": "Ou : sur ce mot du bloc." },
+                        "file": { "type": "string" },
+                        "block": block,
+                        "offset": { "type": "number", "description": "Seconds from the start of the block." },
+                        "word": { "type": "string", "description": "Or: on this word of the block." },
                         "volume_db": { "type": "number" },
                     },
-                    "required": ["fichier", "bloc"],
+                    "required": ["file", "block"],
                 },
             }),
             json!({
-                "name": "retirer_son",
-                "description": "Retire une musique ou un SFX de la finition (par son identifiant).",
+                "name": "remove_sound",
+                "description": "Removes a music or a SFX from the finish (by its id).",
                 "inputSchema": {
                     "type": "object",
                     "properties": { "id": { "type": "integer" } },
@@ -371,111 +399,111 @@ impl Tools {
                 },
             }),
             json!({
-                "name": "regler_ducking",
-                "description": "Règle la baisse de la musique sous la voix et le volume de la voix.",
+                "name": "set_ducking",
+                "description": "Sets how much the music dips under the voice, and the voice volume.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "actif": { "type": "boolean" },
-                        "baisse_db": { "type": "number", "description": "Négatif, −10 par défaut." },
-                        "voix_db": { "type": "number" },
+                        "enabled": { "type": "boolean" },
+                        "depth_db": { "type": "number", "description": "Negative, −10 by default." },
+                        "voice_db": { "type": "number" },
                     },
                 },
             }),
             json!({
-                "name": "generer",
-                "description": "Demande à l'interface d'enfait (qui doit être ouverte) de générer \
-                    les animations de blocs, ou tout ce qui reste à générer, transitions comprises. \
-                    Suis l'avancement avec `storyboard`.",
+                "name": "generate",
+                "description": "Asks the enfait app (which must be open) to generate the \
+                    animations of blocks, or everything left to generate, transitions \
+                    included. Follow the progress with `storyboard`.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "blocs": { "type": "array", "items": { "type": "integer" } },
-                        "tout": { "type": "boolean", "description": "Tout ce qui reste à générer." },
-                        "transitions": { "type": "boolean", "description": "Avec les transitions des blocs demandés." },
+                        "blocks": { "type": "array", "items": { "type": "integer" } },
+                        "all": { "type": "boolean", "description": "Everything left to generate." },
+                        "transitions": { "type": "boolean", "description": "With the transitions of the asked blocks." },
                     },
                 },
             }),
             json!({
-                "name": "ecrire_storyboard",
-                "description": "Demande à l'interface d'enfait (qui doit être ouverte) de faire \
-                    écrire le storyboard par son monteur : type et description des blocs encore \
-                    sans description, moments, transitions, plans réels cherchés et téléchargés \
-                    (licences libres), effets sonores et musique posés. Les blocs déjà décrits \
-                    sont gardés. Une seule étape d'annulation dans l'interface. Relis \
-                    `storyboard` et `finition` ensuite (une à deux minutes).",
+                "name": "write_storyboard",
+                "description": "Asks the enfait app (which must be open) to have its editor \
+                    write the storyboard: type and description of the blocks still without a \
+                    description, moments, transitions, real shots searched and downloaded \
+                    (free licences), sound effects and music placed. Blocks already described \
+                    are kept. A single undo step in the app. Read `storyboard` and `finish` \
+                    afterwards (one to two minutes).",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
-                "name": "mode_magique",
-                "description": "Demande à l'interface d'enfait (qui doit être ouverte) le mode \
-                    magique sur la prise de la session : nettoyage (dernières prises), storyboard \
-                    écrit, plans et sons trouvés, animations, transitions, puis export MP4 à côté \
-                    de la prise. Long (plusieurs minutes) et coûteux en modèles ; suis \
-                    l'avancement avec `storyboard`.",
+                "name": "magic_mode",
+                "description": "Asks the enfait app (which must be open) for magic mode on the \
+                    take of the session: cleanup (last takes), written storyboard, shots and \
+                    sounds found, animations, transitions, then an MP4 export next to the take. \
+                    Long (several minutes) and costly in models; follow the progress with \
+                    `storyboard`.",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
                 "name": "credits",
-                "description": "Les crédits à publier avec la vidéo (fichiers trouvés en ligne).",
+                "description": "The credits to publish with the video (files found online).",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
                 "name": "format",
-                "description": "Change le format de la vidéo : grand format 16:9 (YouTube), court vertical 9:16 (Shorts, Reels, TikTok) ou carré. Les animations sont rangées par format : celles d'un autre format reviennent quand on y retourne, les blocs à animer dans le nouveau format sont à regénérer (outil generer). Une prise d'un autre format est rognée pour remplir le cadre (cadrage « rogner », décalable) ou montrée entière avec des bandes (« bandes »).",
+                "description": "Changes the format of the video: landscape 16:9 (YouTube), vertical 9:16 (Shorts, Reels, TikTok) or square. Animations are stored per format: those of another format come back when returning to it, the blocks to animate in the new format must be generated again (`generate` tool). A take of another format is cropped to fill the frame (framing \"crop\", can be shifted) or shown whole with bars (\"bars\").",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "format": { "type": "string", "enum": ["grand", "vertical", "carre"] },
-                        "cadrage": { "type": "string", "enum": ["rogner", "bandes"] },
-                        "decalage": { "type": "integer", "minimum": -50, "maximum": 50, "description": "Décalage du cadre rogné, en % de la marge : -50 bord gauche (ou haut), 50 bord droit (ou bas)." },
+                        "format": { "type": "string", "enum": ["landscape", "vertical", "square"] },
+                        "framing": { "type": "string", "enum": ["crop", "bars"] },
+                        "pan": { "type": "integer", "minimum": -50, "maximum": 50, "description": "Shift of the cropped frame, in % of the margin: -50 left (or top) edge, 50 right (or bottom) edge." },
                     },
                 },
             }),
             json!({
-                "name": "exporter",
-                "description": "Exporte la vidéo finale (MP4 en pleine définition, post-FX, mixage de la finition, son à -14 LUFS) et/ou le montage pour Premiere Pro (XML FCP7, médias copiés à côté). Les blocs sans animation montrent la prise. Peut prendre plusieurs minutes. Chemins absolus.",
+                "name": "export",
+                "description": "Exports the final video (full-definition MP4, post-FX, mix of the finish, sound at -14 LUFS) and/or the edit for Premiere Pro (FCP7 XML, media copied next to it). Blocks without animation show the take. May take several minutes. Absolute paths.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "video": { "type": "string", "description": "Chemin du MP4 à écrire." },
-                        "premiere": { "type": "string", "description": "Chemin du XML à écrire." },
-                        "sfx": { "type": "boolean", "description": "Garder les effets sonores (vrai par défaut)." },
+                        "video": { "type": "string", "description": "Path of the MP4 to write." },
+                        "premiere": { "type": "string", "description": "Path of the XML to write." },
+                        "sfx": { "type": "boolean", "description": "Keep the sound effects (true by default)." },
                     },
                 },
             }),
             json!({
                 "name": "script",
-                "description": "Le script de la voix off (texte écrit par l'utilisateur).",
+                "description": "The script of the voice-over (text written by the user).",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
         ]
     }
 
     pub async fn call(&mut self, name: &str, args: &Value) -> Outcome {
-        match name {
+        match current_name(name) {
             "storyboard" => self.storyboard(),
-            "modifier_bloc" => self.set_block(args),
-            "ajouter_moment" => self.add_moment(args),
-            "retirer_moment" => self.remove_moment(args),
-            "bibliotheque" => Ok(self.library()),
-            "chercher_medias" => self.search(args).await,
-            "ajouter_media" => self.add_media(args).await,
-            "decrire_fichier" => self.describe_file(args),
-            "finition" => self.finish_text(),
-            "ajouter_musique" => self.add_music(args),
-            "ajouter_sfx" => self.add_sfx(args),
-            "retirer_son" => self.remove_cue(args),
-            "regler_ducking" => self.set_ducking(args),
-            "generer" => self.generate(args),
-            "ecrire_storyboard" => self.project_request(RequestKind::Storyboard),
-            "mode_magique" => self.project_request(RequestKind::Magic),
+            "edit_block" => self.set_block(args),
+            "add_moment" => self.add_moment(args),
+            "remove_moment" => self.remove_moment(args),
+            "library" => Ok(self.library()),
+            "search_media" => self.search(args).await,
+            "add_media" => self.add_media(args).await,
+            "describe_file" => self.describe_file(args),
+            "finish" => self.finish_text(),
+            "add_music" => self.add_music(args),
+            "add_sfx" => self.add_sfx(args),
+            "remove_sound" => self.remove_cue(args),
+            "set_ducking" => self.set_ducking(args),
+            "generate" => self.generate(args),
+            "write_storyboard" => self.project_request(RequestKind::Storyboard),
+            "magic_mode" => self.project_request(RequestKind::Magic),
             "credits" => Ok(self.credits()),
             "format" => self.set_format(args),
-            "exporter" => self.export(args).await,
+            "export" => self.export(args).await,
             "script" => Ok(std::fs::read_to_string(self.dir.join("script.md"))
-                .unwrap_or_else(|_| "(pas de script)".into())),
-            other => Err(format!("outil inconnu : {other}")),
+                .unwrap_or_else(|_| "(no script)".into())),
+            other => Err(format!("unknown tool: {other}")),
         }
     }
 
@@ -485,8 +513,8 @@ impl Tools {
         let settings = project.settings();
         let rate = settings.frame_rate;
         let mut out = format!(
-            "Vidéo {} {}×{}, {}/{} i/s, {} blocs, {}. Interface {}.\n\n",
-            settings.aspect.label().to_lowercase(),
+            "{} video {}×{}, {}/{} fps, {} blocks, {}. App {}.\n\n",
+            settings.aspect.label(),
             settings.resolution.width,
             settings.resolution.height,
             rate.num(),
@@ -494,29 +522,29 @@ impl Tools {
             project.blocks().len(),
             at(project.duration().as_secs_f64()),
             if bridge::app_alive(&self.dir) {
-                "ouverte"
+                "open"
             } else {
-                "fermée (la génération attendra son ouverture)"
+                "closed (generation will wait until it opens)"
             }
         );
         for (i, b) in project.blocks().iter().enumerate() {
             let _ = writeln!(
                 out,
-                "## Bloc {} — {} → {} — {} — {}",
+                "## Block {} — {} → {} — {} — {}",
                 i.saturating_add(1),
                 at(b.range.start().as_secs_f64()),
                 at(b.range.end().as_secs_f64()),
                 kind_name(b.kind),
                 self.block_state(b)
             );
-            let _ = writeln!(out, "Voix : « {} »", transcript.text_in(b.range));
+            let _ = writeln!(out, "Voice: “{}”", transcript.text_in(b.range));
             if !b.description.trim().is_empty() {
-                let _ = writeln!(out, "On voit : {}", b.description.trim());
+                let _ = writeln!(out, "On screen: {}", b.description.trim());
             }
             for m in &b.moments {
                 let _ = writeln!(
                     out,
-                    "Moment sur « {} » ({}) : {}",
+                    "Moment on “{}” ({}): {}",
                     m.word,
                     at(m.at.as_secs_f64()),
                     m.note
@@ -525,27 +553,27 @@ impl Tools {
             if let Some(broll) = &b.broll {
                 let _ = writeln!(
                     out,
-                    "Plan : {} à partir de {:.1} s",
+                    "Shot: {} from {:.1} s",
                     broll.file,
                     broll.start.as_secs_f64()
                 );
             }
             if b.cutout {
-                out.push_str("Personne détourée.\n");
+                out.push_str("Person cut out.\n");
             }
             match &b.transition_after {
                 Transition::Cut => {}
                 Transition::Auto => {
                     let state = self
                         .job_status(b.id, true)
-                        .unwrap_or_else(|| "à générer".into());
-                    let _ = writeln!(out, "Transition vers le suivant : auto ({state})");
+                        .unwrap_or_else(|| TO_GENERATE.into());
+                    let _ = writeln!(out, "Transition to the next one: auto ({state})");
                 }
                 Transition::Described(t) => {
                     let state = self
                         .job_status(b.id, true)
-                        .unwrap_or_else(|| "à générer".into());
-                    let _ = writeln!(out, "Transition vers le suivant : {t} ({state})");
+                        .unwrap_or_else(|| TO_GENERATE.into());
+                    let _ = writeln!(out, "Transition to the next one: {t} ({state})");
                 }
             }
             out.push('\n');
@@ -555,7 +583,7 @@ impl Tools {
 
     fn set_block(&self, args: &Value) -> Outcome {
         let mut project = self.project()?;
-        let block = Self::block(&project, args.get("bloc"))?.clone();
+        let block = Self::block(&project, args.get("block"))?.clone();
         let mut edits = Vec::new();
         if let Some(kind) = text_arg(args, "type") {
             edits.push(Edit::SetKind {
@@ -571,7 +599,7 @@ impl Tools {
         }
         if let Some(t) = text_arg(args, "transition") {
             let transition = match t.trim().to_lowercase().as_str() {
-                "coupe" | "cut" | "" => Transition::Cut,
+                "cut" | "coupe" | "" => Transition::Cut,
                 "auto" => Transition::Auto,
                 _ => Transition::Described(t.trim().to_owned()),
             };
@@ -583,19 +611,17 @@ impl Tools {
         if let Some(file) = text_arg(args, "broll") {
             let look = self.look();
             if !look.assets.iter().any(|a| a.file == file) {
-                return Err(format!(
-                    "{file} n'est pas dans la bibliothèque (voir `bibliotheque`)"
-                ));
+                return Err(format!("{file} is not in the library (see `library`)"));
             }
             edits.push(Edit::SetBroll {
                 block: block.id,
                 broll: Some(Broll {
                     file: file.to_owned(),
-                    start: millis(number_arg(args, "broll_depart").unwrap_or(0.0).max(0.0))?,
+                    start: millis(number_arg(args, "broll_start").unwrap_or(0.0).max(0.0))?,
                 }),
             });
         } else if let (Some(start), Some(current)) =
-            (number_arg(args, "broll_depart"), block.broll.as_ref())
+            (number_arg(args, "broll_start"), block.broll.as_ref())
         {
             edits.push(Edit::SetBroll {
                 block: block.id,
@@ -605,26 +631,26 @@ impl Tools {
                 }),
             });
         }
-        if let Some(cutout) = args.get("detourage").and_then(Value::as_bool) {
+        if let Some(cutout) = args.get("cutout").and_then(Value::as_bool) {
             edits.push(Edit::SetCutout {
                 block: block.id,
                 cutout,
             });
         }
         if edits.is_empty() {
-            return Err("rien à modifier".into());
+            return Err("nothing to change".into());
         }
         for edit in edits {
             edit.apply(&mut project).map_err(|e| e.to_string())?;
         }
         self.save_project(&project)?;
         Ok(format!(
-            "Bloc {} modifié.",
+            "Block {} updated.",
             Self::number_of(&project, block.id)
         ))
     }
 
-    /// Instant du premier mot du bloc qui correspond à `word`.
+    /// Time of the first word of the block matching `word`.
     fn find_word(
         transcript: &Transcript,
         block: &Block,
@@ -645,18 +671,15 @@ impl Tools {
                     .words_in(block.range)
                     .map(|w| w.text.clone())
                     .collect();
-                format!(
-                    "« {word} » n'est pas dans ce bloc. Mots : {}",
-                    words.join(" ")
-                )
+                format!("“{word}” is not in this block. Words: {}", words.join(" "))
             })
     }
 
     fn add_moment(&self, args: &Value) -> Outcome {
         let mut project = self.project()?;
         let transcript = self.transcript();
-        let block = Self::block(&project, args.get("bloc"))?.clone();
-        let word = text_arg(args, "mot").ok_or("indique le mot (`mot`)")?;
+        let block = Self::block(&project, args.get("block"))?.clone();
+        let word = text_arg(args, "word").ok_or("give the word (`word`)")?;
         let note = text_arg(args, "note").unwrap_or("").trim().to_owned();
         let (at_time, text) = Self::find_word(&transcript, &block, word)?;
         if block.moments.iter().any(|m| m.at == at_time) {
@@ -681,7 +704,7 @@ impl Tools {
         }
         self.save_project(&project)?;
         Ok(format!(
-            "Moment posé sur « {text} » ({}).",
+            "Moment set on “{text}” ({}).",
             at(at_time.as_secs_f64())
         ))
     }
@@ -689,27 +712,27 @@ impl Tools {
     fn remove_moment(&self, args: &Value) -> Outcome {
         let mut project = self.project()?;
         let transcript = self.transcript();
-        let block = Self::block(&project, args.get("bloc"))?.clone();
-        let word = text_arg(args, "mot").ok_or("indique le mot (`mot`)")?;
+        let block = Self::block(&project, args.get("block"))?.clone();
+        let word = text_arg(args, "word").ok_or("give the word (`word`)")?;
         let (at_time, text) = Self::find_word(&transcript, &block, word)?;
         Edit::RemoveMoment {
             block: block.id,
             at: at_time,
         }
         .apply(&mut project)
-        .map_err(|_| format!("pas de moment sur « {text} »"))?;
+        .map_err(|_| format!("no moment on “{text}”"))?;
         self.save_project(&project)?;
-        Ok(format!("Moment sur « {text} » retiré."))
+        Ok(format!("Moment on “{text}” removed."))
     }
 
     fn library(&self) -> String {
         let look = self.look();
         if look.assets.is_empty() {
-            return "Bibliothèque vide.".into();
+            return "Empty library.".into();
         }
         let mut out = String::new();
         for a in &look.assets {
-            let _ = write!(out, "- {} ({}) : {}", a.file, a.kind.label(), a.name);
+            let _ = write!(out, "- {} ({}): {}", a.file, a.kind.label(), a.name);
             if !a.description.is_empty() {
                 let _ = write!(out, " — {}", a.description);
             }
@@ -724,10 +747,10 @@ impl Tools {
                         o.source
                     );
                     for w in terms.warnings() {
-                        let _ = write!(out, " ; ⚠ {w}");
+                        let _ = write!(out, "; ⚠ {w}");
                     }
                 }
-                None => out.push_str(" — fichier de l'utilisateur"),
+                None => out.push_str(" — user's file"),
             }
             out.push('\n');
         }
@@ -735,10 +758,10 @@ impl Tools {
     }
 
     async fn search(&mut self, args: &Value) -> Outcome {
-        let query = text_arg(args, "requete").ok_or("indique la recherche (`requete`)")?;
-        let media = match text_arg(args, "type").unwrap_or("image") {
+        let query = text_arg(args, "query").ok_or("give the search (`query`)")?;
+        let media = match text_arg(args, "media").unwrap_or("image") {
             "video" | "vidéo" => Media::Video,
-            "son" | "audio" | "sound" => Media::Audio,
+            "sound" | "audio" | "son" => Media::Audio,
             _ => Media::Image,
         };
         let client = enfait_assets::search::client().map_err(|e| e.to_string())?;
@@ -768,25 +791,25 @@ impl Tools {
             out.push('\n');
         }
         for e in &results.errors {
-            let _ = writeln!(out, "(banque indisponible : {e})");
+            let _ = writeln!(out, "(bank unavailable: {e})");
         }
         if self.found.is_empty() {
-            out.push_str("Aucun résultat.\n");
+            out.push_str("No result.\n");
         }
         Ok(out)
     }
 
     async fn add_media(&mut self, args: &Value) -> Outcome {
         let n = args
-            .get("resultat")
+            .get("result")
             .and_then(Value::as_u64)
             .and_then(|n| usize::try_from(n).ok())
-            .ok_or("indique le numéro du résultat (`resultat`)")?;
+            .ok_or("give the number of the result (`result`)")?;
         let hit = n
             .checked_sub(1)
             .and_then(|i| self.found.get(i))
             .cloned()
-            .ok_or("pas de tel résultat : relance `chercher_medias`")?;
+            .ok_or("no such result: run `search_media` again")?;
         let client = enfait_assets::search::client().map_err(|e| e.to_string())?;
         let tmp = self.dir.join("studio").join("downloads").join(format!(
             "mcp-{}.{}",
@@ -814,7 +837,7 @@ impl Tools {
         self.save_look(&look)?;
         let terms = hit.origin.license.terms();
         let mut out = format!(
-            "Ajouté à la bibliothèque : {file} ({}, {}).",
+            "Added to the library: {file} ({}, {}).",
             hit.origin.license.name,
             terms.summary()
         );
@@ -825,7 +848,7 @@ impl Tools {
     }
 
     fn describe_file(&self, args: &Value) -> Outcome {
-        let file = text_arg(args, "fichier").ok_or("indique le fichier")?;
+        let file = text_arg(args, "file").ok_or("give the file (`file`)")?;
         let description = text_arg(args, "description")
             .unwrap_or("")
             .trim()
@@ -835,10 +858,10 @@ impl Tools {
             .assets
             .iter_mut()
             .find(|a| a.file == file)
-            .ok_or_else(|| format!("{file} n'est pas dans la bibliothèque"))?;
+            .ok_or_else(|| format!("{file} is not in the library"))?;
         asset.description = description;
         self.save_look(&look)?;
-        Ok(format!("{file} décrit."))
+        Ok(format!("{file} described."))
     }
 
     fn finish_text(&self) -> Outcome {
@@ -849,18 +872,18 @@ impl Tools {
         let d = finish.ducking;
         let _ = writeln!(
             out,
-            "Ducking : {} ({:+.0} dB sous la voix). Voix : {:+.1} dB.",
-            if d.enabled { "actif" } else { "coupé" },
+            "Ducking: {} ({:+.0} dB under the voice). Voice: {:+.1} dB.",
+            if d.enabled { "on" } else { "off" },
             d.depth_db,
             finish.voice_gain_db
         );
         for m in &finish.music {
-            let _ = write!(out, "- Musique {} : {}", m.id, m.file);
+            let _ = write!(out, "- Music {}: {}", m.id, m.file);
             match placed.music.iter().find(|p| p.id == m.id) {
                 Some(p) => {
                     let _ = write!(
                         out,
-                        ", blocs {} à {} ({} → {}), {:+.0} dB",
+                        ", blocks {} to {} ({} → {}), {:+.0} dB",
                         Self::number_of(&project, m.from),
                         Self::number_of(&project, m.to),
                         at(p.start),
@@ -868,41 +891,43 @@ impl Tools {
                         m.gain_db
                     );
                 }
-                None => out.push_str(", son bloc n'existe plus"),
+                None => out.push_str(", its block no longer exists"),
             }
             out.push('\n');
         }
         for s in &finish.sfx {
-            let _ = write!(out, "- SFX {} : {}", s.id, s.file);
+            let _ = write!(out, "- SFX {}: {}", s.id, s.file);
             match placed.sfx.iter().find(|p| p.id == s.id) {
                 Some(p) => {
                     let _ = write!(
                         out,
-                        ", bloc {} {:+.2} s ({}), {:+.0} dB",
+                        ", block {} {:+.2} s ({}), {:+.0} dB",
                         Self::number_of(&project, s.block),
                         s.offset,
                         at(p.at),
                         s.gain_db
                     );
                 }
-                None => out.push_str(", son bloc n'existe plus"),
+                None => out.push_str(", its block no longer exists"),
             }
             out.push('\n');
         }
         if finish.is_empty() {
-            out.push_str("Ni musique ni SFX pour l'instant.\n");
+            out.push_str("No music or SFX yet.\n");
         }
         Ok(out)
     }
 
     fn sound_file(&self, args: &Value) -> Result<String, String> {
-        let file = text_arg(args, "fichier").ok_or("indique le fichier (`fichier`)")?;
+        let file = text_arg(args, "file").ok_or("give the file (`file`)")?;
         let look = self.look();
-        let asset = look.assets.iter().find(|a| a.file == file).ok_or_else(|| {
-            format!("{file} n'est pas dans la bibliothèque (voir `bibliotheque`)")
-        })?;
+        let asset = look
+            .assets
+            .iter()
+            .find(|a| a.file == file)
+            .ok_or_else(|| format!("{file} is not in the library (see `library`)"))?;
         if asset.kind != enfait_core::AssetKind::Audio {
-            return Err(format!("{file} n'est pas un son"));
+            return Err(format!("{file} is not a sound"));
         }
         Ok(file.to_owned())
     }
@@ -911,18 +936,18 @@ impl Tools {
         let file = self.sound_file(args)?;
         let project = self.project()?;
         let blocks = project.blocks();
-        let from = match args.get("du_bloc") {
+        let from = match args.get("from_block") {
             Some(v) => Self::block(&project, Some(v))?.id,
-            None => blocks.first().ok_or("storyboard vide")?.id,
+            None => blocks.first().ok_or("empty storyboard")?.id,
         };
-        let to = match args.get("au_bloc") {
+        let to = match args.get("to_block") {
             Some(v) => Self::block(&project, Some(v))?.id,
-            None => blocks.last().ok_or("storyboard vide")?.id,
+            None => blocks.last().ok_or("empty storyboard")?.id,
         };
         let mut finish = self.finish();
         let id = finish.add_music(file.clone(), from, to);
         if let (Some(gain), Some(m)) = (number_arg(args, "volume_db"), finish.music_mut(id)) {
-            // Gain en dB : petite valeur, la conversion ne perd rien d'utile.
+            // Gain in dB: small value, the conversion loses nothing useful.
             #[allow(clippy::cast_possible_truncation)]
             {
                 m.gain_db = gain as f32;
@@ -930,7 +955,7 @@ impl Tools {
         }
         self.save_finish(&finish)?;
         Ok(format!(
-            "Musique {id} posée : {file}, blocs {} à {}.",
+            "Music {id} placed: {file}, blocks {} to {}.",
             Self::number_of(&project, from),
             Self::number_of(&project, to)
         ))
@@ -939,8 +964,8 @@ impl Tools {
     fn add_sfx(&self, args: &Value) -> Outcome {
         let file = self.sound_file(args)?;
         let project = self.project()?;
-        let block = Self::block(&project, args.get("bloc"))?;
-        let offset = match (text_arg(args, "mot"), number_arg(args, "decalage")) {
+        let block = Self::block(&project, args.get("block"))?;
+        let offset = match (text_arg(args, "word"), number_arg(args, "offset")) {
             (Some(word), _) => {
                 let (t, _) = Self::find_word(&self.transcript(), block, word)?;
                 t.as_secs_f64() - block.range.start().as_secs_f64()
@@ -957,38 +982,35 @@ impl Tools {
         }
         self.save_finish(&finish)?;
         Ok(format!(
-            "SFX {id} posé : {file}, bloc {} {offset:+.2} s.",
+            "SFX {id} placed: {file}, block {} {offset:+.2} s.",
             Self::number_of(&project, block.id)
         ))
     }
 
     fn remove_cue(&self, args: &Value) -> Outcome {
-        let id = args
-            .get("id")
-            .and_then(Value::as_u64)
-            .ok_or("indique `id`")?;
+        let id = args.get("id").and_then(Value::as_u64).ok_or("give `id`")?;
         let mut finish = self.finish();
         let before = finish.music.len().saturating_add(finish.sfx.len());
         finish.remove(id);
         if finish.music.len().saturating_add(finish.sfx.len()) == before {
-            return Err(format!("pas de son {id} (voir `finition`)"));
+            return Err(format!("no sound {id} (see `finish`)"));
         }
         self.save_finish(&finish)?;
-        Ok(format!("Son {id} retiré."))
+        Ok(format!("Sound {id} removed."))
     }
 
     fn set_ducking(&self, args: &Value) -> Outcome {
         let mut finish = self.finish();
-        if let Some(on) = args.get("actif").and_then(Value::as_bool) {
+        if let Some(on) = args.get("enabled").and_then(Value::as_bool) {
             finish.ducking.enabled = on;
         }
-        // Valeurs en dB, bornées : la conversion ne perd rien d'utile.
+        // Values in dB, bounded: the conversion loses nothing useful.
         #[allow(clippy::cast_possible_truncation)]
         {
-            if let Some(depth) = number_arg(args, "baisse_db") {
+            if let Some(depth) = number_arg(args, "depth_db") {
                 finish.ducking.depth_db = depth.clamp(-40.0, 0.0) as f32;
             }
-            if let Some(voice) = number_arg(args, "voix_db") {
+            if let Some(voice) = number_arg(args, "voice_db") {
                 finish.voice_gain_db = voice.clamp(-24.0, 24.0) as f32;
             }
         }
@@ -996,23 +1018,22 @@ impl Tools {
         self.finish_text()
     }
 
-    /// Demande sur tout le projet, exécutée par l'interface.
+    /// Request on the whole project, run by the app.
     fn project_request(&self, kind: RequestKind) -> Outcome {
         if !bridge::app_alive(&self.dir) {
             return Err(
-                "l'interface d'enfait n'est pas ouverte sur cette session : \
-                        lance `enfait`, puis redemande."
+                "the enfait app is not open on this session: start `enfait`, then ask again."
                     .into(),
             );
         }
         bridge::send_request(&self.dir, &Request { block: None, kind })
             .map_err(|e| e.to_string())?;
         Ok(match kind {
-            RequestKind::Magic => "Mode magique demandé : l'interface s'en charge. Suis \
-                l'avancement avec `storyboard` ; la vidéo sera exportée à côté de la prise."
+            RequestKind::Magic => "Magic mode requested: the app takes care of it. Follow the \
+                progress with `storyboard`; the video will be exported next to the take."
                 .into(),
-            _ => "Demande envoyée : le monteur écrit le storyboard dans l'interface. Relis \
-                `storyboard` dans une à deux minutes."
+            _ => "Request sent: the editor writes the storyboard in the app. Read \
+                `storyboard` again in one to two minutes."
                 .into(),
         })
     }
@@ -1020,7 +1041,7 @@ impl Tools {
     fn generate(&self, args: &Value) -> Outcome {
         let project = self.project()?;
         let blocks = project.blocks();
-        let all = args.get("tout").and_then(Value::as_bool).unwrap_or(false);
+        let all = args.get("all").and_then(Value::as_bool).unwrap_or(false);
         let with_transitions = args
             .get("transitions")
             .and_then(Value::as_bool)
@@ -1028,16 +1049,13 @@ impl Tools {
         let chosen: Vec<&Block> = if all {
             blocks
                 .iter()
-                .filter(|b| {
-                    matches!(self.block_state(b).as_str(), "à générer")
-                        || b.kind == BlockKind::Broll
-                })
+                .filter(|b| self.block_state(b) == TO_GENERATE || b.kind == BlockKind::Broll)
                 .collect()
         } else {
             let numbers = args
-                .get("blocs")
+                .get("blocks")
                 .and_then(Value::as_array)
-                .ok_or("indique `blocs` (numéros) ou `tout`")?;
+                .ok_or("give `blocks` (numbers) or `all`")?;
             numbers
                 .iter()
                 .map(|n| Self::block(&project, Some(n)))
@@ -1046,8 +1064,8 @@ impl Tools {
         let mut sent = Vec::new();
         for b in &chosen {
             if matches!(b.kind, BlockKind::Rush | BlockKind::Broll) {
-                // Rien à générer : la prise telle quelle, ou un plan monté
-                // automatiquement par l'aperçu.
+                // Nothing to generate: the take as is, or a shot edited
+                // automatically by the preview.
                 continue;
             }
             bridge::send_request(
@@ -1058,13 +1076,13 @@ impl Tools {
                 },
             )
             .map_err(|e| e.to_string())?;
-            sent.push(format!("bloc {}", Self::number_of(&project, b.id)));
+            sent.push(format!("block {}", Self::number_of(&project, b.id)));
         }
         if with_transitions {
             for pair in blocks.windows(2) {
                 let [b, _] = pair else { continue };
                 let wanted = all || chosen.iter().any(|c| c.id == b.id);
-                let done = self.job_status(b.id, true).as_deref() == Some("fait");
+                let done = self.job_status(b.id, true).as_deref() == Some(DONE);
                 if wanted && b.transition_after != Transition::Cut && !(all && done) {
                     bridge::send_request(
                         &self.dir,
@@ -1075,22 +1093,20 @@ impl Tools {
                     )
                     .map_err(|e| e.to_string())?;
                     sent.push(format!(
-                        "transition après le bloc {}",
+                        "transition after block {}",
                         Self::number_of(&project, b.id)
                     ));
                 }
             }
         }
         if sent.is_empty() {
-            return Ok("Rien à générer.".into());
+            return Ok("Nothing to generate.".into());
         }
-        let mut out = format!("Demandé : {}.", sent.join(", "));
+        let mut out = format!("Requested: {}.", sent.join(", "));
         if bridge::app_alive(&self.dir) {
-            out.push_str(" L'interface les met en file ; suis l'avancement avec `storyboard`.");
+            out.push_str(" The app queues them; follow the progress with `storyboard`.");
         } else {
-            out.push_str(
-                " L'interface d'enfait est fermée : les demandes seront traitées à son ouverture.",
-            );
+            out.push_str(" The enfait app is closed: the requests will run when it opens.");
         }
         Ok(out)
     }
@@ -1101,14 +1117,18 @@ impl Tools {
         let mut settings = *project.settings();
         if let Some(format) = text_arg(args, "format") {
             let aspect = match format.trim().to_lowercase().as_str() {
-                "grand" | "16:9" | "paysage" => AspectRatio::Landscape16x9,
+                "landscape" | "16:9" | "grand" | "paysage" => AspectRatio::Landscape16x9,
                 "vertical" | "9:16" | "court" => AspectRatio::Portrait9x16,
-                "carre" | "carré" | "1:1" => AspectRatio::Square1x1,
-                other => return Err(format!("format inconnu : {other} (grand, vertical, carre)")),
+                "square" | "1:1" | "carre" | "carré" => AspectRatio::Square1x1,
+                other => {
+                    return Err(format!(
+                        "unknown format: {other} (landscape, vertical, square)"
+                    ));
+                }
             };
             if aspect != settings.aspect {
                 settings = settings.with_aspect(aspect);
-                // Une prise d'un autre format remplit le cadre.
+                // A take of another format fills the frame.
                 let rush = self.rush_aspect();
                 settings.framing = if rush.is_some_and(|r| r != aspect) {
                     Framing::Fill
@@ -1118,13 +1138,13 @@ impl Tools {
                 settings.pan = 0;
             }
         }
-        match text_arg(args, "cadrage").map(str::trim) {
-            Some("rogner") => settings.framing = Framing::Fill,
-            Some("bandes") => settings.framing = Framing::Fit,
-            Some(other) => return Err(format!("cadrage inconnu : {other} (rogner, bandes)")),
+        match text_arg(args, "framing").map(str::trim) {
+            Some("crop" | "rogner") => settings.framing = Framing::Fill,
+            Some("bars" | "bandes") => settings.framing = Framing::Fit,
+            Some(other) => return Err(format!("unknown framing: {other} (crop, bars)")),
             None => {}
         }
-        if let Some(pan) = args.get("decalage").and_then(Value::as_i64) {
+        if let Some(pan) = args.get("pan").and_then(Value::as_i64) {
             settings.pan = i8::try_from(pan.clamp(-50, 50)).unwrap_or(0);
         }
         Edit::SetSettings { settings }
@@ -1132,18 +1152,18 @@ impl Tools {
             .map_err(|e| e.to_string())?;
         self.save_project(&project)?;
         Ok(format!(
-            "Format : {} ({}×{}), prise {}.",
+            "Format: {} ({}×{}), take {}.",
             settings.aspect.label(),
             settings.resolution.width,
             settings.resolution.height,
             match settings.framing {
-                Framing::Fill => format!("rognée (décalage {})", settings.pan()),
-                Framing::Fit => "entière".to_owned(),
+                Framing::Fill => format!("cropped (shift {})", settings.pan()),
+                Framing::Fit => "whole".to_owned(),
             }
         ))
     }
 
-    /// Format des images de la prise, d'après la session.
+    /// Format of the frames of the take, from the session.
     fn rush_aspect(&self) -> Option<enfait_core::AspectRatio> {
         let data: Value =
             serde_json::from_slice(&std::fs::read(self.dir.join("session.json")).ok()?).ok()?;
@@ -1156,11 +1176,13 @@ impl Tools {
         let video = text_arg(args, "video").map(PathBuf::from);
         let premiere = text_arg(args, "premiere").map(PathBuf::from);
         if video.is_none() && premiere.is_none() {
-            return Err("indique `video` (chemin du MP4) et/ou `premiere` (chemin du XML)".into());
+            return Err(
+                "give `video` (path of the MP4) and/or `premiere` (path of the XML)".into(),
+            );
         }
         for path in video.iter().chain(&premiere) {
             if !path.is_absolute() {
-                return Err(format!("chemin absolu attendu : {}", path.display()));
+                return Err(format!("absolute path expected: {}", path.display()));
             }
         }
         let sfx = args.get("sfx").and_then(Value::as_bool).unwrap_or(true);
@@ -1174,7 +1196,7 @@ impl Tools {
             } else {
                 let l: Vec<String> = list.iter().map(ToString::to_string).collect();
                 format!(
-                    " Blocs sans animation (la prise les couvre) : {}.",
+                    " Blocks without animation (the take covers them): {}.",
                     l.join(", ")
                 )
             }
@@ -1188,7 +1210,7 @@ impl Tools {
             .map_err(|e| format!("{e:#}"))?;
             let _ = writeln!(
                 out,
-                "Montage Premiere : {} (médias dans {}).{}",
+                "Premiere edit: {} (media in {}).{}",
                 report.xml.display(),
                 report.media.display(),
                 missing(&report.missing)
@@ -1208,7 +1230,7 @@ impl Tools {
             .map_err(|e| format!("{e:#}"))?;
             let _ = writeln!(
                 out,
-                "Vidéo : {} ({}).{}",
+                "Video: {} ({}).{}",
                 report.path.display(),
                 at(report.duration),
                 missing(&report.missing)
@@ -1220,14 +1242,14 @@ impl Tools {
     fn credits(&self) -> String {
         let text = enfait_core::license::credits(&self.look().assets);
         if text.is_empty() {
-            "Aucun fichier trouvé en ligne : pas de crédits à publier.".into()
+            "No file found online: no credits to publish.".into()
         } else {
             text
         }
     }
 }
 
-/// Mot ramené à l'essentiel pour comparer (minuscules, sans ponctuation).
+/// Word reduced to the essentials to compare (lowercase, no punctuation).
 fn normalize(word: &str) -> String {
     word.chars()
         .filter(|c| c.is_alphanumeric() || *c == '\'' || *c == '’' || *c == '-')

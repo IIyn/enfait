@@ -1,19 +1,19 @@
-//! Transcription : les mots prononcés et leur position dans le temps.
+//! Transcript: the spoken words and their position in time.
 
 use crate::time::{Flicks, TimeRange};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Word {
-    /// Le mot tel que prononcé, ponctuation comprise, sans espace autour.
+    /// The word as spoken, punctuation included, no surrounding space.
     pub text: String,
     pub range: TimeRange,
-    /// Confiance du modèle, entre 0 et 1.
+    /// Confidence of the model, from 0 to 1.
     pub confidence: f32,
 }
 
 impl Word {
-    /// Le mot termine-t-il une phrase ?
+    /// Does the word end a sentence?
     pub fn ends_sentence(&self) -> bool {
         self.text
             .trim_end_matches(['"', '»', ')', '’', '\''])
@@ -23,23 +23,23 @@ impl Word {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Transcript {
-    /// Code de langue (`fr`, `en`…).
+    /// Language code (`fr`, `en`…).
     pub language: String,
-    /// Mots dans l'ordre, sans chevauchement.
+    /// Words in order, without overlap.
     pub words: Vec<Word>,
-    /// Durée totale du média transcrit.
+    /// Total duration of the transcribed media.
     pub media_duration: Flicks,
 }
 
 impl Transcript {
-    /// Mots qui commencent dans `range`.
+    /// Words starting in `range`.
     pub fn words_in(&self, range: TimeRange) -> impl Iterator<Item = &Word> {
         self.words
             .iter()
             .filter(move |w| range.contains(w.range.start()))
     }
 
-    /// Texte de `range`, mots séparés par une espace.
+    /// Text of `range`, words separated by a space.
     pub fn text_in(&self, range: TimeRange) -> String {
         self.words_in(range)
             .map(|w| w.text.as_str())

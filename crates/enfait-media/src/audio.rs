@@ -1,22 +1,22 @@
-//! Son décodé en mémoire, prêt pour la lecture et la forme d'onde.
+//! Decoded sound in memory, ready for playback and the waveform.
 //!
-//! Le son est gardé entier en mémoire, en entiers 16 bits à 48 kHz, une ou
-//! deux voies : environ 11 Mo par minute en stéréo. Cela suffit pour des
-//! voix off et des rushs de quelques dizaines de minutes, et permet la
-//! lecture arrière et accélérée (J/K/L) sans relancer de décodeur.
+//! The sound is kept whole in memory, as 16-bit integers at 48 kHz, one
+//! or two channels: about 11 MB per minute in stereo. That is enough for
+//! voice-overs and rushes of a few tens of minutes, and allows backward
+//! and fast playback (J/K/L) without restarting a decoder.
 
 use crate::MediaError;
 use std::path::Path;
 use std::sync::Arc;
 
-/// Fréquence de travail.
+/// Working sample rate.
 pub const RATE: u32 = 48_000;
 
 #[derive(Debug, Clone)]
 pub struct AudioBuffer {
     rate: u32,
     channels: u16,
-    /// Échantillons entrelacés.
+    /// Interleaved samples.
     samples: Arc<[i16]>,
 }
 
@@ -46,7 +46,7 @@ impl AudioBuffer {
         &self.samples
     }
 
-    /// Nombre d'instants (un échantillon par voie).
+    /// Number of frames (one sample per channel).
     pub fn frames(&self) -> usize {
         self.samples.len() / usize::from(self.channels)
     }
@@ -55,8 +55,8 @@ impl AudioBuffer {
         self.frames() as f64 / f64::from(self.rate)
     }
 
-    /// Valeur de l'instant `frame`, voies gauche et droite (la même en mono),
-    /// entre -1 et 1. Hors limites : silence.
+    /// Value of frame `frame`, left and right channels (the same in mono),
+    /// from -1 to 1. Out of range: silence.
     pub fn frame(&self, frame: usize) -> [f32; 2] {
         let scale = 1.0 / 32_768.0;
         if self.channels == 1 {
@@ -76,12 +76,12 @@ impl AudioBuffer {
         }
     }
 
-    /// Valeur à un instant fractionnaire (interpolation linéaire).
+    /// Value at a fractional time (linear interpolation).
     pub fn sample_at(&self, position: f64) -> [f32; 2] {
         if position.is_nan() || position < 0.0 {
             return [0.0, 0.0];
         }
-        // Position positive et finie : la conversion tronque vers zéro.
+        // Positive, finite position: the conversion truncates towards zero.
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let i = position.floor() as usize;
         #[allow(clippy::cast_possible_truncation)]
@@ -91,8 +91,8 @@ impl AudioBuffer {
         [a0 + (b0 - a0) * frac, a1 + (b1 - a1) * frac]
     }
 
-    /// Lit un fichier brut écrit par [`AudioBuffer::write_raw`] ou ffmpeg
-    /// (`s16le`, entrelacé).
+    /// Reads a raw file written by [`AudioBuffer::write_raw`] or ffmpeg
+    /// (`s16le`, interleaved).
     pub fn read_raw(path: &Path, rate: u32, channels: u16) -> Result<Self, MediaError> {
         let bytes = std::fs::read(path)?;
         Self::new(rate, channels, from_le_bytes(&bytes))
@@ -108,8 +108,8 @@ pub(crate) fn from_le_bytes(bytes: &[u8]) -> Vec<i16> {
         .collect()
 }
 
-/// Décode le premier flux audio de `input` en `s16le` 48 kHz, une ou deux
-/// voies, dans `out`.
+/// Decodes the first audio stream of `input` to `s16le` 48 kHz, one or two
+/// channels, into `out`.
 pub(crate) fn decode_to_file(
     input: &Path,
     channels: u16,

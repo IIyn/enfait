@@ -1,8 +1,8 @@
-//! Installation de `chrome-headless-shell` depuis Chrome for Testing.
+//! Installing `chrome-headless-shell` from Chrome for Testing.
 //!
-//! On lit l'index officiel des versions stables, on télécharge l'archive de
-//! la plateforme et on l'extrait dans `dir/<version>/`. Une version déjà
-//! installée n'est pas retéléchargée.
+//! Reads the official index of stable versions, downloads the archive of
+//! the platform and extracts it into `dir/<version>/`. A version already
+//! installed is not downloaded again.
 
 use crate::error::MotionError;
 use serde::Deserialize;
@@ -29,7 +29,7 @@ struct Download {
     url: String,
 }
 
-/// Plateforme au sens de Chrome for Testing.
+/// Platform in the Chrome for Testing sense.
 fn platform() -> Result<&'static str, MotionError> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => Ok("linux64"),
@@ -38,7 +38,7 @@ fn platform() -> Result<&'static str, MotionError> {
         ("windows", "x86_64") => Ok("win64"),
         ("windows", "x86") => Ok("win32"),
         (os, arch) => Err(MotionError::Fetch(format!(
-            "pas de chrome-headless-shell pour {os}/{arch}"
+            "no chrome-headless-shell for {os}/{arch}"
         ))),
     }
 }
@@ -70,8 +70,8 @@ fn installed(dir: &Path, platform: &str) -> Option<PathBuf> {
     found.pop()
 }
 
-/// Renvoie le chemin de `chrome-headless-shell`, en l'installant dans `dir`
-/// au premier appel.
+/// Returns the path of `chrome-headless-shell`, installing it into `dir`
+/// on the first call.
 pub async fn ensure_browser(dir: &Path) -> Result<PathBuf, MotionError> {
     let platform = platform()?;
     if let Some(path) = installed(dir, platform) {
@@ -90,14 +90,14 @@ pub async fn ensure_browser(dir: &Path) -> Result<PathBuf, MotionError> {
     let stable = index
         .channels
         .get("Stable")
-        .ok_or_else(|| MotionError::Fetch("canal Stable absent de l'index".into()))?;
+        .ok_or_else(|| MotionError::Fetch("no Stable channel in the index".into()))?;
     let url = stable
         .downloads
         .get(PRODUCT)
         .and_then(|list| list.iter().find(|d| d.platform == platform))
         .map(|d| d.url.clone())
-        .ok_or_else(|| MotionError::Fetch(format!("aucun téléchargement pour {platform}")))?;
-    tracing::info!("téléchargement de chrome-headless-shell {}", stable.version);
+        .ok_or_else(|| MotionError::Fetch(format!("no download for {platform}")))?;
+    tracing::info!("downloading chrome-headless-shell {}", stable.version);
     let archive = client
         .get(&url)
         .send()
@@ -126,7 +126,7 @@ pub async fn ensure_browser(dir: &Path) -> Result<PathBuf, MotionError> {
     let path = executable(&version_dir, platform);
     if !path.is_file() {
         return Err(MotionError::Fetch(format!(
-            "exécutable absent de l'archive : {}",
+            "executable missing from the archive: {}",
             path.display()
         )));
     }

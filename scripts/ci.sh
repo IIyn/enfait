@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vérifications d'intégration : à lancer avant chaque commit et dans la CI.
+# Integration checks: run before every commit and in CI.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -10,5 +10,5 @@ cargo test --workspace --locked
 if command -v cargo-deny >/dev/null 2>&1; then
     cargo deny check
 else
-    echo "cargo-deny absent, vérification des licences ignorée (cargo install cargo-deny --locked)" >&2
+    echo "cargo-deny missing, licence check skipped (cargo install cargo-deny --locked)" >&2
 fi

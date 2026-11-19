@@ -1,4 +1,4 @@
-//! Identifiants typés : un `BlockId` ne peut pas être passé là où on attend un `ProjectId`.
+//! Typed ids: a `BlockId` cannot be passed where a `ProjectId` is expected.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -12,7 +12,7 @@ macro_rules! typed_id {
         pub struct $name(Uuid);
 
         impl $name {
-            /// Nouvel identifiant aléatoire (UUID v4).
+            /// New random id (UUID v4).
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
@@ -41,10 +41,10 @@ macro_rules! typed_id {
 }
 
 typed_id!(
-    /// Identifiant d'un projet.
+    /// Id of a project.
     ProjectId
 );
 typed_id!(
-    /// Identifiant d'un bloc du storyboard.
+    /// Id of a storyboard block.
     BlockId
 );

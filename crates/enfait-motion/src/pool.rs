@@ -1,8 +1,8 @@
-//! Plusieurs Chromium indépendants pour rendre en parallèle.
+//! Several independent Chromium instances to render in parallel.
 //!
-//! Plusieurs onglets d'un même Chromium en mode « contrôle d'image » font
-//! planter le navigateur : chaque tâche parallèle a donc son propre processus
-//! (et son propre profil).
+//! Several tabs of one Chromium in "frame control" mode crash the
+//! browser: each parallel task therefore has its own process (and its own
+//! profile).
 
 use crate::error::MotionError;
 use crate::render::{Gpu, Renderer};
@@ -16,7 +16,7 @@ pub struct RendererPool {
     available: Semaphore,
 }
 
-/// Un Chromium emprunté au pool, rendu à la fin de la portée.
+/// A Chromium borrowed from the pool, returned at the end of the scope.
 pub struct Lease<'a> {
     pool: &'a RendererPool,
     index: usize,
@@ -26,7 +26,7 @@ impl std::ops::Deref for Lease<'_> {
     type Target = Renderer;
 
     fn deref(&self) -> &Renderer {
-        // L'index vient de `free`, qui ne contient que des index valides.
+        // The index comes from `free`, which only holds valid indices.
         #[allow(clippy::indexing_slicing)]
         &self.pool.renderers[self.index]
     }
@@ -42,7 +42,7 @@ impl Drop for Lease<'_> {
 }
 
 impl RendererPool {
-    /// Lance `size` Chromium, profils dans `profile_root/0`, `profile_root/1`…
+    /// Starts `size` Chromium instances, profiles in `profile_root/0`, `profile_root/1`…
     pub async fn launch(
         executable: &Path,
         profile_root: &Path,
@@ -62,7 +62,7 @@ impl RendererPool {
         })
     }
 
-    /// Attend qu'un Chromium soit libre.
+    /// Waits for a free Chromium.
     pub async fn acquire(&self) -> Result<Lease<'_>, MotionError> {
         let permit = self
             .available
@@ -75,7 +75,7 @@ impl RendererPool {
             .lock()
             .ok()
             .and_then(|mut free| free.pop())
-            .ok_or_else(|| MotionError::Browser("pool de rendu incohérent".into()))?;
+            .ok_or_else(|| MotionError::Browser("inconsistent render pool".into()))?;
         Ok(Lease { pool: self, index })
     }
 

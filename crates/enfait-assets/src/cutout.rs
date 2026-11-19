@@ -1,19 +1,19 @@
-//! Détourage : un modèle de segmentation (ONNX, exécuté par `tract`, en
-//! Rust pur) donne un masque du sujet, posé en couche alpha.
+//! Cutout: a segmentation model (ONNX, run by `tract`, in pure Rust) gives
+//! a mask of the subject, set as the alpha channel.
 //!
-//! Deux modèles, téléchargés au premier usage (dépôt de rembg) et vérifiés
-//! par empreinte :
-//! - [`Model::Precise`] : ISNet (DIS, Apache-2.0), 1024 px, quelques
-//!   secondes par image, pour les fichiers de la bibliothèque ;
-//! - [`Model::Fast`] : U²-Net-p (Apache-2.0), 320 px, moins d'une seconde,
-//!   pour les images d'une prise filmée.
+//! Two models, downloaded on first use (rembg repository) and checked by
+//! fingerprint:
+//! - [`Model::Precise`]: ISNet (DIS, Apache-2.0), 1024 px, a few seconds
+//!   per image, for library files;
+//! - [`Model::Fast`]: U²-Net-p (Apache-2.0), 320 px, under a second, for
+//!   the frames of a filmed take.
 
 use crate::AssetError;
 use image::{GrayImage, ImageBuffer, Luma, Rgb, RgbImage, Rgba, RgbaImage};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Appels à `tract`, isolés (son prélude exporte beaucoup de noms).
+/// Calls to `tract`, isolated (its prelude exports many names).
 mod engine {
     use tract_onnx::prelude::*;
 
@@ -27,13 +27,13 @@ mod engine {
             .into_runnable()
     }
 
-    /// Première sortie du modèle pour une entrée `[1, 3, side, side]`.
+    /// First output of the model for an input `[1, 3, side, side]`.
     pub fn run(plan: &Plan, side: usize, input: &[f32]) -> TractResult<Vec<f32>> {
         let tensor = Tensor::from_shape(&[1, 3, side, side], input)?;
         let outputs = plan.run(tvec!(tensor.into()))?;
         let first = outputs
             .first()
-            .ok_or_else(|| TractError::msg("aucune sortie"))?;
+            .ok_or_else(|| TractError::msg("no output"))?;
         Ok(first
             .to_plain_array_view::<f32>()?
             .iter()
@@ -67,7 +67,7 @@ impl Model {
         }
     }
 
-    /// Empreinte BLAKE3 du fichier attendu.
+    /// BLAKE3 fingerprint of the expected file.
     const fn hash(self) -> &'static str {
         match self {
             Self::Precise => "a4803d041160d956c81853125e6391608a3e9b7772e37bcbcc86aa3d87d6b214",
@@ -75,7 +75,7 @@ impl Model {
         }
     }
 
-    /// Côté de l'image donnée au modèle.
+    /// Side of the image given to the model.
     const fn size(self) -> usize {
         match self {
             Self::Precise => 1024,
@@ -83,7 +83,7 @@ impl Model {
         }
     }
 
-    /// Normalisation des couleurs (moyenne, écart type).
+    /// Colour normalisation (mean, standard deviation).
     const fn normalize(self) -> ([f32; 3], [f32; 3]) {
         match self {
             Self::Precise => ([0.5; 3], [1.0; 3]),
@@ -92,13 +92,13 @@ impl Model {
     }
 }
 
-/// Chemin du modèle dans `dir`, téléchargé et vérifié s'il manque.
+/// Path of the model in `dir`, downloaded and checked if missing.
 pub async fn ensure_model(dir: &Path, model: Model) -> Result<PathBuf, AssetError> {
     let path = dir.join(model.file());
     if path.is_file() {
         return Ok(path);
     }
-    tracing::info!("téléchargement du modèle de détourage {}", model.file());
+    tracing::info!("downloading cutout model {}", model.file());
     let client = crate::search::client()?;
     let partial = dir.join(format!("{}.download", model.file()));
     crate::search::download(&client, model.url(), &partial).await?;
@@ -107,7 +107,7 @@ pub async fn ensure_model(dir: &Path, model: Model) -> Result<PathBuf, AssetErro
     if hash.as_str() != model.hash() {
         let _ = tokio::fs::remove_file(&partial).await;
         return Err(AssetError::Source(format!(
-            "modèle {} : empreinte inattendue",
+            "model {}: unexpected fingerprint",
             model.file()
         )));
     }
@@ -115,7 +115,7 @@ pub async fn ensure_model(dir: &Path, model: Model) -> Result<PathBuf, AssetErro
     Ok(path)
 }
 
-/// Un modèle chargé, prêt à détourer (utilisable depuis plusieurs fils).
+/// A loaded model, ready to cut out (usable from several threads).
 pub struct Cutter {
     model: Model,
     plan: engine::Plan,
@@ -128,7 +128,7 @@ impl Cutter {
         Ok(Self { model, plan })
     }
 
-    /// Masque du sujet (255 : sujet, 0 : fond), à la taille de `image`.
+    /// Mask of the subject (255: subject, 0: background), at the size of `image`.
     pub fn mask(&self, image: &RgbImage) -> Result<GrayImage, AssetError> {
         let side = self.model.size();
         let side_u32 = u32::try_from(side).unwrap_or(u32::MAX);
@@ -139,7 +139,7 @@ impl Cutter {
             image::imageops::FilterType::Triangle,
         );
         let (mean, std) = self.model.normalize();
-        // Comme rembg : couleurs divisées par la plus forte valeur de l'image.
+        // Like rembg: colours divided by the highest value of the image.
         let max = f32::from(small.pixels().flat_map(|p| p.0).max().unwrap_or(255).max(1));
         let mut input = vec![0.0_f32; 3 * side * side];
         for (x, y, Rgb(px)) in small.enumerate_pixels() {
@@ -167,7 +167,7 @@ impl Cutter {
         let mut mask = GrayImage::new(side_u32, side_u32);
         for (i, v) in plane.iter().enumerate() {
             let (x, y) = (i % side, i / side);
-            // Valeur ramenée dans [0, 255].
+            // Value brought back into [0, 255].
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let level = (((v - lo) / span) * 255.0).round().clamp(0.0, 255.0) as u8;
             mask.put_pixel(
@@ -184,7 +184,7 @@ impl Cutter {
         ))
     }
 
-    /// L'image détourée : ses couleurs, avec le masque en couche alpha.
+    /// The cut-out image: its colours, with the mask as alpha channel.
     pub fn cut(&self, image: &RgbImage) -> Result<RgbaImage, AssetError> {
         let mask = self.mask(image)?;
         Ok(ImageBuffer::from_fn(
@@ -199,7 +199,7 @@ impl Cutter {
     }
 }
 
-/// Détoure le fichier `input` (image) et écrit un PNG transparent dans `out`.
+/// Cuts out the file `input` (image) and writes a transparent PNG to `out`.
 pub fn cut_file(cutter: &Cutter, input: &Path, out: &Path) -> Result<(), AssetError> {
     let image = image::open(input)
         .map_err(|e| AssetError::Image(e.to_string()))?
@@ -212,8 +212,8 @@ pub fn cut_file(cutter: &Cutter, input: &Path, out: &Path) -> Result<(), AssetEr
         .map_err(|e| AssetError::Image(e.to_string()))
 }
 
-/// Détoure une suite d'images (`frames[i]` → `outs[i]`, PNG), sur `threads`
-/// fils ; `progress` reçoit le nombre d'images faites.
+/// Cuts out a sequence of images (`frames[i]` → `outs[i]`, PNG), on
+/// `threads` threads; `progress` gets the number of images done.
 pub fn cut_frames(
     cutter: &Cutter,
     jobs: &[(PathBuf, PathBuf)],
@@ -252,7 +252,7 @@ pub fn cut_frames(
     }
 }
 
-/// PNG à compression rapide (images de travail, pas d'archive).
+/// Fast-compression PNG (working images, not an archive).
 fn save_png_fast(image: &RgbaImage, out: &Path) -> Result<(), AssetError> {
     use image::ImageEncoder as _;
     use image::codecs::png::{CompressionType, FilterType, PngEncoder};

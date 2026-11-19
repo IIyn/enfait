@@ -1,4 +1,4 @@
-//! Essai manuel : `cargo run -p enfait-motion --example smoke -- <dossier> [page.html]`.
+//! Manual test: `cargo run -p enfait-motion --example smoke -- <folder> [page.html]`.
 #![allow(clippy::print_stdout)]
 use enfait_motion::{CheckJob, FrameJob, Gpu, Renderer, composition, ensure_browser, library};
 use std::path::PathBuf;
@@ -8,7 +8,7 @@ html,body{margin:0;background:#101312;color:#E6ECE9;font-family:"Fraunces";overf
 h1{position:absolute;left:160px;top:420px;font-size:140px;margin:0;font-weight:600}
 .bar{position:absolute;left:160px;top:620px;height:12px;width:900px;background:#C3F53C;transform-origin:left}
 svg{position:absolute;left:1200px;top:300px}
-</style></head><body><h1 id="t">Salut à tous</h1><div class="bar"></div><div id="n" style="position:absolute;left:160px;top:760px;font:600 90px Inter">0</div><div id="m" style="position:absolute;left:760px;top:760px;font:600 90px Inter">0</div>
+</style></head><body><h1 id="t">Hello everyone</h1><div class="bar"></div><div id="n" style="position:absolute;left:160px;top:760px;font:600 90px Inter">0</div><div id="m" style="position:absolute;left:760px;top:760px;font:600 90px Inter">0</div>
 <svg width="500" height="500" viewBox="0 0 500 500"><circle id="c" cx="250" cy="250" r="200" fill="none" stroke="#C3F53C" stroke-width="10"/></svg>
 <script>
 const { createTimeline, splitText, stagger, svg } = anime;
@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     let root = PathBuf::from(
         std::env::args()
             .nth(1)
-            .ok_or_else(|| anyhow::anyhow!("dossier"))?,
+            .ok_or_else(|| anyhow::anyhow!("folder"))?,
     );
     let cache = PathBuf::from(std::env::var("HOME")?).join(".cache/enfait");
     let chrome_dir =
@@ -104,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
         cap += b.elapsed();
     }
     println!(
-        "seek {:?}/image, capture {:?}/image, {} Ko/image",
+        "seek {:?}/frame, capture {:?}/frame, {} KB/frame",
         seek / 60,
         cap / 60,
         bytes / 60 / 1000

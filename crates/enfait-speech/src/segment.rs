@@ -1,21 +1,21 @@
-//! Découpage d'une transcription en blocs contigus.
+//! Splitting a transcript into contiguous blocks.
 //!
-//! On coupe en fin de phrase dès que le bloc a une durée suffisante, ou sur
-//! une pause ou une virgule quand il devient long. Chaque coupe tombe au
-//! milieu du silence entre deux mots.
+//! Cuts at a sentence end once the block is long enough, or at a pause or
+//! a comma when it gets long. Each cut falls in the middle of the silence
+//! between two words.
 
 use crate::SpeechError;
 use enfait_core::{Flicks, TimeRange, Transcript};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SegmentParams {
-    /// En dessous, on ne coupe pas même en fin de phrase.
+    /// Below this, no cut even at a sentence end.
     pub min: Flicks,
-    /// Au-delà, on coupe à la première pause ou virgule.
+    /// Beyond this, cut at the first pause or comma.
     pub target_max: Flicks,
-    /// Au-delà, on coupe au prochain mot quoi qu'il arrive.
+    /// Beyond this, cut at the next word whatever happens.
     pub hard_max: Flicks,
-    /// Silence qui compte comme une pause.
+    /// Silence that counts as a pause.
     pub pause: Flicks,
 }
 
@@ -34,7 +34,7 @@ fn midpoint(a: Flicks, b: Flicks) -> Flicks {
     Flicks::new(a.get().saturating_add(b.get().saturating_sub(a.get()) / 2))
 }
 
-/// Découpe `[0, durée)` en blocs contigus.
+/// Splits `[0, duration)` into contiguous blocks.
 pub fn segment(
     transcript: &Transcript,
     params: &SegmentParams,
@@ -62,7 +62,7 @@ pub fn segment(
             block_start = cut;
         }
     }
-    // Un dernier bloc trop court rejoint le précédent.
+    // A last block that is too short joins the previous one.
     if let Some(&last) = cuts.last()
         && end_of_media.checked_sub(last)?.get() < params.min.get().saturating_mul(3) / 5
     {
@@ -114,7 +114,7 @@ mod tests {
                 ("Aujourd'hui", 600, 1200),
                 ("on", 1250, 1400),
                 ("parle", 1450, 2000),
-                ("vidéo.", 2050, 2600), // coupe ici (2,6 s écoulées)
+                ("vidéo.", 2050, 2600), // cut here (2.6 s elapsed)
                 ("C'est", 3000, 3300),
                 ("parti", 3350, 3800),
                 ("maintenant.", 3850, 5200),

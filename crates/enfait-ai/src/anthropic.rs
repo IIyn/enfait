@@ -1,4 +1,4 @@
-//! API Messages d'Anthropic, en HTTP direct avec streaming SSE.
+//! Anthropic Messages API, over direct HTTP with SSE streaming.
 
 use crate::llm::{AiError, Part, Reply, Request, Usage};
 use base64::Engine as _;
@@ -39,7 +39,7 @@ impl AnthropicClient {
             attempt = attempt.saturating_add(1);
             match self.send(&body).await {
                 Err(Retry::Later(wait, error)) if attempt < MAX_ATTEMPTS => {
-                    tracing::warn!("{error}, nouvel essai dans {}s", wait.as_secs());
+                    tracing::warn!("{error}, retrying in {}s", wait.as_secs());
                     tokio::time::sleep(wait).await;
                 }
                 Err(Retry::Later(_, error) | Retry::Never(error)) => return Err(error),

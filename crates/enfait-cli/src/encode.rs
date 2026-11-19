@@ -1,4 +1,4 @@
-//! Assemblage des images et de la voix en MP4 (ffmpeg en sous-processus).
+//! Assembling the frames and the voice into an MP4 (ffmpeg as a subprocess).
 
 use crate::timeline::{Source, Timeline};
 use anyhow::{Context as _, Result};
@@ -7,9 +7,9 @@ use std::path::Path;
 use std::process::Stdio;
 use tokio::io::AsyncWriteExt as _;
 
-/// Encode en H.264 (x264), avec la voix si elle est fournie et les filtres
-/// `filter` (post-FX). NVENC a été essayé : pas plus rapide ici (le
-/// décodage des PNG domine) et des fichiers deux fois plus lourds.
+/// Encodes to H.264 (x264), with the voice if given and the `filter`
+/// filters (post-FX). NVENC was tried: not faster here (decoding the PNGs
+/// dominates) and files twice as heavy.
 pub async fn encode(
     work: &Path,
     timeline: &Timeline,
@@ -55,8 +55,8 @@ pub async fn encode(
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
-        .context("lancement de ffmpeg")?;
-    let mut stdin = child.stdin.take().context("entrée de ffmpeg")?;
+        .context("starting ffmpeg")?;
+    let mut stdin = child.stdin.take().context("ffmpeg input")?;
     for index in timeline.total.clone() {
         let path = match timeline.source(index)? {
             Source::Block(b, j) => frames
@@ -73,7 +73,7 @@ pub async fn encode(
             .await
             .with_context(|| format!("image manquante : {}", path.display()))?;
         if stdin.write_all(&png).await.is_err() {
-            break; // ffmpeg s'est arrêté : son message d'erreur suit.
+            break; // ffmpeg stopped: its error message follows.
         }
     }
     drop(stdin);

@@ -1,6 +1,6 @@
-//! Le serveur MCP sur une vraie session : protocole par l'entrée et la
-//! sortie standard (simulées), outils qui modifient les fichiers, demandes
-//! de génération déposées pour l'interface.
+//! The MCP server on a real session: protocol through standard input and
+//! output (simulated), tools changing the files, generation requests
+//! dropped for the app.
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::panic)]
 
@@ -22,7 +22,7 @@ fn range(a: f64, b: f64) -> TimeRange {
     TimeRange::new(secs(a), secs(b)).unwrap()
 }
 
-/// Session : deux blocs, la voix « Bonjour à tous. Voici l'aiguillage. ».
+/// Session: two blocks, the voice "Bonjour à tous. Voici l'aiguillage.".
 fn session() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
@@ -94,24 +94,24 @@ async fn tools_edit_the_session() {
     let (text, err) = call(&mut server, 1, "storyboard", json!({})).await;
     assert!(!err);
     assert!(
-        text.contains("## Bloc 2") && text.contains("« Voici l'aiguillage. »"),
+        text.contains("## Block 2") && text.contains("“Voici l'aiguillage.”"),
         "{text}"
     );
-    assert!(text.contains("fermée"), "pas d'interface ouverte");
+    assert!(text.contains("closed"), "no app open");
 
     let (text, err) = call(
         &mut server,
         2,
-        "modifier_bloc",
-        json!({ "bloc": 2, "description": "Un aiguillage en gravure", "transition": "auto" }),
+        "edit_block",
+        json!({ "block": 2, "description": "Un aiguillage en gravure", "transition": "auto" }),
     )
     .await;
     assert!(!err, "{text}");
     let (text, err) = call(
         &mut server,
         3,
-        "ajouter_moment",
-        json!({ "bloc": "2", "mot": "aiguillage", "note": "il bascule" }),
+        "add_moment",
+        json!({ "block": "2", "word": "aiguillage", "note": "il bascule" }),
     )
     .await;
     assert!(!err, "{text}");
@@ -123,71 +123,58 @@ async fn tools_edit_the_session() {
     assert_eq!(b.moments[0].note, "il bascule");
     assert_eq!(b.moments[0].at, secs(2.7));
 
-    // Erreurs lisibles.
+    // Readable errors.
     let (text, err) = call(
         &mut server,
         4,
-        "modifier_bloc",
-        json!({ "bloc": 9, "type": "rush" }),
+        "edit_block",
+        json!({ "block": 9, "type": "rush" }),
     )
     .await;
-    assert!(err && text.contains("pas de bloc 9"), "{text}");
+    assert!(err && text.contains("no block 9"), "{text}");
     let (text, err) = call(
         &mut server,
         5,
-        "ajouter_moment",
-        json!({ "bloc": 1, "mot": "train", "note": "x" }),
+        "add_moment",
+        json!({ "block": 1, "word": "train", "note": "x" }),
     )
     .await;
-    assert!(err && text.contains("Mots : Bonjour à tous."), "{text}");
+    assert!(err && text.contains("Words: Bonjour à tous."), "{text}");
 
-    // Finition : un whoosh juste avant le bloc 2, ducking réglé.
+    // Finish: a whoosh just before block 2, ducking set.
     let (text, err) = call(
         &mut server,
         6,
-        "ajouter_sfx",
-        json!({ "fichier": "whoosh.wav", "bloc": 2, "decalage": -0.25 }),
+        "add_sfx",
+        json!({ "file": "whoosh.wav", "block": 2, "offset": -0.25 }),
     )
     .await;
     assert!(!err, "{text}");
-    let (_, err) = call(
-        &mut server,
-        7,
-        "regler_ducking",
-        json!({ "baisse_db": -18 }),
-    )
-    .await;
+    let (_, err) = call(&mut server, 7, "set_ducking", json!({ "depth_db": -18 })).await;
     assert!(!err);
     let finish: Finish =
         serde_json::from_slice(&std::fs::read(d.join("finish.json")).unwrap()).unwrap();
     assert_eq!(finish.sfx.len(), 1);
     assert_eq!(finish.ducking.depth_db, -18.0);
-    let (text, _) = call(&mut server, 8, "finition", json!({})).await;
-    assert!(text.contains("bloc 2 -0.25 s (0:01.8)"), "{text}");
-    let (text, err) = call(
-        &mut server,
-        9,
-        "ajouter_musique",
-        json!({ "fichier": "absent.mp3" }),
-    )
-    .await;
-    assert!(err && text.contains("pas dans la bibliothèque"), "{text}");
+    let (text, _) = call(&mut server, 8, "finish", json!({})).await;
+    assert!(text.contains("block 2 -0.25 s (0:01.8)"), "{text}");
+    let (text, err) = call(&mut server, 9, "add_music", json!({ "file": "absent.mp3" })).await;
+    assert!(err && text.contains("not in the library"), "{text}");
 
-    // Génération : demandes déposées pour l'interface.
-    let (text, err) = call(&mut server, 10, "generer", json!({ "tout": true })).await;
+    // Generation: requests dropped for the app.
+    let (text, err) = call(&mut server, 10, "generate", json!({ "all": true })).await;
     assert!(!err, "{text}");
-    assert!(text.contains("bloc 1") && !text.contains("transition après le bloc 2"));
+    assert!(text.contains("block 1") && !text.contains("transition after block 2"));
     let requests = take_requests(d);
     assert_eq!(
         requests.len(),
         2,
-        "deux animations (le bloc 2 a une transition auto, mais c'est le dernier)"
+        "two animations (block 2 has an auto transition, but it is the last one)"
     );
     assert!(requests.iter().all(|r| r.kind == RequestKind::Animation));
 }
 
-/// Le protocole complet par des flux, comme sur l'entrée et la sortie
-/// standard.
+/// The whole protocol through streams, as on standard input and output.
 #[tokio::test]
 async fn speaks_mcp_over_streams() {
     let dir = session();
@@ -212,9 +199,9 @@ async fn speaks_mcp_over_streams() {
         .await;
     send(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })).await;
     send(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" })).await;
-    send(json!({ "jsonrpc": "2.0", "id": 3, "method": "nimporte" })).await;
+    send(json!({ "jsonrpc": "2.0", "id": 3, "method": "whatever" })).await;
     send(json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": { "name": "credits", "arguments": {} } })).await;
-    // Fin de l'entrée : le serveur s'arrête après avoir tout traité.
+    // End of the input: the server stops after handling everything.
     client_write.shutdown().await.unwrap();
 
     let mut replies = Vec::new();
@@ -222,7 +209,7 @@ async fn speaks_mcp_over_streams() {
         replies.push(serde_json::from_str::<Value>(&line).unwrap());
     }
     task.await.unwrap().unwrap();
-    assert_eq!(replies.len(), 4, "pas de réponse à une notification");
+    assert_eq!(replies.len(), 4, "no answer to a notification");
     assert_eq!(replies[0]["result"]["protocolVersion"], "2025-06-18");
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "enfait");
     let tools = replies[1]["result"]["tools"].as_array().unwrap();
@@ -233,6 +220,6 @@ async fn speaks_mcp_over_streams() {
         replies[3]["result"]["content"][0]["text"]
             .as_str()
             .unwrap()
-            .contains("pas de crédits")
+            .contains("no credits")
     );
 }

@@ -1,15 +1,15 @@
-//! Décodage des images du proxy, guidé par l'horloge.
+//! Decoding proxy frames, driven by the clock.
 //!
-//! Un fil de travail garde un processus ffmpeg ouvert qui débite les images
-//! dans l'ordre (BGRA, l'ordre attendu par gpui). Tant que l'horloge avance
-//! normalement, il lit la suite ; s'il est trop en retard ou en avance, il
-//! relance ffmpeg au bon endroit (le proxy a une image clé toutes les
-//! demi-secondes, ce qui rend ces relances rapides).
+//! A worker thread keeps an ffmpeg process open that outputs frames in
+//! order (BGRA, the order gpui expects). While the clock moves normally,
+//! it reads on; if it is too late or too early, it restarts ffmpeg at the
+//! right place (the proxy has a keyframe every half second, which makes
+//! these restarts fast).
 //!
-//! ffmpeg ne sait décoder qu'en avant. Pour la lecture arrière (et les pas
-//! en arrière), le décodeur lit d'un coup un bloc d'images qui se termine à
-//! l'image voulue et le garde en mémoire ; il lit le bloc précédent à
-//! l'avance, en continuant d'afficher les images déjà en mémoire.
+//! ffmpeg only decodes forward. For backward playback (and backward
+//! steps), the decoder reads at once a block of frames ending at the
+//! wanted frame and keeps it in memory; it reads the previous block ahead
+//! of time, while still showing the frames already in memory.
 
 use crate::{Clock, Edl, MediaError};
 use enfait_core::FrameRate;
@@ -22,40 +22,40 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-/// Une image décodée.
+/// A decoded frame.
 #[derive(Debug)]
 pub struct Frame {
-    /// Index de l'image dans le média.
+    /// Index of the frame in the media.
     pub index: i64,
     pub width: u32,
     pub height: u32,
-    /// Pixels BGRA, ligne par ligne.
+    /// BGRA pixels, row by row.
     pub data: Vec<u8>,
 }
 
-/// Index de l'image affichée à l'instant `t` (secondes).
+/// Index of the frame displayed at time `t` (seconds).
 pub fn frame_at(t: f64, rate: FrameRate) -> i64 {
     let fps = f64::from(rate.num()) / f64::from(rate.den());
-    // Petite marge : un instant calé sur le début d'une image doit la donner.
+    // Small margin: a time snapped to the start of a frame must give it.
     let x = (t.max(0.0) * fps + 1e-6).floor();
-    // Borné par la durée du média : la conversion ne déborde pas.
+    // Bounded by the media duration: the conversion does not overflow.
     #[allow(clippy::cast_possible_truncation)]
     let i = x as i64;
     i
 }
 
-/// Début de l'image `index`, en secondes.
+/// Start of frame `index`, in seconds.
 pub fn frame_time(index: i64, rate: FrameRate) -> f64 {
     #[allow(clippy::cast_precision_loss)]
     let i = index as f64;
     i * f64::from(rate.den()) / f64::from(rate.num())
 }
 
-/// Lecteur séquentiel d'images à partir d'un index.
+/// Sequential frame reader from an index.
 struct Reader {
     child: Child,
     stdout: ChildStdout,
-    /// Index de la prochaine image lue.
+    /// Index of the next frame read.
     next: i64,
 }
 
@@ -68,9 +68,9 @@ impl Reader {
         height: u32,
         extra: Option<&str>,
     ) -> Result<Self, MediaError> {
-        // `-ss` avant `-i` : recherche rapide jusqu'à l'image clé précédente,
-        // puis décodage jusqu'à l'instant exact. Le léger retrait évite de
-        // tomber sur l'image suivante à cause des arrondis.
+        // `-ss` before `-i`: fast seek to the previous keyframe, then decoding
+        // up to the exact time. The slight step back avoids landing on the next
+        // frame because of rounding.
         let start = (frame_time(index, rate) - 0.001).max(0.0);
         let mut child = enfait_config::process::command("ffmpeg")
             .args(["-nostdin", "-hide_banner", "-v", "error"])
@@ -78,8 +78,8 @@ impl Reader {
             .arg("-i")
             .arg(path)
             .args(["-map", "0:v:0", "-an", "-sn"])
-            // `fps` : une source d'origine peut avoir une cadence variable ;
-            // on veut exactement une image par index.
+            // `fps`: an original source may have a variable frame rate; we want
+            // exactly one frame per index.
             .args([
                 "-vf",
                 &format!(
@@ -106,7 +106,7 @@ impl Reader {
         })
     }
 
-    /// Lit l'image suivante dans `buf` ; `false` à la fin du flux.
+    /// Reads the next frame into `buf`; `false` at the end of the stream.
     fn read(&mut self, buf: &mut [u8]) -> bool {
         if self.stdout.read_exact(buf).is_ok() {
             self.next = self.next.saturating_add(1);
@@ -124,14 +124,14 @@ impl Drop for Reader {
     }
 }
 
-/// Correspondance entre les images du montage et celles de la source.
+/// Mapping between the frames of the edit and those of the source.
 #[derive(Debug, Clone)]
 struct FrameMap {
     edl: Arc<Edl>,
     rate: FrameRate,
-    /// Dernière image de la source.
+    /// Last frame of the source.
     last_source: i64,
-    /// Dernière image du montage.
+    /// Last frame of the edit.
     last_output: i64,
 }
 
@@ -146,16 +146,16 @@ impl FrameMap {
         }
     }
 
-    /// Image du montage à l'instant `t`.
+    /// Frame of the edit at time `t`.
     fn output_at(&self, t: f64) -> i64 {
         frame_at(t, self.rate).clamp(0, self.last_output)
     }
 
-    /// Image de la source montrée à l'image `o` du montage, et première
-    /// image de la source de son morceau.
+    /// Source frame shown at edit frame `o`, and first source frame of its
+    /// piece.
     fn source(&self, o: i64) -> (i64, i64) {
         let half = 0.5 * f64::from(self.rate.den()) / f64::from(self.rate.num());
-        // Le milieu de l'image évite les erreurs d'arrondi aux frontières.
+        // The middle of the frame avoids rounding errors at boundaries.
         let t = frame_time(o, self.rate) + half;
         let source = frame_at(self.edl.to_source(t), self.rate).clamp(0, self.last_source);
         let part_start = self
@@ -166,13 +166,12 @@ impl FrameMap {
     }
 }
 
-/// Décodeur en tâche de fond. S'arrête quand il est abandonné.
+/// Background decoder. Stops when dropped.
 pub struct VideoDecoder {
     latest: Arc<Mutex<Option<Arc<Frame>>>>,
-    /// Mémoire d'images partagée : [`VideoDecoder::latest`] y cherche
-    /// directement l'image de l'horloge, sans attendre le fil de décodage
-    /// (qui peut être bloqué quelques dizaines de millisecondes au lancement
-    /// de ffmpeg).
+    /// Shared frame memory: [`VideoDecoder::latest`] looks up the clock's
+    /// frame there directly, without waiting for the decoding thread (which
+    /// can be blocked a few tens of milliseconds while ffmpeg starts).
     cache: Arc<Mutex<FrameCache>>,
     clock: Arc<Clock>,
     map: FrameMap,
@@ -181,10 +180,10 @@ pub struct VideoDecoder {
 }
 
 impl VideoDecoder {
-    /// `frame_count` : images de la source ; `edl` : montage lu (l'horloge
-    /// est en temps montage) ; `size` : dimensions des images produites ;
-    /// `filter` : filtres ffmpeg ajoutés (post-FX en aperçu).
-    /// `on_frame` est appelé depuis le fil de travail à chaque image publiée.
+    /// `frame_count`: frames of the source; `edl`: edit being played (the
+    /// clock is in edit time); `size`: size of the produced frames;
+    /// `filter`: added ffmpeg filters (post-FX in preview). `on_frame` is
+    /// called from the worker thread for each published frame.
     #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         source: PathBuf,
@@ -216,7 +215,7 @@ impl VideoDecoder {
             std::thread::Builder::new()
                 .name("enfait-video".into())
                 .spawn(move || worker.run())
-                .map_err(|e| tracing::error!("décodeur vidéo : {e}"))
+                .map_err(|e| tracing::error!("video decoder: {e}"))
                 .ok()
         };
         Self {
@@ -229,8 +228,8 @@ impl VideoDecoder {
         }
     }
 
-    /// Image à afficher maintenant : celle de l'horloge si elle est en
-    /// mémoire, sinon la dernière publiée.
+    /// Frame to show now: the clock's if it is in memory, else the last
+    /// published one.
     pub fn latest(&self) -> Option<Arc<Frame>> {
         let (target, _) = self.map.source(self.map.output_at(self.clock.position()));
         let cached = self.cache.lock().ok().and_then(|c| c.get(target));
@@ -241,7 +240,7 @@ impl VideoDecoder {
         slot.clone()
     }
 
-    /// Image de la source attendue à la position actuelle de l'horloge.
+    /// Source frame expected at the current clock position.
     pub fn wanted(&self) -> i64 {
         self.map.source(self.map.output_at(self.clock.position())).0
     }
@@ -256,18 +255,17 @@ impl Drop for VideoDecoder {
     }
 }
 
-/// Images gardées en mémoire autour de la tête de lecture (environ 100 Mo
-/// à 960×540).
+/// Frames kept in memory around the playhead (about 100 MB at 960×540).
 const CACHE_FRAMES: usize = 48;
-/// Images décodées d'un coup pour la lecture arrière.
+/// Frames decoded at once for backward playback.
 const BLOCK: i64 = 20;
-/// Images lues d'avance pendant la lecture avant (de quoi préparer la suite
-/// d'une coupe sans à-coup).
+/// Frames read ahead during forward playback (enough to prepare what
+/// follows a cut without a hitch).
 const AHEAD: i64 = 8;
-/// Images qu'on accepte de lire et jeter plutôt que de relancer ffmpeg.
+/// Frames we accept to read and drop rather than restart ffmpeg.
 const MAX_SKIP: i64 = 12;
 
-/// Images décodées de la source, rangées par index.
+/// Decoded source frames, by index.
 #[derive(Debug)]
 struct FrameCache {
     frames: BTreeMap<i64, Arc<Frame>>,
@@ -290,7 +288,7 @@ impl FrameCache {
         self.frames.contains_key(&index)
     }
 
-    /// Range une image, puis oublie les plus éloignées de `around`.
+    /// Stores a frame, then forgets those farthest from `around`.
     fn insert(&mut self, frame: Arc<Frame>, around: i64) {
         self.frames.insert(frame.index, frame);
         while self.frames.len() > self.capacity {
@@ -309,33 +307,33 @@ impl FrameCache {
     }
 }
 
-/// Ce que le décodeur voit avant de choisir quoi faire.
+/// What the decoder sees before choosing what to do.
 #[derive(Debug, Clone, Copy)]
 struct Situation {
-    /// Image du montage voulue par l'horloge.
+    /// Edit frame wanted by the clock.
     target: i64,
-    /// Dernière image du montage.
+    /// Last frame of the edit.
     last: i64,
-    /// Image de la source publiée.
+    /// Published source frame.
     shown: Option<i64>,
-    /// Prochaine image de la source du flux ffmpeg ouvert.
+    /// Next source frame of the open ffmpeg stream.
     next: Option<i64>,
     speed: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Plan {
-    /// Rien à faire.
+    /// Nothing to do.
     Hold,
-    /// Publier l'image voulue, déjà en mémoire.
+    /// Publish the wanted frame, already in memory.
     Show,
-    /// Décoder les images de la source `start..=end` (en continuant le flux
-    /// ouvert s'il est déjà à `start`, sinon en relançant ffmpeg).
+    /// Decode the source frames `start..=end` (continuing the open stream if
+    /// it is already at `start`, else restarting ffmpeg).
     Decode { start: i64, end: i64 },
 }
 
-/// `source` : image de la source et début de son morceau, pour une image du
-/// montage ; `cached` : l'image de la source est-elle en mémoire ?
+/// `source`: source frame and start of its piece, for an edit frame;
+/// `cached`: is the source frame in memory?
 fn plan(s: Situation, source: &dyn Fn(i64) -> (i64, i64), cached: &dyn Fn(i64) -> bool) -> Plan {
     let (wanted, _) = source(s.target);
     let need = if !cached(wanted) {
@@ -343,8 +341,8 @@ fn plan(s: Situation, source: &dyn Fn(i64) -> (i64, i64), cached: &dyn Fn(i64) -
     } else if s.shown != Some(wanted) {
         return Plan::Show;
     } else {
-        // Préparer la suite dans le sens de lecture ; en pause, l'arrière
-        // (pour que J et ← partent sans attendre).
+        // Prepare what follows in the playing direction; paused, backward (so
+        // that J and ← start without waiting).
         let (step, reach) = if s.speed > 0.0 {
             (1, AHEAD)
         } else {
@@ -368,8 +366,8 @@ fn plan(s: Situation, source: &dyn Fn(i64) -> (i64, i64), cached: &dyn Fn(i64) -
                 end: frame,
             }
         }
-        // En arrière (lecture ou pas à pas) : tout un bloc qui finit à
-        // l'image voulue, sans remonter avant le début de son morceau.
+        // Backward (playing or stepping): a whole block ending at the wanted
+        // frame, without going before the start of its piece.
         next if backward || (s.speed == 0.0 && next.is_some_and(|n| frame < n)) => Plan::Decode {
             start: frame.saturating_sub(BLOCK - 1).max(part_start).max(0),
             end: frame,
@@ -395,7 +393,7 @@ struct Worker {
 }
 
 impl Worker {
-    /// Image du montage voulue par l'horloge.
+    /// Edit frame wanted by the clock.
     fn target(&self) -> i64 {
         self.map.output_at(self.clock.position())
     }
@@ -410,7 +408,7 @@ impl Worker {
     fn run(&self) {
         let mut reader: Option<Reader> = None;
         let mut shown: Option<i64> = None;
-        // Début d'un décodage en échec : ne pas relancer ffmpeg en boucle.
+        // Start of a failed decoding: do not restart ffmpeg in a loop.
         let mut failed: Option<i64> = None;
         while !self.stop.load(Ordering::Acquire) {
             let situation = Situation {
@@ -451,7 +449,7 @@ impl Worker {
                         ) {
                             Ok(r) => reader = Some(r),
                             Err(e) => {
-                                tracing::warn!("décodage de l'image {start} : {e}");
+                                tracing::warn!("decoding frame {start}: {e}");
                                 failed = Some(start);
                                 continue;
                             }
@@ -469,10 +467,10 @@ impl Worker {
         }
     }
 
-    /// Lit les images de la source jusqu'à `end` en les gardant en mémoire,
-    /// et publie au passage l'image voulue dès qu'elle est disponible.
-    /// S'interrompt si l'horloge réclame une image absente hors de ce bloc.
-    /// `false` : fin du flux ou erreur.
+    /// Reads source frames up to `end`, keeping them in memory, and publishes
+    /// the wanted frame as soon as it is available. Stops if the clock asks
+    /// for a frame missing outside this block. `false`: end of the stream or
+    /// error.
     fn decode(&self, reader: &mut Reader, start: i64, end: i64, shown: &mut Option<i64>) -> bool {
         let (width, height) = self.size;
         let len = usize::try_from(u64::from(width) * u64::from(height) * 4).unwrap_or(0);
@@ -546,19 +544,19 @@ mod tests {
             vec![2, 3, 4, 5]
         );
         c.insert(frame(9), 3);
-        assert!(!c.contains(9), "la plus éloignée part");
+        assert!(!c.contains(9), "the farthest one goes");
     }
 
     #[test]
     fn frame_map_follows_the_cut() {
-        // 10 i/s ; montage : [2 s ; 3 s) puis [0,5 s ; 1 s).
+        // 10 fps; edit: [2 s; 3 s) then [0.5 s; 1 s).
         let rate = FrameRate::new(10, 1).unwrap();
         let edl = Arc::new(Edl::from_ranges(&[(2.0, 3.0), (0.5, 1.0)]));
         let map = FrameMap::new(edl, rate, 100);
         assert_eq!(map.last_output, 14);
         assert_eq!(map.source(0), (20, 20));
         assert_eq!(map.source(9), (29, 20));
-        assert_eq!(map.source(10), (5, 5), "après la coupe");
+        assert_eq!(map.source(10), (5, 5), "after the cut");
         assert_eq!(map.source(14), (9, 5));
         assert_eq!(map.output_at(99.0), 14);
         let id = FrameMap::new(Arc::new(Edl::identity(10.0)), rate, 100);
@@ -567,7 +565,7 @@ mod tests {
         }
     }
 
-    /// Montage identité de 100 images, et ensemble d'images en mémoire.
+    /// Identity edit of 100 frames, and a set of frames in memory.
     fn decide(s: Situation, cached: &[i64]) -> Plan {
         plan(s, &|o| (o, 0), &|i| cached.contains(&i))
     }
@@ -605,7 +603,7 @@ mod tests {
             },
             "trop loin : relance"
         );
-        // Image affichée : on lit d'avance jusqu'à AHEAD images.
+        // Displayed frame: read ahead up to AHEAD frames.
         let shown = Situation {
             shown: Some(6),
             ..playing(6, 7)
@@ -618,32 +616,32 @@ mod tests {
 
     #[test]
     fn backward_decodes_blocks_and_prefetches() {
-        // Pas en arrière, en pause : un bloc entier qui finit à l'image voulue.
+        // Step back, paused: a whole block ending at the wanted frame.
         let step_back = Situation {
             next: Some(51),
             ..at(49)
         };
         assert_eq!(decide(step_back, &[]), Plan::Decode { start: 30, end: 49 });
-        // Près du début du média : le bloc est tronqué.
+        // Near the start of the media: the block is truncated.
         let early = Situation {
             speed: -1.0,
             ..at(5)
         };
         assert_eq!(decide(early, &[]), Plan::Decode { start: 0, end: 5 });
-        // En mémoire mais pas encore publiée.
+        // In memory but not published yet.
         let block: Vec<i64> = (30..=40).collect();
         let ready = Situation {
             speed: -1.0,
             ..at(40)
         };
         assert_eq!(decide(ready, &block), Plan::Show);
-        // Publiée, avec de la marge : rien à faire.
+        // Published, with margin: nothing to do.
         let shown = Situation {
             shown: Some(40),
             ..ready
         };
         assert_eq!(decide(shown, &block), Plan::Hold);
-        // Marge faible : on lit le bloc précédent à l'avance (en pause aussi).
+        // Little margin: read the previous block ahead (paused too).
         let low = Situation {
             shown: Some(35),
             ..at(35)
@@ -657,7 +655,7 @@ mod tests {
 
     #[test]
     fn prepares_the_frames_after_a_cut() {
-        // Montage : images 20 à 29 de la source, puis 5 à 14.
+        // Edit: source frames 20 to 29, then 5 to 14.
         let source = |o: i64| if o < 10 { (20 + o, 20) } else { (o - 5, 5) };
         let s = Situation {
             target: 8,
@@ -671,9 +669,9 @@ mod tests {
         assert_eq!(
             decided,
             Plan::Decode { start: 5, end: 5 },
-            "relance après la coupe"
+            "restart after the cut"
         );
-        // En arrière, le bloc ne remonte pas avant le début du morceau.
+        // Backward, the block does not go before the start of the piece.
         let back = Situation {
             target: 12,
             shown: None,

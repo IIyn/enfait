@@ -1,7 +1,7 @@
 /target
 /essais
 
-# Références tierces (transcript de la démo de hum.studio) : à garder en local,
-# pas à publier.
+# Third-party references (transcript of the hum.studio demo) and private
+# notes: kept locally, not published.
 /docs/ref/
 /docs/PLAN.md

@@ -122,6 +122,15 @@ _version: 2
 "settings.no_tray":
   en: "No system tray was found on this desktop: closing the window quits enfait."
   fr: "Aucune barre système trouvée sur ce bureau : fermer la fenêtre quitte enfait."
+"settings.notifications":
+  en: "Notifications"
+  fr: "Notifications"
+"settings.notifications_help":
+  en: "When a block is animated, a storyboard written or an export finished, while enfait is in the background. Click one to bring the window back."
+  fr: "Quand un bloc est animé, un storyboard écrit ou un export terminé, pendant qu'enfait est en arrière-plan. Clique dessus pour retrouver la fenêtre."
+"settings.notifications_on":
+  en: "Show notifications"
+  fr: "Afficher les notifications"
 "settings.onboarding":
   en: "First-launch setup"
   fr: "Configuration du premier lancement"

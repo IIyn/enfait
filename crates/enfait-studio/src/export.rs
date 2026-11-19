@@ -1,10 +1,10 @@
-//! Export de la vidéo finale : la prise montée, les animations, plans de
-//! b-roll et transitions en pleine définition, les post-FX, puis le
-//! mixage de la finition (avec ou sans SFX) normalisé en loudness.
+//! Export of the final video: the edited take, the animations, b-roll
+//! shots and transitions in full definition, the post-FX, then the mix of
+//! the finish (with or without SFX) normalised in loudness.
 //!
-//! Quatre passages ffmpeg : l'image (le plus long), la voix du montage, le
-//! mixage en WAV, puis la mesure de loudness et l'assemblage final (le son
-//! est normalisé en deux passes, sans compresser la dynamique).
+//! Four ffmpeg passes: the picture (the longest), the voice of the edit,
+//! the mix as WAV, then the loudness measurement and the final assembly
+//! (the sound is normalised in two passes, without compressing dynamics).
 
 use crate::preview::{Output, Quality, assemble, pieces};
 use crate::session::{Sources, Visuals};
@@ -12,16 +12,16 @@ use anyhow::{Context as _, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Loudness visée (LUFS intégrés) : celle de YouTube, Instagram et TikTok.
+/// Target loudness (integrated LUFS): that of YouTube, Instagram and TikTok.
 pub const TARGET_LUFS: f64 = -14.0;
-/// Crête vraie maximale (dBTP).
+/// Maximum true peak (dBTP).
 pub const TRUE_PEAK: f64 = -1.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ExportOptions {
-    /// Garder les effets sonores.
+    /// Keep the sound effects.
     pub sfx: bool,
-    /// Loudness visée ; `None` : son laissé tel qu'il est mixé.
+    /// Target loudness; `None`: sound left as mixed.
     pub loudness: Option<f64>,
 }
 
@@ -34,19 +34,19 @@ impl Default for ExportOptions {
     }
 }
 
-/// Ce qu'a donné l'export.
+/// What the export produced.
 #[derive(Debug, Clone)]
 pub struct ExportReport {
     pub path: PathBuf,
     pub duration: f64,
-    /// Blocs (rang à partir de 1) qui n'ont pas encore leur animation ou
-    /// leur plan : la prise est montrée à la place.
+    /// Blocks (rank from 1) that do not have their animation or shot yet: the
+    /// take is shown instead.
     pub missing: Vec<usize>,
-    /// Loudness du mixage avant normalisation (LUFS), si mesurée.
+    /// Loudness of the mix before normalisation (LUFS), if measured.
     pub measured_lufs: Option<f64>,
 }
 
-/// Mesures de la première passe de `loudnorm`.
+/// Measurements of the first `loudnorm` pass.
 #[derive(Debug, Clone, Deserialize)]
 struct Measure {
     input_i: String,
@@ -56,7 +56,7 @@ struct Measure {
     target_offset: String,
 }
 
-/// Dossier de travail de l'export, à côté du fichier final.
+/// Working folder of the export, next to the final file.
 fn work_dir(out: &Path) -> PathBuf {
     let mut name = out
         .file_name()
@@ -66,8 +66,8 @@ fn work_dir(out: &Path) -> PathBuf {
     out.with_file_name(name)
 }
 
-/// Exporte la vidéo dans `out` (MP4, H.264 + AAC). `progress` : avancement
-/// de 0 à 1.
+/// Exports the video to `out` (MP4, H.264 + AAC). `progress`: progress
+/// from 0 to 1.
 pub async fn video(
     sources: &Sources<'_>,
     options: ExportOptions,
@@ -80,13 +80,13 @@ pub async fn video(
     let rate = settings.frame_rate;
     let fps = f64::from(rate.num()) / f64::from(rate.den());
     let info = enfait_media::probe::probe(sources.rush)
-        .with_context(|| format!("prise illisible : {}", sources.rush.display()))?;
-    anyhow::ensure!(info.audio.is_some(), "la prise n'a pas de son");
+        .with_context(|| format!("unreadable take: {}", sources.rush.display()))?;
+    anyhow::ensure!(info.audio.is_some(), "the take has no sound");
     let visuals = Visuals::of(sources.studio, project);
     let work = work_dir(out);
     tokio::fs::create_dir_all(&work).await?;
     let result = async {
-        // 1. L'image : 90 % du temps.
+        // 1. The picture: 90 % of the time.
         let image = work.join("image.mp4");
         let step = |p: f64| progress(0.9 * p);
         assemble(
@@ -105,8 +105,8 @@ pub async fn video(
             &image,
         )
         .await?;
-        // 2. La voix du montage, puis le mixage.
-        let voice = work.join("voix.wav");
+        // 2. The voice of the edit, then the mix.
+        let voice = work.join("voice.wav");
         ffmpeg(
             enfait_config::process::tokio_command("ffmpeg")
                 .args(["-nostdin", "-v", "error", "-y", "-i"])
@@ -117,14 +117,14 @@ pub async fn video(
                 ])
                 .args(["-map", "[a]", "-c:a", "pcm_f32le"])
                 .arg(&voice),
-            "voix",
+            "voice",
         )
         .await?;
         progress(0.93);
-        let mix = work.join("mixage.wav");
+        let mix = work.join("mix.wav");
         crate::mix::render(&voice, &crate::mix::plan(sources, options.sfx), &mix).await?;
         progress(0.96);
-        // 3. Loudness, puis assemblage.
+        // 3. Loudness, then assembly.
         let measure = match options.loudness {
             Some(_) => Some(measure(&mix).await?),
             None => None,
@@ -144,7 +144,7 @@ pub async fn video(
             .arg("-i")
             .arg(&mix)
             .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy"]);
-        // Un mixage presque muet (moins de −70 LUFS) n'est pas relevé.
+        // An almost silent mix (under −70 LUFS) is not raised.
         if let (Some(target), Some(m), Some(i)) = (options.loudness, &measure, measured)
             && i > -70.0
         {
@@ -177,7 +177,7 @@ pub async fn video(
 }
 
 async fn ffmpeg(cmd: &mut tokio::process::Command, what: &str) -> Result<()> {
-    let output = cmd.output().await.context("lancement de ffmpeg")?;
+    let output = cmd.output().await.context("starting ffmpeg")?;
     anyhow::ensure!(
         output.status.success(),
         "{what} : {}",
@@ -186,7 +186,7 @@ async fn ffmpeg(cmd: &mut tokio::process::Command, what: &str) -> Result<()> {
     Ok(())
 }
 
-/// Première passe de `loudnorm` : mesures du mixage.
+/// First `loudnorm` pass: measurements of the mix.
 async fn measure(audio: &Path) -> Result<Measure> {
     let output = enfait_config::process::tokio_command("ffmpeg")
         .args(["-nostdin", "-hide_banner", "-nostats", "-i"])
@@ -200,13 +200,13 @@ async fn measure(audio: &Path) -> Result<Measure> {
         ])
         .output()
         .await
-        .context("lancement de ffmpeg")?;
+        .context("starting ffmpeg")?;
     let text = String::from_utf8_lossy(&output.stderr);
     anyhow::ensure!(output.status.success(), "loudness : {}", text.trim());
-    parse_measure(&text).context("loudness : mesure illisible")
+    parse_measure(&text).context("loudness: unreadable measurement")
 }
 
-/// Le bloc JSON que `loudnorm` écrit à la fin de ses messages.
+/// The JSON block `loudnorm` writes at the end of its messages.
 fn parse_measure(text: &str) -> Option<Measure> {
     let start = text.rfind('{')?;
     let end = text.rfind('}')?;
@@ -225,7 +225,7 @@ mod tests {
         let m = parse_measure(text).unwrap();
         assert_eq!(m.input_i, "-23.54");
         assert_eq!(m.target_offset, "0.12");
-        assert!(parse_measure("pas de mesure").is_none());
+        assert!(parse_measure("no measurement").is_none());
     }
 
     #[test]

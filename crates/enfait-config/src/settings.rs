@@ -130,6 +130,8 @@ pub struct Settings {
     pub close_action: CloseAction,
     /// The onboarding has been completed (or skipped).
     pub onboarded: bool,
+    /// Desktop notifications when work finishes in the background.
+    pub notifications: bool,
     /// OpenAI-compatible server for local models (Ollama by default).
     pub local_url: String,
     /// Local model name (`qwen3-coder:30b`…); empty: not configured.
@@ -147,6 +149,7 @@ impl Default for Settings {
             accent: Accent::default(),
             close_action: CloseAction::default(),
             onboarded: false,
+            notifications: true,
             local_url: DEFAULT_LOCAL_URL.to_owned(),
             local_model: String::new(),
         }
@@ -239,6 +242,7 @@ mod tests {
             accent: Accent::Sky,
             close_action: CloseAction::Quit,
             onboarded: true,
+            notifications: false,
             local_url: "http://box:8080/v1".into(),
             local_model: "qwen".into(),
         };
@@ -250,5 +254,6 @@ mod tests {
         assert_eq!(partial.theme, ThemeId::Nord);
         assert_eq!(partial.local_url, DEFAULT_LOCAL_URL);
         assert!(!partial.onboarded);
+        assert!(partial.notifications);
     }
 }

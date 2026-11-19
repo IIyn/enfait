@@ -1,12 +1,12 @@
-//! IA d'enfait.
+//! enfait's AI.
 //!
-//! - [`llm`] : requêtes indépendantes du fournisseur ;
-//! - [`anthropic`], [`claude_code`] et [`local`] (serveur compatible
-//!   OpenAI : Ollama, llama.cpp…) : les fournisseurs, réunis dans
-//!   [`Provider`] ;
-//! - [`editor`] : la passe « monteur » (storyboard écrit par le modèle) ;
-//! - [`direction`] : la passe « réalisateur » ;
-//! - [`animate`] : les animateurs (création, correction, critique).
+//! - [`llm`]: provider-independent requests;
+//! - [`anthropic`], [`claude_code`] and [`local`] (OpenAI-compatible
+//!   server: Ollama, llama.cpp…): the providers, gathered in
+//!   [`Provider`];
+//! - [`editor`]: the "editor" pass (storyboard written by the model);
+//! - [`direction`]: the "director" pass;
+//! - [`animate`]: the animators (creation, fix, critique).
 
 pub mod animate;
 pub mod anthropic;
@@ -24,8 +24,8 @@ pub use llm::{AiError, Effort, Part, Reply, Request, Usage};
 pub use provider::{Provider, ProviderChoice};
 pub use quality::{Quality, QualitySettings};
 
-/// Tous les textes qui orientent les modèles (prompts, guide, styles), avec
-/// leur nom : de quoi dater une passe d'évaluation par une empreinte.
+/// All the texts steering the models (prompts, guide, styles), with their
+/// name: enough to date an evaluation pass by a fingerprint.
 pub fn prompt_sources() -> Vec<(&'static str, &'static str)> {
     let mut sources = vec![
         ("director", direction::DIRECTOR),

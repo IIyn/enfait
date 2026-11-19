@@ -1,7 +1,7 @@
 [
  {
   "id": "chiffre-choc",
-  "theme": "un grand nombre isolé",
+  "theme": "a large isolated number",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -57,8 +57,8 @@
  },
  {
   "id": "pourcentage",
-  "theme": "une proportion à rendre visible",
-  "style": "suisse",
+  "theme": "a proportion to make visible",
+  "style": "swiss",
   "aspect": "16:9",
   "language": "fr",
   "context": "Vidéo sur la consommation d'énergie des centres de données.",
@@ -117,7 +117,7 @@
  },
  {
   "id": "liste-trois",
-  "theme": "une énumération de trois éléments",
+  "theme": "a list of three items",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -185,8 +185,8 @@
  },
  {
   "id": "etapes",
-  "theme": "un processus en étapes",
-  "style": "craie",
+  "theme": "a step-by-step process",
+  "style": "chalk",
   "aspect": "16:9",
   "language": "fr",
   "context": "Cours d'introduction à la photosynthèse.",
@@ -249,8 +249,8 @@
  },
  {
   "id": "citation",
-  "theme": "une citation attribuée",
-  "style": "gravure",
+  "theme": "an attributed quote",
+  "style": "engraving",
   "aspect": "16:9",
   "language": "fr",
   "context": "Documentaire sur l'histoire des sciences.",
@@ -321,8 +321,8 @@
  },
  {
   "id": "date-histoire",
-  "theme": "une date et un événement",
-  "style": "gravure",
+  "theme": "a date and an event",
+  "style": "engraving",
   "aspect": "16:9",
   "language": "fr",
   "context": "Documentaire sur les grandes expéditions.",
@@ -389,7 +389,7 @@
  },
  {
   "id": "abstrait",
-  "theme": "une idée abstraite sans objet concret",
+  "theme": "an abstract idea without a concrete object",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -429,8 +429,8 @@
  },
  {
   "id": "emotion",
-  "theme": "une émotion, de la retenue",
-  "style": "papier",
+  "theme": "an emotion, restraint",
+  "style": "paper",
   "aspect": "16:9",
   "language": "fr",
   "context": "Récit personnel sur un déménagement.",
@@ -497,7 +497,7 @@
  },
  {
   "id": "question",
-  "theme": "une question rhétorique",
+  "theme": "a rhetorical question",
   "style": null,
   "aspect": "9:16",
   "language": "fr",
@@ -549,8 +549,8 @@
  },
  {
   "id": "avant-apres",
-  "theme": "un contraste avant / après",
-  "style": "suisse",
+  "theme": "a before / after contrast",
+  "style": "swiss",
   "aspect": "16:9",
   "language": "fr",
   "context": "Présentation d'une refonte de site.",
@@ -609,8 +609,8 @@
  },
  {
   "id": "geographie",
-  "theme": "un lieu, une carte",
-  "style": "papier",
+  "theme": "a place, a map",
+  "style": "paper",
   "aspect": "16:9",
   "language": "fr",
   "context": "Vidéo de voyage sur l'Islande.",
@@ -665,7 +665,7 @@
  },
  {
   "id": "personne",
-  "theme": "présenter une personne",
+  "theme": "introducing a person",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -725,8 +725,8 @@
  },
  {
   "id": "explication",
-  "theme": "un mécanisme scientifique",
-  "style": "craie",
+  "theme": "a scientific mechanism",
+  "style": "chalk",
   "aspect": "16:9",
   "language": "fr",
   "context": "Cours de physique sur les arcs-en-ciel.",
@@ -801,7 +801,7 @@
  },
  {
   "id": "metaphore",
-  "theme": "une métaphore filée",
+  "theme": "an extended metaphor",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -881,7 +881,7 @@
  },
  {
   "id": "tres-court",
-  "theme": "un bloc très court et percutant",
+  "theme": "a very short, punchy block",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -905,8 +905,8 @@
  },
  {
   "id": "long",
-  "theme": "un bloc long avec beaucoup d'information",
-  "style": "suisse",
+  "theme": "a long block with a lot of information",
+  "style": "swiss",
   "aspect": "16:9",
   "language": "fr",
   "context": "Explication du fonctionnement d'une élection.",
@@ -1053,7 +1053,7 @@
  },
  {
   "id": "classement",
-  "theme": "un classement, un podium",
+  "theme": "a ranking, a podium",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -1113,8 +1113,8 @@
  },
  {
   "id": "frise",
-  "theme": "une chronologie",
-  "style": "gravure",
+  "theme": "a timeline",
+  "style": "engraving",
   "aspect": "16:9",
   "language": "fr",
   "context": "Histoire de l'écriture.",
@@ -1185,8 +1185,8 @@
  },
  {
   "id": "cause-effet",
-  "theme": "une chaîne de causes",
-  "style": "papier",
+  "theme": "a chain of causes",
+  "style": "paper",
   "aspect": "16:9",
   "language": "fr",
   "context": "Vidéo sur les écosystèmes.",
@@ -1245,7 +1245,7 @@
  },
  {
   "id": "avertissement",
-  "theme": "une mise en garde",
+  "theme": "a warning",
   "style": null,
   "aspect": "1:1",
   "language": "fr",
@@ -1305,7 +1305,7 @@
  },
  {
   "id": "appel-action",
-  "theme": "une fin de vidéo, un appel",
+  "theme": "an end of video, a call to action",
   "style": null,
   "aspect": "9:16",
   "language": "fr",
@@ -1365,8 +1365,8 @@
  },
  {
   "id": "definition",
-  "theme": "définir un mot",
-  "style": "suisse",
+  "theme": "defining a word",
+  "style": "swiss",
   "aspect": "16:9",
   "language": "fr",
   "context": "Lexique de l'économie.",
@@ -1413,7 +1413,7 @@
  },
  {
   "id": "compteur",
-  "theme": "un nombre qui monte",
+  "theme": "a number going up",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -1485,7 +1485,7 @@
  },
  {
   "id": "argent",
-  "theme": "une somme d'argent",
+  "theme": "a sum of money",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -1557,8 +1557,8 @@
  },
  {
   "id": "echelle",
-  "theme": "une différence d'échelle",
-  "style": "craie",
+  "theme": "a difference of scale",
+  "style": "chalk",
   "aspect": "16:9",
   "language": "fr",
   "context": "Vidéo sur l'infiniment petit.",
@@ -1633,7 +1633,7 @@
  },
  {
   "id": "vitesse",
-  "theme": "une vitesse, du mouvement",
+  "theme": "a speed, motion",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -1689,7 +1689,7 @@
  },
  {
   "id": "technique",
-  "theme": "un concept logiciel",
+  "theme": "a software concept",
   "style": null,
   "aspect": "16:9",
   "language": "fr",
@@ -1753,7 +1753,7 @@
  },
  {
   "id": "en-sport",
-  "theme": "anglais, un exploit sportif",
+  "theme": "English, a sporting feat",
   "style": null,
   "aspect": "16:9",
   "language": "en",
@@ -1825,8 +1825,8 @@
  },
  {
   "id": "en-nature",
-  "theme": "anglais, la nature",
-  "style": "papier",
+  "theme": "English, nature",
+  "style": "paper",
   "aspect": "9:16",
   "language": "en",
   "context": "Nature short about forests.",
@@ -1897,8 +1897,8 @@
  },
  {
   "id": "en-produit",
-  "theme": "anglais, présentation de produit",
-  "style": "suisse",
+  "theme": "English, product presentation",
+  "style": "swiss",
   "aspect": "16:9",
   "language": "en",
   "context": "Launch video for a note-taking app.",

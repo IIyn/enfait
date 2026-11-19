@@ -1,30 +1,29 @@
-//! Origine et licence des fichiers venus d'une banque libre de droits :
-//! conditions d'utilisation lues dans le nom de la licence, avertissements
-//! et crédits à publier avec la vidéo.
+//! Origin and licence of files from a royalty-free bank: terms of use read
+//! from the licence name, warnings and credits to publish with the video.
 
 use crate::look::Asset;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 
-/// D'où vient un fichier de la bibliothèque.
+/// Where a library file comes from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Origin {
-    /// Banque d'images (« Wikimedia Commons », « Pexels »…).
+    /// Image bank ("Wikimedia Commons", "Pexels"…).
     pub source: String,
-    /// Page du fichier chez la source.
+    /// Page of the file at the source.
     pub page: String,
     pub title: String,
-    /// Auteur, tel que la source le donne (vide s'il est inconnu).
+    /// Author, as given by the source (empty if unknown).
     #[serde(default)]
     pub author: String,
     pub license: License,
-    /// Modifications faites par enfait (« détouré »), à signaler dans les
-    /// crédits quand la licence le demande.
+    /// Changes made by enfait ("cut out"), to mention in the credits when the
+    /// licence asks for it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub changes: Vec<String>,
 }
 
-/// Une licence, par son nom court (« CC BY-SA 4.0 », « Licence Pexels »).
+/// A licence, by its short name ("CC BY-SA 4.0", "Pexels License").
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct License {
     pub name: String,
@@ -32,18 +31,18 @@ pub struct License {
     pub url: Option<String>,
 }
 
-/// Ce que permet une licence.
+/// What a licence allows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Terms {
-    /// Licence reconnue ; sinon, à vérifier à la main.
+    /// Recognised licence; otherwise, to check by hand.
     pub known: bool,
-    /// Citer l'auteur.
+    /// Credit the author.
     pub attribution: bool,
-    /// Une œuvre dérivée doit être publiée sous la même licence.
+    /// A derived work must be published under the same licence.
     pub share_alike: bool,
-    /// Pas d'usage commercial.
+    /// No commercial use.
     pub non_commercial: bool,
-    /// Pas de modification (ni recadrage, ni détourage).
+    /// No changes (no cropping, no cutout).
     pub no_derivatives: bool,
 }
 
@@ -55,7 +54,7 @@ impl License {
         }
     }
 
-    /// Conditions lues dans le nom de la licence.
+    /// Terms read from the licence name.
     pub fn terms(&self) -> Terms {
         let lower = self.name.to_lowercase();
         let words: Vec<&str> = lower
@@ -108,57 +107,57 @@ impl License {
 }
 
 impl Terms {
-    /// Le fichier peut être modifié (détouré, recadré).
+    /// The file can be changed (cut out, cropped).
     pub const fn allows_changes(&self) -> bool {
         !self.no_derivatives
     }
 
-    /// Ce qu'il faut savoir avant de publier, en clair.
+    /// What to know before publishing, in plain words.
     pub fn warnings(&self) -> Vec<&'static str> {
         let mut out = Vec::new();
         if !self.known {
-            out.push("licence non reconnue : vérifie-la sur la page du fichier");
+            out.push("unrecognised licence: check it on the file page");
         }
         if self.non_commercial {
-            out.push("pas d'usage commercial (vidéo monétisée, publicité)");
+            out.push("no commercial use (monetised video, advertising)");
         }
         if self.no_derivatives {
-            out.push("pas de modification : à montrer entier, sans recadrage ni détourage");
+            out.push("no changes: show it whole, without cropping or cutout");
         }
         if self.share_alike {
-            out.push("partage dans les mêmes conditions : la vidéo doit reprendre cette licence");
+            out.push("share alike: the video must use the same licence");
         }
         out
     }
 
-    /// La licence peut interdire certains usages (commercial, modification)
-    /// ou n'est pas reconnue : à signaler avant tout ajout.
+    /// The licence may forbid some uses (commercial, changes) or is not
+    /// recognised: to point out before adding the file.
     pub const fn restrictive(&self) -> bool {
         !self.known || self.non_commercial || self.no_derivatives
     }
 
-    /// Résumé court pour une liste (« citer l'auteur », « libre »).
+    /// Short summary for a list ("credit the author", "free").
     pub fn summary(&self) -> &'static str {
         match (self.known, self.attribution) {
-            (false, _) => "à vérifier",
-            (true, false) => "libre",
-            (true, true) => "citer l'auteur",
+            (false, _) => "to check",
+            (true, false) => "free",
+            (true, true) => "credit the author",
         }
     }
 }
 
-/// Crédits à publier avec la vidéo (description, générique) : un fichier
-/// par ligne, ceux qui demandent une attribution d'abord. Vide si aucun
-/// fichier ne vient d'une banque.
+/// Credits to publish with the video (description, end credits): one file
+/// per line, those requiring attribution first. Empty if no file comes
+/// from a bank.
 pub fn credits(assets: &[Asset]) -> String {
     let mut origins: Vec<&Origin> = assets.iter().filter_map(|a| a.origin.as_ref()).collect();
     if origins.is_empty() {
         return String::new();
     }
     origins.sort_by_key(|o| !o.license.terms().attribution);
-    let mut out = String::from("Crédits\n");
+    let mut out = String::from("Credits\n");
     for o in origins {
-        let _ = write!(out, "- « {} »", o.title.trim());
+        let _ = write!(out, "- “{}”", o.title.trim());
         if !o.author.trim().is_empty() {
             let _ = write!(out, ", {}", o.author.trim());
         }
@@ -211,7 +210,7 @@ mod tests {
         assert!(gfdl.attribution && gfdl.share_alike);
         let unknown = terms("Tous droits réservés");
         assert!(!unknown.known);
-        assert_eq!(unknown.summary(), "à vérifier");
+        assert_eq!(unknown.summary(), "to check");
     }
 
     #[test]
@@ -233,7 +232,7 @@ mod tests {
         };
         assert!(credits(&[asset("logo.svg", None)]).is_empty());
         let mut train = origin("Train.webm", "CC BY-SA 3.0");
-        train.changes.push("détouré".into());
+        train.changes.push("cut out".into());
         let text = credits(&[
             asset("logo.svg", None),
             asset("chat.jpg", Some(origin("Chat.jpg", "CC0 1.0"))),
@@ -241,7 +240,7 @@ mod tests {
         ]);
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 3);
-        assert!(lines[1].starts_with("- « Train.webm », Whpq, CC BY-SA 3.0, détouré — "));
+        assert!(lines[1].starts_with("- “Train.webm”, Whpq, CC BY-SA 3.0, cut out — "));
         assert!(lines[2].contains("Chat.jpg"));
     }
 }

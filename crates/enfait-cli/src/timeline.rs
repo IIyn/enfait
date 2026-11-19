@@ -1,27 +1,27 @@
-//! Correspondance entre les images de la vidéo finale et les rendus.
+//! Mapping between the frames of the final video and the renders.
 //!
-//! Chaque bloc est rendu sur ses propres images, élargies d'une marge avant
-//! et après quand une transition le touche. Une transition remplace les
-//! images autour de la frontière entre deux blocs.
+//! Each block is rendered on its own frames, widened by a margin before
+//! and after when a transition touches it. A transition replaces the
+//! frames around the boundary between two blocks.
 
 use anyhow::{Context as _, Result};
 use enfait_core::{FrameRate, TimeRange};
 use std::ops::Range;
 
-/// Part de la transition avant la frontière (le reste est après).
+/// Share of the transition before the boundary (the rest is after).
 const TRANSITION_BEFORE: f64 = 0.4;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockFrames {
-    /// Images de la vidéo qui appartiennent au bloc.
+    /// Frames of the video belonging to the block.
     pub own: Range<i64>,
-    /// Images rendues (marges de transition comprises).
+    /// Rendered frames (transition margins included).
     pub rendered: Range<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransitionFrames {
-    /// Index du bloc de départ (le suivant est `after + 1`).
+    /// Index of the outgoing block (the next one is `after + 1`).
     pub after: usize,
     pub frames: Range<i64>,
 }
@@ -34,12 +34,12 @@ pub struct Timeline {
     pub transitions: Vec<TransitionFrames>,
 }
 
-/// Source d'une image de la vidéo finale.
+/// Source of a frame of the final video.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
-    /// Bloc et index de l'image dans son dossier de rendu.
+    /// Block and index of the frame in its render folder.
     Block(usize, usize),
-    /// Transition (index dans `transitions`) et index de l'image.
+    /// Transition (index in `transitions`) and index of the frame.
     Transition(usize, usize),
 }
 
@@ -48,8 +48,8 @@ fn local(index: i64, start: i64) -> Option<usize> {
 }
 
 impl Timeline {
-    /// `transitions` : index des blocs suivis d'une transition ; `length` :
-    /// durée voulue d'une transition, en secondes.
+    /// `transitions`: indices of the blocks followed by a transition;
+    /// `length`: wanted duration of a transition, in seconds.
     pub fn build(
         rate: FrameRate,
         ranges: &[TimeRange],
@@ -67,7 +67,7 @@ impl Timeline {
             })
             .collect::<Result<Vec<_>>>()?;
         let fps = f64::from(rate.num()) / f64::from(rate.den());
-        // Petite durée positive, bornée : la conversion ne peut pas déborder.
+        // Small positive duration, bounded: the conversion cannot overflow.
         #[allow(clippy::cast_possible_truncation)]
         let frames = |secs: f64| (secs * fps).round().clamp(1.0, 600.0) as i64;
         let before_len = frames(length * TRANSITION_BEFORE);
@@ -104,15 +104,15 @@ impl Timeline {
         })
     }
 
-    /// Instant local (s) de l'image globale `index` pour un rendu qui commence
-    /// à l'image `start` de la vidéo, avec `origin` le début du bloc.
+    /// Local time (s) of global frame `index` for a render starting at frame
+    /// `start` of the video, with `origin` the start of the block.
     pub fn local_time(&self, index: i64, origin: i64) -> Result<f64> {
         let t = self.rate.frame_to_flicks(index)?;
         let o = self.rate.frame_to_flicks(origin)?;
         Ok(t.checked_sub(o)?.as_secs_f64())
     }
 
-    /// D'où vient l'image `index` de la vidéo finale.
+    /// Where frame `index` of the final video comes from.
     pub fn source(&self, index: i64) -> Result<Source> {
         for (i, t) in self.transitions.iter().enumerate() {
             if t.frames.contains(&index) {
@@ -125,13 +125,13 @@ impl Timeline {
             if b.own.contains(&index) {
                 return local(index, b.rendered.start)
                     .map(|j| Source::Block(i, j))
-                    .context("index de bloc");
+                    .context("block index");
             }
         }
-        anyhow::bail!("aucune source pour l'image {index}")
+        anyhow::bail!("no source for frame {index}")
     }
 
-    /// Image `index` de la vidéo dans le rendu du bloc `block`.
+    /// Frame `index` of the video in the render of block `block`.
     pub fn block_frame(&self, block: usize, index: i64) -> Option<usize> {
         let b = self.blocks.get(block)?;
         if b.rendered.contains(&index) {

@@ -1,6 +1,6 @@
-// Pilote injecté par enfait dans chaque page avant ses propres scripts.
-// Il capte les erreurs, rend le hasard déterministe et expose de quoi
-// positionner la composition à un instant précis puis l'inspecter.
+// Driver injected by enfait into every page before its own scripts.
+// It catches errors, makes randomness deterministic and exposes what is
+// needed to move the composition to a precise time and inspect it.
 (() => {
   "use strict";
   const errors = [];
@@ -15,14 +15,14 @@
     const where = e.filename ? ` (${e.filename.split("/").pop()}:${e.lineno})` : "";
     push((e.message || "erreur") + where);
   }, true);
-  window.addEventListener("unhandledrejection", (e) => push("promesse rejetée : " + e.reason));
+  window.addEventListener("unhandledrejection", (e) => push("unhandled promise rejection: " + e.reason));
   const consoleError = console.error.bind(console);
   console.error = (...args) => {
     push(args.map(String).join(" "));
     consoleError(...args);
   };
 
-  // Hasard reproductible : xorshift32 à graine fixe.
+  // Reproducible randomness: xorshift32 with a fixed seed.
   let seed = 0x2545f491;
   Math.random = () => {
     seed ^= seed << 13;
@@ -50,8 +50,8 @@
       .join("")
       .trim();
 
-  // Bruit déterministe dans [-1, 1] pour un entier : même entrée, même
-  // sortie, quel que soit l'ordre des appels.
+  // Deterministic noise in [-1, 1] for an integer: same input, same
+  // output, whatever the order of the calls.
   window.enfaitNoise = (n) => {
     let x = (Math.imul(n | 0, 0x27d4eb2d) ^ 0x165667b1) >>> 0;
     x = Math.imul(x ^ (x >>> 15), 0x85ebca6b) >>> 0;
@@ -62,7 +62,7 @@
   window.__enfait = {
     errors,
 
-    // Attend polices et images, vérifie le contrat.
+    // Waits for fonts and images, checks the contract.
     async ready() {
       await document.fonts.ready;
       await Promise.all(Array.from(document.images).map(decode));
@@ -74,15 +74,15 @@
       if (!Number.isFinite(duration) || duration <= 0) {
         return { ok: false, duration: 0, errors, reason: "window.enfait.duration invalide" };
       }
-      // Aller à la fin puis revenir au début applique l'état de départ de
-      // chaque animation (anime.js ne le fait qu'en passant dessus).
+      // Going to the end then back to the start applies the initial state of
+      // each animation (anime.js only does it when passing over it).
       await api.seek(duration);
       await api.seek(0);
       return { ok: true, duration, errors, reason: null };
     },
 
-    // Positionne la composition à `t` secondes. `scenes` associe un nom de
-    // scène (`from`, `to`) à l'URL de l'image à afficher pour cette frame.
+    // Moves the composition to `t` seconds. `scenes` maps a scene name
+    // (`from`, `to`) to the URL of the image to show for this frame.
     async seek(t, scenes) {
       if (scenes) {
         const pending = [];
@@ -105,12 +105,12 @@
         video.pause();
         video.currentTime = t;
       }
-      // L'image est produite ensuite par beginFrame : pas d'attente ici.
+      // The frame is then produced by beginFrame: no wait here.
       return true;
     },
 
-    // Problèmes visibles à l'instant courant : texte hors zone sûre,
-    // polices inconnues.
+    // Problems visible at the current time: text outside the safe area,
+    // unknown fonts.
     inspect(safeMargin, knownFamilies) {
       const W = innerWidth;
       const H = innerHeight;
@@ -128,7 +128,7 @@
         if (!known.has(family.toLowerCase()) && !generic.has(family.toLowerCase())) fonts.add(family);
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
-        if (r.right <= 0 || r.bottom <= 0 || r.left >= W || r.top >= H) continue; // hors champ : voulu
+        if (r.right <= 0 || r.bottom <= 0 || r.left >= W || r.top >= H) continue; // off screen: intended
         if (r.left < mx - 1 || r.top < my - 1 || r.right > W - mx + 1 || r.bottom > H - my + 1) {
           outside.push({ text: text.slice(0, 60), left: r.left, top: r.top, right: r.right, bottom: r.bottom });
         }

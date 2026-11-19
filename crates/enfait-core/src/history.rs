@@ -1,8 +1,8 @@
-//! Annuler / rétablir.
+//! Undo / redo.
 //!
-//! Chaque [`Edit`] appliqué renvoie son inverse exact. L'historique empile ces
-//! inverses : annuler, c'est appliquer l'inverse (qui renvoie à son tour de
-//! quoi rétablir).
+//! Every applied [`Edit`] returns its exact inverse. The history stacks
+//! these inverses: undoing is applying the inverse (which in turn returns
+//! what is needed to redo).
 
 use crate::block::{Block, BlockKind, Broll, Moment, Transition};
 use crate::error::EditError;
@@ -11,7 +11,7 @@ use crate::project::{Project, ProjectSettings};
 use crate::time::Flicks;
 use serde::{Deserialize, Serialize};
 
-/// Une modification du projet.
+/// A change to the project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Edit {
@@ -56,16 +56,16 @@ pub enum Edit {
         at: Flicks,
         note: String,
     },
-    /// Format, cadrage et cadence du projet.
+    /// Format, framing and frame rate of the project.
     SetSettings {
         settings: ProjectSettings,
     },
-    /// Plusieurs éditions appliquées d'un coup (le storyboard écrit par le
-    /// monteur) : une seule étape d'annulation. Tout ou rien.
+    /// Several edits applied at once (the storyboard written by the editor):
+    /// a single undo step. All or nothing.
     Batch {
         edits: Vec<Edit>,
     },
-    /// Inverse exact d'une fusion : recrée le bloc suivant tel qu'il était.
+    /// Exact inverse of a merge: recreates the next block as it was.
     Unmerge {
         block: BlockId,
         first_description: String,
@@ -75,26 +75,26 @@ pub enum Edit {
 }
 
 impl Edit {
-    /// Libellé affiché dans « Annuler : … ».
+    /// Label shown in "Undo: …".
     pub fn label(&self) -> &'static str {
         match self {
-            Self::SetDescription { .. } => "Modifier la description",
-            Self::SetKind { .. } => "Changer le type de bloc",
-            Self::SetTransition { .. } => "Changer la transition",
-            Self::SetBroll { .. } => "Changer le plan de b-roll",
-            Self::SetCutout { .. } => "Détourage de la personne",
-            Self::Split { .. } => "Couper le bloc",
-            Self::MergeWithNext { .. } => "Fusionner les blocs",
-            Self::Unmerge { .. } => "Séparer les blocs",
-            Self::AddMoment { .. } => "Ajouter un moment",
-            Self::RemoveMoment { .. } => "Retirer le moment",
-            Self::SetMomentNote { .. } => "Modifier le moment",
-            Self::SetSettings { .. } => "Changer le format",
-            Self::Batch { .. } => "Écrire le storyboard",
+            Self::SetDescription { .. } => "Edit the description",
+            Self::SetKind { .. } => "Change the block kind",
+            Self::SetTransition { .. } => "Change the transition",
+            Self::SetBroll { .. } => "Change the b-roll shot",
+            Self::SetCutout { .. } => "Cut out the person",
+            Self::Split { .. } => "Split the block",
+            Self::MergeWithNext { .. } => "Merge the blocks",
+            Self::Unmerge { .. } => "Unmerge the blocks",
+            Self::AddMoment { .. } => "Add a moment",
+            Self::RemoveMoment { .. } => "Remove the moment",
+            Self::SetMomentNote { .. } => "Edit the moment",
+            Self::SetSettings { .. } => "Change the format",
+            Self::Batch { .. } => "Write the storyboard",
         }
     }
 
-    /// Applique l'édition et renvoie son inverse. En cas d'erreur, le projet est intact.
+    /// Applies the edit and returns its inverse. On error, the project is untouched.
     pub fn apply(self, project: &mut Project) -> Result<Edit, EditError> {
         match self {
             Self::SetDescription { block, text } => {
@@ -162,8 +162,8 @@ impl Edit {
                     match edit.apply(project) {
                         Ok(inverse) => inverses.push(inverse),
                         Err(err) => {
-                            // Défaire ce qui est déjà appliqué : le projet
-                            // reste intact.
+                            // Undo what is already applied: the project
+                            // stays untouched.
                             for inverse in inverses.into_iter().rev() {
                                 let _ = inverse.apply(project);
                             }
@@ -195,7 +195,7 @@ struct Entry {
     edit: Edit,
 }
 
-/// Piles annuler / rétablir, bornées.
+/// Undo / redo stacks, bounded.
 #[derive(Debug, Clone)]
 pub struct History {
     undo: Vec<Entry>,
@@ -224,7 +224,7 @@ impl History {
         }
     }
 
-    /// Applique une édition et l'inscrit dans l'historique. Vide la pile « rétablir ».
+    /// Applies an edit and records it in the history. Clears the redo stack.
     pub fn apply(&mut self, project: &mut Project, edit: Edit) -> Result<(), EditError> {
         let label = edit.label();
         let inverse = edit.apply(project)?;
@@ -238,12 +238,12 @@ impl History {
         Ok(())
     }
 
-    /// Annule la dernière édition. `Ok(false)` s'il n'y a rien à annuler.
+    /// Undoes the last edit. `Ok(false)` if there is nothing to undo.
     pub fn undo(&mut self, project: &mut Project) -> Result<bool, EditError> {
         Self::step(project, &mut self.undo, &mut self.redo)
     }
 
-    /// Rétablit la dernière édition annulée. `Ok(false)` s'il n'y a rien à rétablir.
+    /// Redoes the last undone edit. `Ok(false)` if there is nothing to redo.
     pub fn redo(&mut self, project: &mut Project) -> Result<bool, EditError> {
         Self::step(project, &mut self.redo, &mut self.undo)
     }
@@ -314,7 +314,7 @@ mod tests {
             .enumerate()
             .map(|(i, (w, kind))| {
                 let mut b = Block::new(TimeRange::new(secs(w[0]), secs(w[1])).unwrap(), kind);
-                b.description = format!("bloc {i}");
+                b.description = format!("block {i}");
                 b.transition_after = if i % 2 == 0 {
                     Transition::Cut
                 } else {
@@ -342,12 +342,12 @@ mod tests {
         h.apply(&mut p, Edit::SetSettings { settings: tall })
             .unwrap();
         assert_eq!(p.settings().resolution.height, 1920);
-        assert_eq!(h.undo_label(), Some("Changer le format"));
+        assert_eq!(h.undo_label(), Some("Change the format"));
         h.undo(&mut p).unwrap();
         assert_eq!(*p.settings(), before);
         h.redo(&mut p).unwrap();
         assert_eq!(*p.settings(), tall);
-        // Ancien project.json sans cadrage : image entière.
+        // Old project.json without framing: whole image.
         let json = p.to_json().unwrap().replace("\"framing\": \"fill\",", "");
         assert_eq!(
             Project::from_json(&json).unwrap().settings().framing,
@@ -373,7 +373,7 @@ mod tests {
         assert_eq!(p.blocks().len(), 5);
         assert_eq!(p.blocks()[1].transition_after, Transition::Cut);
         assert_eq!(p.blocks()[2].transition_after, Transition::Auto);
-        assert_eq!(h.undo_label(), Some("Couper le bloc"));
+        assert_eq!(h.undo_label(), Some("Split the block"));
         assert!(h.undo(&mut p).unwrap());
         assert_eq!(p, original);
         assert!(h.redo(&mut p).unwrap());
@@ -433,7 +433,7 @@ mod tests {
             },
         )
         .unwrap();
-        // Couper à 10 s : le second moment part avec la seconde moitié.
+        // Split at 10 s: the second moment goes with the second half.
         let tail = BlockId::new();
         h.apply(
             &mut p,
@@ -446,7 +446,7 @@ mod tests {
         .unwrap();
         assert_eq!(p.blocks()[1].moments.len(), 1);
         assert_eq!(p.blocks()[2].moments[0].note, "l'aiguillage bascule");
-        // Fusionner les recolle, dans l'ordre.
+        // Merging glues them back, in order.
         h.apply(&mut p, Edit::MergeWithNext { block: b }).unwrap();
         let words: Vec<&str> = p.blocks()[1]
             .moments
@@ -454,7 +454,7 @@ mod tests {
             .map(|m| m.word.as_str())
             .collect();
         assert_eq!(words, ["rail", "aiguilleur"]);
-        // Tout défaire revient à l'original ; le JSON garde les moments.
+        // Undoing everything goes back to the original; the JSON keeps the moments.
         let json = p.to_json().unwrap();
         assert_eq!(Project::from_json(&json).unwrap(), p);
         while h.undo(&mut p).unwrap() {}
@@ -497,11 +497,11 @@ mod tests {
             },
         )
         .unwrap();
-        // La seconde moitié reprend la vidéo là où la première s'arrête.
+        // The second half resumes the video where the first one stops.
         let tail = &p.blocks()[2];
         assert_eq!(tail.broll.as_ref().unwrap().start, secs(5));
         assert!(tail.cutout);
-        assert_eq!(h.undo_label(), Some("Couper le bloc"));
+        assert_eq!(h.undo_label(), Some("Split the block"));
         while h.undo(&mut p).unwrap() {}
         assert_eq!(p, original);
         assert!(p.to_json().unwrap().find("broll").is_none());
@@ -516,7 +516,7 @@ mod tests {
         h.apply(&mut p, Edit::MergeWithNext { block: first })
             .unwrap();
         assert_eq!(p.blocks().len(), 3);
-        assert_eq!(p.blocks()[0].description, "bloc 0\nbloc 1");
+        assert_eq!(p.blocks()[0].description, "block 0\nblock 1");
         assert_eq!(p.blocks()[0].range.end(), secs(14));
         h.undo(&mut p).unwrap();
         assert_eq!(p, original);
@@ -587,13 +587,13 @@ mod tests {
         .unwrap();
         assert_eq!(p.blocks()[0].description, "deux");
         assert_eq!(p.blocks()[1].kind, BlockKind::Broll);
-        assert_eq!(h.undo_label(), Some("Écrire le storyboard"));
+        assert_eq!(h.undo_label(), Some("Write the storyboard"));
         assert!(h.undo(&mut p).unwrap());
-        assert_eq!(p, before, "une seule étape défait tout, dans l'ordre");
+        assert_eq!(p, before, "a single step undoes everything, in order");
         assert!(h.redo(&mut p).unwrap());
         assert_eq!(p.blocks()[0].description, "deux");
 
-        // Une édition impossible au milieu : rien n'est appliqué.
+        // An impossible edit in the middle: nothing is applied.
         let mut q = before.clone();
         let err = Edit::Batch {
             edits: vec![

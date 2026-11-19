@@ -1,8 +1,8 @@
-//! Forme d'onde : crêtes minimales et maximales par paquets d'échantillons.
+//! Waveform: minimum and maximum peaks per packet of samples.
 //!
-//! Un seul niveau de détail (256 instants par paquet, soit 5,3 ms à 48 kHz)
-//! suffit : pour l'affichage, on regroupe les paquets d'une colonne, ce qui
-//! reste rapide même pour une heure de son (560 000 paquets).
+//! A single level of detail (256 frames per packet, i.e. 5.3 ms at 48 kHz)
+//! is enough: for display, the packets of a column are grouped, which
+//! stays fast even for an hour of sound (560,000 packets).
 
 use crate::{AudioBuffer, MediaError};
 use std::io::Write as _;
@@ -16,7 +16,7 @@ const VERSION: u32 = 1;
 pub struct Peaks {
     rate: u32,
     bucket: u32,
-    /// Paires (min, max) par paquet, toutes voies confondues.
+    /// (min, max) pairs per packet, all channels together.
     pairs: Vec<(i16, i16)>,
 }
 
@@ -46,8 +46,8 @@ impl Peaks {
         self.pairs.len() as f64 * f64::from(self.bucket) / f64::from(self.rate)
     }
 
-    /// `columns` paires (min, max) entre -1 et 1 pour l'intervalle
-    /// `[start, end)` en secondes. Une colonne sans donnée vaut (0, 0).
+    /// `columns` (min, max) pairs from -1 to 1 for the interval
+    /// `[start, end)` in seconds. A column without data is (0, 0).
     pub fn columns(&self, start: f64, end: f64, columns: usize) -> Vec<(f32, f32)> {
         if columns == 0 || start.is_nan() || end.is_nan() || end <= start {
             return Vec::new();
@@ -125,7 +125,7 @@ fn bucket_index(x: f64) -> usize {
     if x <= 0.0 {
         0
     } else {
-        // Positif et fini (borné par la durée) : troncature voulue.
+        // Positive and finite (bounded by the duration): truncation intended.
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let i = x.floor() as usize;
         i
@@ -137,7 +137,7 @@ mod tests {
     use super::*;
 
     fn ramp() -> AudioBuffer {
-        // 1 s à 1 024 Hz, mono : quatre paquets de 256, chacun à son niveau.
+        // 1 s at 1,024 Hz, mono: four packets of 256, each at its level.
         let samples = (0..1024_i32)
             .map(|i| i16::try_from((i / 256) * 1000 - (i % 2) * 2000).unwrap())
             .collect();
@@ -161,9 +161,9 @@ mod tests {
         assert_eq!(two.len(), 2);
         assert!((two[0].0 - (-2000.0 / 32768.0)).abs() < 1e-6);
         assert!((two[1].1 - (3000.0 / 32768.0)).abs() < 1e-6);
-        // Plus de colonnes que de paquets : chaque colonne lit au moins un paquet.
+        // More columns than packets: each column reads at least one packet.
         assert_eq!(p.columns(0.0, 1.0, 16).len(), 16);
-        // Au-delà de la fin : silence.
+        // Beyond the end: silence.
         assert_eq!(p.columns(2.0, 3.0, 3), vec![(0.0, 0.0); 3]);
         assert!(p.columns(1.0, 1.0, 3).is_empty());
     }

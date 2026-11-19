@@ -1,70 +1,69 @@
-//! Nettoyage d'une prise sans script (mode magique, ou voix improvisée) :
-//! les phrases et leurs reprises se déduisent de la transcription.
+//! Cleaning up a take without a script (magic mode, or improvised voice):
+//! sentences and their retakes are found in the transcript.
 //!
-//! La transcription est coupée en énoncés (fins de phrase, longs silences). Un
-//! énoncé qui redit un énoncé récent presque mot pour mot est une reprise,
-//! comme celui qui en reprend le début après un silence et finit
-//! autrement ; un énoncé qui s'arrête en route et que le suivant reprend
-//! depuis le début est un faux départ. Chaque groupe devient une phrase,
-//! chacune de ses lectures une prise : l'[`Analysis`] obtenue est celle d'un
-//! script écrit, la règle « dernière prise » et les choix à la main s'y
-//! appliquent tels quels. Les apartés, qui ne ressemblent à rien d'autre,
-//! restent des phrases à part entière.
+//! The transcript is cut into utterances (sentence ends, long silences).
+//! An utterance that says a recent one again almost word for word is a
+//! retake, as is one that takes its start again after a silence and ends
+//! differently; an utterance stopping midway that the next one takes from
+//! the start is a false start. Each group becomes a sentence, each of its
+//! readings a take: the resulting [`Analysis`] is that of a written script,
+//! the "last take" rule and the manual choices apply as they are. Asides,
+//! which look like nothing else, stay sentences of their own.
 
 use crate::script::{Sentence, tokens};
 use crate::takes::{Analysis, Take, similar};
 use enfait_core::Transcript;
 
-/// Silence qui coupe un énoncé même sans ponctuation (secondes). Plus court,
-/// il couperait une phrase relue avec des respirations en morceaux qui ne
-/// ressemblent plus à la phrase.
+/// Silence that cuts an utterance even without punctuation (seconds).
+/// Shorter, it would cut a sentence read with breaths into pieces that no
+/// longer look like the sentence.
 const SPLIT_GAP: f64 = 1.5;
-/// Silence qui marque une hésitation avant un énoncé (secondes).
+/// Silence marking a hesitation before an utterance (seconds).
 const PAUSE: f64 = 0.6;
-/// Part des mots en commun au-delà de laquelle deux énoncés sont deux
-/// lectures de la même phrase.
+/// Share of common words beyond which two utterances are two readings of
+/// the same sentence.
 const RETAKE_SIMILARITY: f32 = 0.85;
-/// Reprise reformulée : même début (au moins autant de mots), après un
-/// silence, et au moins cette part de mots en commun.
+/// Rephrased retake: same start (at least as many words), after a
+/// silence, and at least this share of common words.
 const REPHRASED_PREFIX: usize = 3;
 const REPHRASED_SIMILARITY: f32 = 0.6;
-/// Groupes récents comparés à un nouvel énoncé : on reprend une phrase juste
-/// après l'avoir ratée, pas trois minutes plus tard.
+/// Recent groups compared to a new utterance: one retakes a sentence right
+/// after missing it, not three minutes later.
 const RECENT_GROUPS: usize = 3;
-/// Au-delà de ce délai depuis la dernière lecture d'une phrase, un énoncé
-/// semblable est une phrase nouvelle (un refrain, une récapitulation).
+/// Beyond this delay since the last reading of a sentence, a similar
+/// utterance is a new sentence (a chorus, a recap).
 const RECENT_SECONDS: f64 = 45.0;
-/// Longueur maximale (en mots) d'un faux départ dont la reprise a perdu son
-/// premier mot.
+/// Maximum length (in words) of a false start whose retake lost its first
+/// word.
 const MAX_FRAGMENT: usize = 3;
-/// Part de la phrase qu'une lecture doit couvrir pour être complète.
+/// Share of the sentence a reading must cover to be complete.
 const COMPLETE: f32 = 0.8;
-/// Hésitations retirées des phrases déduites.
+/// Hesitations removed from the found sentences.
 const FILLERS: [&str; 9] = ["euh", "heu", "euhh", "hum", "hmm", "um", "uh", "erm", "bah"];
 
-/// Un énoncé : des mots consécutifs de la transcription.
+/// An utterance: consecutive words of the transcript.
 #[derive(Debug, Clone, Default)]
 struct Utterance {
-    /// Mots gardés (index dans la transcription), sans hésitations.
+    /// Kept words (index in the transcript), without hesitations.
     words: Vec<usize>,
-    /// Nombre de jetons de chaque mot gardé (un mot en donne un ou plus :
+    /// Number of tokens of each kept word (a word gives one or more:
     /// `l'oxygène` → `l`, `oxygene`).
     counts: Vec<usize>,
-    /// Mots normalisés.
+    /// Normalised words.
     tokens: Vec<String>,
-    /// Le dernier mot n'est suivi d'aucune ponctuation (ou de points de
-    /// suspension, d'un tiret) : la phrase a pu être coupée en plein mot.
+    /// The last word is followed by no punctuation (or by an ellipsis, a
+    /// dash): the sentence may have been cut mid-word.
     open_end: bool,
-    /// Un silence précède l'énoncé.
+    /// A silence precedes the utterance.
     after_pause: bool,
-    /// Fin du dernier mot (secondes).
+    /// End of the last word (seconds).
     end: f64,
 }
 
-/// Les lectures d'une même phrase.
+/// The readings of one sentence.
 struct Group {
-    /// Index (dans `readings`) de la lecture qui sert de référence : la plus
-    /// complète, la plus récente à longueur égale.
+    /// Index (in `readings`) of the reference reading: the most complete, the
+    /// most recent on equal length.
     best: usize,
     readings: Vec<Utterance>,
 }
@@ -79,8 +78,8 @@ impl Group {
     }
 }
 
-/// Phrases et prises d'une prise sans script, comme si elle avait été
-/// alignée sur un script.
+/// Sentences and takes of a take without a script, as if it had been
+/// aligned on a script.
 pub fn analyze(transcript: &Transcript) -> Analysis {
     let groups = groups(transcript);
     let mut sentences = Vec::with_capacity(groups.len());
@@ -114,14 +113,14 @@ pub fn analyze(transcript: &Transcript) -> Analysis {
             tokens: reference.tokens.clone(),
         });
     }
-    // Les prises dans l'ordre de la prise, comme pour un script écrit.
+    // Takes in the order of the take, as for a written script.
     takes.sort_by_key(|t| t.words.start);
     Analysis { sentences, takes }
 }
 
-/// Script déduit de la transcription : une phrase par ligne, dans l'ordre où
-/// elles sont dites pour la première fois. Vide s'il n'y a aucun mot. Sert
-/// de point de départ à un script qu'on corrige à la main.
+/// Script found in the transcript: one sentence per line, in the order
+/// they are first said. Empty if there is no word. A starting point for a
+/// script corrected by hand.
 pub fn derived_script(transcript: &Transcript) -> String {
     analyze(transcript)
         .sentences
@@ -131,7 +130,7 @@ pub fn derived_script(transcript: &Transcript) -> String {
         .join("\n")
 }
 
-/// Regroupe les énoncés en lectures d'une même phrase.
+/// Groups the utterances into readings of the same sentence.
 fn groups(transcript: &Transcript) -> Vec<Group> {
     let mut groups: Vec<Group> = Vec::new();
     for utterance in utterances(transcript).into_iter().flat_map(split_restarts) {
@@ -164,7 +163,7 @@ fn groups(transcript: &Transcript) -> Vec<Group> {
     groups
 }
 
-/// Découpe la transcription en énoncés : après une fin de phrase, ou à un
+/// Cuts the transcript into utterances: after a sentence end, or at a
 /// long silence.
 fn utterances(transcript: &Transcript) -> Vec<Utterance> {
     let mut out = Vec::new();
@@ -178,7 +177,7 @@ fn utterances(transcript: &Transcript) -> Vec<Utterance> {
         }
         previous_end = Some(word.range.end().as_secs_f64());
         let text = word.text.trim();
-        // Bruits notés par whisper : « [Musique] », « (rires) ».
+        // Noises written by whisper: "[Musique]", "(rires)".
         if text.starts_with(['[', '(']) {
             continue;
         }
@@ -212,8 +211,7 @@ fn push_utterance(out: &mut Vec<Utterance>, current: &mut Utterance) {
     }
 }
 
-/// Le mot peut avoir été coupé : pas de ponctuation après lui, ou une
-/// suspension.
+/// The word may have been cut: no punctuation after it, or an ellipsis.
 fn open_end(text: &str) -> bool {
     let last = text.chars().last();
     text.ends_with("...")
@@ -221,14 +219,14 @@ fn open_end(text: &str) -> bool {
         || last.is_some_and(char::is_alphanumeric)
 }
 
-/// Un énoncé qui recommence son propre début (« Le projet, le projet est
-/// né ») contient un faux départ : on le coupe là, le regroupement fera le
-/// reste.
+/// An utterance starting its own beginning again ("Le projet, le projet
+/// est né") contains a false start: it is cut there, grouping does the
+/// rest.
 fn split_restarts(utterance: Utterance) -> Vec<Utterance> {
     let (Some(a), Some(b)) = (utterance.tokens.first(), utterance.tokens.get(1)) else {
         return vec![utterance];
     };
-    // Premier jeton de chaque mot, pour couper entre deux mots.
+    // First token of each word, to cut between two words.
     let mut firsts = Vec::with_capacity(utterance.counts.len());
     let mut at = 0_usize;
     for &n in &utterance.counts {
@@ -250,8 +248,8 @@ fn split_restarts(utterance: Utterance) -> Vec<Utterance> {
         words: utterance.words.get(..k).unwrap_or_default().to_vec(),
         counts: utterance.counts.get(..k).unwrap_or_default().to_vec(),
         tokens: utterance.tokens.get(..q).unwrap_or_default().to_vec(),
-        // Coupé juste avant sa reprise : son dernier mot est entier
-        // (« Le projet, le projet est né »).
+        // Cut just before its retake: its last word is whole
+        // ("Le projet, le projet est né").
         open_end: false,
         after_pause: utterance.after_pause,
         end: utterance.end,
@@ -261,7 +259,7 @@ fn split_restarts(utterance: Utterance) -> Vec<Utterance> {
         counts: utterance.counts.get(k..).unwrap_or_default().to_vec(),
         tokens: utterance.tokens.get(q..).unwrap_or_default().to_vec(),
         open_end: utterance.open_end,
-        // Une reprise dans la foulée vaut une reprise après un silence.
+        // A retake straight away counts as a retake after a silence.
         after_pause: true,
         end: utterance.end,
     };
@@ -270,7 +268,7 @@ fn split_restarts(utterance: Utterance) -> Vec<Utterance> {
     out
 }
 
-/// `b` (dit après `a`) est-il une autre lecture de la même phrase ?
+/// Is `b` (said after `a`) another reading of the same sentence?
 fn same_sentence(a: &Utterance, b: &Utterance) -> bool {
     let (la, lb) = (a.tokens.len(), b.tokens.len());
     if la.min(lb) < 2 {
@@ -281,9 +279,9 @@ fn same_sentence(a: &Utterance, b: &Utterance) -> bool {
     if ratio >= RETAKE_SIMILARITY {
         return true;
     }
-    // Reprise reformulée : on recommence après un silence, même début,
-    // autre fin. Sans silence, c'est un parallélisme (« C'est simple et
-    // rapide. C'est simple et gratuit. »).
+    // Rephrased retake: starting again after a silence, same start, other
+    // end. Without a silence, it is a parallelism ("C'est simple et
+    // rapide. C'est simple et gratuit.").
     let prefix = a
         .tokens
         .iter()
@@ -297,10 +295,10 @@ fn same_sentence(a: &Utterance, b: &Utterance) -> bool {
     false_start(short, long) || lost_first_word(a, b)
 }
 
-/// Faux départ dont la reprise a perdu son premier mot (mal entendu) :
-/// « Armand Emm… | (Armand) Emmanuel Sophie… » transcrit « Mont-Emmanuel |
-/// Emmanuel Sophie… ». Le fragment est court, non ponctué, et son dernier
-/// mot ouvre l'énoncé suivant.
+/// False start whose retake lost its first word (misheard): "Armand
+/// Emm… | (Armand) Emmanuel Sophie…" transcribed "Mont-Emmanuel |
+/// Emmanuel Sophie…". The fragment is short, unpunctuated, and its last
+/// word opens the next utterance.
 fn lost_first_word(fragment: &Utterance, next: &Utterance) -> bool {
     let n = fragment.tokens.len();
     (2..=MAX_FRAGMENT).contains(&n)
@@ -313,9 +311,9 @@ fn lost_first_word(fragment: &Utterance, next: &Utterance) -> bool {
             .is_some_and(|(a, b)| similar(a, b))
 }
 
-/// `short` est-il le début de `long`, abandonné en route ? Tous ses mots
-/// doivent ouvrir `long` dans l'ordre ; le dernier peut manquer s'il a pu
-/// être coupé (pas de ponctuation après lui).
+/// Is `short` the start of `long`, abandoned midway? All its words must
+/// open `long` in order; the last may be missing if it may have been cut
+/// (no punctuation after it).
 fn false_start(short: &Utterance, long: &Utterance) -> bool {
     if short.tokens.len() >= long.tokens.len() {
         return false;
@@ -334,7 +332,7 @@ fn false_start(short: &Utterance, long: &Utterance) -> bool {
     short.iter().zip(long).all(|(a, b)| similar(a, b))
 }
 
-/// Plus longue sous-suite commune (mots proches acceptés).
+/// Longest common subsequence (close words accepted).
 fn lcs(a: &[String], b: &[String]) -> usize {
     let mut row = vec![0_usize; b.len().saturating_add(1)];
     for x in a {
@@ -356,7 +354,7 @@ fn lcs(a: &[String], b: &[String]) -> usize {
     row.last().copied().unwrap_or(0)
 }
 
-/// Texte d'une phrase déduite, terminé par une ponctuation de fin.
+/// Text of a found sentence, ending with a final punctuation mark.
 fn sentence_text(transcript: &Transcript, utterance: &Utterance) -> String {
     let text = utterance
         .words
@@ -370,7 +368,7 @@ fn sentence_text(transcript: &Transcript, utterance: &Utterance) -> String {
         .trim_end_matches("...")
         .trim_end_matches('…')
         .trim();
-    // Un « # » en tête serait lu comme un titre si le texte devient un script.
+    // A leading "#" would read as a heading if the text becomes a script.
     let text = text.trim_start_matches('#').trim_start();
     if text.is_empty() {
         String::new()
@@ -392,8 +390,8 @@ mod tests {
         Flicks::from_millis((t * 1000.0).round() as i64).unwrap()
     }
 
-    /// Transcription : mots séparés par des espaces, `|` marque une pause
-    /// d'une seconde. 0,3 s par mot.
+    /// Transcript: words separated by spaces, `|` marks a one-second pause.
+    /// 0.3 s per word.
     fn rush(text: &str) -> Transcript {
         let mut t = 0.0;
         let mut words = Vec::new();
@@ -416,7 +414,7 @@ mod tests {
         }
     }
 
-    /// Texte du montage obtenu sans script.
+    /// Text of the edit obtained without a script.
     fn cleaned(t: &Transcript) -> String {
         let a = analyze(t);
         let parts = cut(&a, t, &a.default_choice()).unwrap();
@@ -487,8 +485,8 @@ mod tests {
         );
         let script = derived_script(&t);
         assert!(!script.contains("Musique"), "{script}");
-        // « Bonjour à toutes et à tous » ne redit pas assez « Bonjour à
-        // tous » pour être une reprise : l'aparté et les deux saluts restent.
+        // "Bonjour à toutes et à tous" does not say "Bonjour à tous" again
+        // closely enough to be a retake: the aside and both greetings stay.
         assert_eq!(script.lines().count(), 3, "{script}");
     }
 

@@ -39,6 +39,17 @@ pub fn models_dir() -> PathBuf {
     cache_dir().join("models")
 }
 
+/// Cutout models. The folder used to be called `detourage`: an existing
+/// one is renamed rather than downloaded again.
+pub fn cutout_models_dir() -> PathBuf {
+    let dir = models_dir().join("cutout");
+    let old = models_dir().join("detourage");
+    if !dir.exists() && old.is_dir() {
+        let _ = std::fs::rename(&old, &dir);
+    }
+    dir
+}
+
 /// Prepared media (proxies, audio, waveforms), shared by the app and the CLI.
 pub fn media_cache() -> PathBuf {
     cache_dir().join("media")

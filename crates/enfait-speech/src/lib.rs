@@ -1,4 +1,4 @@
-//! Parole : de l'enregistrement aux mots datés, puis aux blocs du storyboard.
+//! Speech: from the recording to dated words, then to storyboard blocks.
 
 pub mod audio;
 pub mod cleanup;
@@ -20,14 +20,14 @@ pub use transcribe::{TranscribeOptions, transcribe};
 
 #[derive(Debug, thiserror::Error)]
 pub enum SpeechError {
-    #[error("ffmpeg introuvable ou en échec : {0}")]
+    #[error("ffmpeg not found or failed: {0}")]
     Ffmpeg(String),
-    #[error("entrée-sortie : {0}")]
+    #[error("input-output: {0}")]
     Io(#[from] std::io::Error),
     #[error("whisper : {0}")]
     Whisper(#[from] whisper_rs::WhisperError),
     #[error("temps : {0}")]
     Time(#[from] enfait_core::TimeError),
-    #[error("aucun mot reconnu")]
+    #[error("no word recognised")]
     NoSpeech,
 }

@@ -1,5 +1,5 @@
-//! Détourage d'une suite d'images avec le vrai modèle rapide, s'il est déjà
-//! en cache (`enfait-cli cutout --fast` le télécharge) ; ignoré sinon.
+//! Cutout of a sequence of images with the real fast model, if it is
+//! already cached (`enfait-cli cutout --fast` downloads it); skipped otherwise.
 
 #![allow(clippy::unwrap_used, clippy::print_stderr)]
 
@@ -9,12 +9,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[test]
 fn cuts_frames_in_parallel() {
-    let model = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|h| h.join(".cache/enfait/models/detourage/u2netp.onnx"))
-        .filter(|p| p.is_file());
+    let model =
+        Some(enfait_config::paths::cutout_models_dir().join("u2netp.onnx")).filter(|p| p.is_file());
     let Some(model) = model else {
-        eprintln!("modèle de détourage absent : test ignoré");
+        eprintln!("cutout model missing: test skipped");
         return;
     };
     let dir = tempfile::tempdir().unwrap();

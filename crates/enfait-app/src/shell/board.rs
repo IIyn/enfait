@@ -482,22 +482,26 @@ impl Shell {
                             .text_size(px(12.))
                             .text_color(color(tokens::MUTE)),
                     )
-                    .child(chip("undo", tr!("common.undo"), false, can_undo.is_some()).when(
-                        can_undo.is_some(),
-                        |d| {
-                            d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
-                                shell.undo(window, cx);
-                            }))
-                        },
-                    ))
-                    .child(chip("redo", tr!("common.redo"), false, can_redo.is_some()).when(
-                        can_redo.is_some(),
-                        |d| {
-                            d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
-                                shell.redo(window, cx);
-                            }))
-                        },
-                    )),
+                    .child(
+                        chip("undo", tr!("common.undo"), false, can_undo.is_some()).when(
+                            can_undo.is_some(),
+                            |d| {
+                                d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
+                                    shell.undo(window, cx);
+                                }))
+                            },
+                        ),
+                    )
+                    .child(
+                        chip("redo", tr!("common.redo"), false, can_redo.is_some()).when(
+                            can_redo.is_some(),
+                            |d| {
+                                d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
+                                    shell.redo(window, cx);
+                                }))
+                            },
+                        ),
+                    ),
             )
             .child(studio_bar)
             .child(
@@ -568,11 +572,9 @@ impl Shell {
         let can_moment = chosen_word
             .as_ref()
             .is_some_and(|(_, _, at)| !moment_words.contains(at));
-        let word_label = chosen_word
-            .as_ref()
-            .map_or_else(String::new, |(_, t, _)| {
-                format!(" {}", tr!("common.quoted", text = t))
-            });
+        let word_label = chosen_word.as_ref().map_or_else(String::new, |(_, t, _)| {
+            format!(" {}", tr!("common.quoted", text = t))
+        });
         let transition_controls = self.transition_controls(cx);
         let studio = self.studio_inspector(cx);
         let listeners: &Context<Self> = cx;
@@ -750,9 +752,12 @@ impl Shell {
                         .items_baseline()
                         .gap(px(10.))
                         .child(
-                            mono(tr!("board.scene", n = format!("{:02}", index.saturating_add(1))))
-                                .text_size(px(16.))
-                                .font_weight(FontWeight::MEDIUM),
+                            mono(tr!(
+                                "board.scene",
+                                n = format!("{:02}", index.saturating_add(1))
+                            ))
+                            .text_size(px(16.))
+                            .font_weight(FontWeight::MEDIUM),
                         )
                         .child(
                             mono(range)
@@ -899,14 +904,17 @@ fn block_row(
                         .flex_col()
                         .gap(px(2.))
                         .child(
-                            mono(tr!("board.scene", n = format!("{:02}", index.saturating_add(1))))
-                                .text_size(px(15.))
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(color(if playing {
-                                    tokens::SIGNAL
-                                } else {
-                                    tokens::FG
-                                })),
+                            mono(tr!(
+                                "board.scene",
+                                n = format!("{:02}", index.saturating_add(1))
+                            ))
+                            .text_size(px(15.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(color(if playing {
+                                tokens::SIGNAL
+                            } else {
+                                tokens::FG
+                            })),
                         )
                         .child(
                             mono(range)

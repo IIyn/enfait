@@ -1,18 +1,18 @@
-//! Lancement de ffmpeg avec suivi de l'avancement.
+//! Running ffmpeg with progress tracking.
 
 use anyhow::{Context as _, Result};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, BufReader};
 
-/// Lance `cmd` (une commande ffmpeg complète) ; `total` : durée produite,
-/// en secondes, pour rapporter l'avancement (0 à 1) à `progress`.
+/// Runs `cmd` (a complete ffmpeg command); `total`: produced duration, in
+/// seconds, to report the progress (0 to 1) to `progress`.
 pub async fn run(
     mut cmd: tokio::process::Command,
     total: f64,
     progress: Option<&(dyn Fn(f64) + Sync)>,
 ) -> Result<()> {
     let Some(progress) = progress else {
-        let output = cmd.output().await.context("lancement de ffmpeg")?;
+        let output = cmd.output().await.context("starting ffmpeg")?;
         anyhow::ensure!(
             output.status.success(),
             "ffmpeg : {}",
@@ -20,8 +20,8 @@ pub async fn run(
         );
         return Ok(());
     };
-    // `-progress` doit précéder la sortie : on l'ajoute en tête des options
-    // globales, qui valent pour toute la commande.
+    // `-progress` must come before the output: it is added at the head of the
+    // global options, which apply to the whole command.
     let mut child = {
         let std = cmd.as_std();
         let mut with = enfait_config::process::tokio_command(std.get_program());
@@ -32,10 +32,10 @@ pub async fn run(
             .stdin(Stdio::null())
             .kill_on_drop(true)
             .spawn()
-            .context("lancement de ffmpeg")?
+            .context("starting ffmpeg")?
     };
-    let stdout = child.stdout.take().context("sortie de ffmpeg")?;
-    let mut stderr = child.stderr.take().context("erreurs de ffmpeg")?;
+    let stdout = child.stdout.take().context("ffmpeg output")?;
+    let mut stderr = child.stderr.take().context("ffmpeg errors")?;
     let errors = tokio::spawn(async move {
         let mut text = String::new();
         let _ = stderr.read_to_string(&mut text).await;

@@ -1,8 +1,8 @@
-//! Lecture : la sortie audio fait avancer l'horloge.
+//! Playback: the audio output drives the clock.
 //!
-//! Avec du son et une carte son, c'est le rappel de cpal qui avance
-//! l'horloge, au rythme exact des échantillons joués. Sans son (vidéo muette)
-//! ou sans carte, un fil de travail l'avance d'après l'horloge système.
+//! With sound and a sound card, cpal's callback drives the clock, at the
+//! exact pace of the played samples. Without sound (silent video) or
+//! without a card, a worker thread drives it from the system clock.
 
 use crate::{AudioBuffer, Clock, Edl, MediaError};
 use cpal::traits::{DeviceTrait as _, HostTrait as _, StreamTrait as _};
@@ -12,24 +12,23 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-/// Au-delà de cette vitesse, le son est atténué (navette rapide).
+/// Beyond this speed, the sound is attenuated (fast shuttle).
 const LOUD_SPEED: f64 = 2.0;
 
-/// Lecture en cours ; s'arrête quand elle est abandonnée.
+/// Playback running; stops when dropped.
 pub struct Playback {
     inner: Inner,
 }
 
-/// Les deux variantes ne servent qu'à garder vivant ce qui fait avancer
-/// l'horloge.
+/// Both variants only keep alive what drives the clock.
 enum Inner {
     Audio { _stream: cpal::Stream },
     Ticker { _ticker: Ticker },
 }
 
 impl Playback {
-    /// Démarre la lecture de `audio` (s'il y en a) en suivant `clock`,
-    /// selon le montage `edl` (l'horloge est en temps montage).
+    /// Starts playing `audio` (if any) following `clock`, according to the
+    /// edit `edl` (the clock is in edit time).
     pub fn start(clock: Arc<Clock>, audio: Option<AudioBuffer>, edl: Arc<Edl>) -> Self {
         if let Some(audio) = audio {
             match open_stream(Arc::clone(&clock), audio, edl) {
@@ -38,7 +37,7 @@ impl Playback {
                         inner: Inner::Audio { _stream: stream },
                     };
                 }
-                Err(e) => tracing::warn!("{e} ; lecture sans son"),
+                Err(e) => tracing::warn!("{e}; playing without sound"),
             }
         }
         Self {
@@ -74,7 +73,7 @@ impl Ticker {
                         last = now;
                     }
                 })
-                .map_err(|e| tracing::error!("horloge de lecture : {e}"))
+                .map_err(|e| tracing::error!("playback clock: {e}"))
                 .ok()
         };
         Self { stop, thread }
@@ -99,7 +98,7 @@ fn open_stream(
     let host = cpal::default_host();
     let device = host
         .default_output_device()
-        .ok_or_else(|| MediaError::Output("aucune sortie audio".into()))?;
+        .ok_or_else(|| MediaError::Output("no audio output".into()))?;
     let supported = device.default_output_config().map_err(|e| err(&e))?;
     let format = supported.sample_format();
     let config: cpal::StreamConfig = supported.into();
@@ -110,7 +109,7 @@ fn open_stream(
         cpal::SampleFormat::U16 => build::<u16>(&device, config, clock, audio, edl),
         cpal::SampleFormat::F64 => build::<f64>(&device, config, clock, audio, edl),
         other => Err(MediaError::Output(format!(
-            "format d'échantillon {other} non pris en charge"
+            "unsupported sample format {other}"
         ))),
     }
 }
@@ -132,7 +131,7 @@ where
             config,
             move |out: &mut [T], info: &cpal::OutputCallbackInfo| {
                 let frames = out.len() / channels;
-                // Temps entre cet appel et la sortie effective du son.
+                // Time between this call and the actual output of the sound.
                 let stamp = info.timestamp();
                 let delay = (stamp.playback - stamp.callback).as_secs_f64();
                 #[allow(clippy::cast_precision_loss)]
@@ -149,11 +148,11 @@ where
     Ok(stream)
 }
 
-/// Durée des fondus de part et d'autre d'une coupe (évite les clics).
+/// Duration of the fades on both sides of a cut (avoids clicks).
 const CUT_FADE: f64 = 0.004;
 
-/// Remplit `out` (entrelacé, `channels` voies) avec le son à partir de
-/// l'instant `tick.start` du montage, à la vitesse `tick.speed`.
+/// Fills `out` (interleaved, `channels` channels) with the sound from edit
+/// time `tick.start`, at speed `tick.speed`.
 fn fill<T>(
     out: &mut [T],
     channels: usize,
@@ -219,7 +218,7 @@ mod tests {
         fill(&mut out, 2, &audio, &edl, play(0.75, -1.0), 4.0);
         assert_eq!(out, [0.75, 0.75, 0.5, 0.5, 0.25, 0.25, 0.0, 0.0]);
 
-        // Sortie à 8 Hz : chaque instant source est joué deux fois.
+        // Output at 8 Hz: each source frame is played twice.
         let mut mono = [0.0_f32; 4];
         fill(&mut mono, 1, &audio, &edl, play(0.0, 1.0), 8.0);
         assert_eq!(mono, [0.0, 0.125, 0.25, 0.375]);
@@ -227,17 +226,17 @@ mod tests {
         fill(&mut out, 2, &audio, &edl, play(0.5, 0.0), 4.0);
         assert_eq!(out, [0.0; 8]);
 
-        // Au-delà de la fin : silence.
+        // Beyond the end: silence.
         fill(&mut out, 2, &audio, &edl, play(5.0, 1.0), 4.0);
         assert_eq!(out, [0.0; 8]);
     }
 
     #[test]
     fn follows_the_cut_and_fades_at_joins() {
-        // 1 s à 1 000 Hz : la valeur d'un instant est son index / 1000.
+        // 1 s at 1,000 Hz: the value of a frame is its index / 1000.
         let samples: Vec<i16> = (0..1000).map(|i| i16::try_from(i * 32).unwrap()).collect();
         let audio = AudioBuffer::new(1000, 1, samples).unwrap();
-        // Montage : [0,5 ; 0,6) puis [0,1 ; 0,2).
+        // Edit: [0.5; 0.6) then [0.1; 0.2).
         let edl = Edl::from_ranges(&[(0.5, 0.6), (0.1, 0.2)]);
         let mut out = [0.0_f32; 200];
         fill(
@@ -254,7 +253,7 @@ mod tests {
         let at = |i: usize| out[i] * 32768.0 / 32.0;
         assert!((at(50) - 550.0).abs() < 0.5, "{}", at(50));
         assert!((at(150) - 150.0).abs() < 0.5, "{}", at(150));
-        // À la coupe (t = 0,1) : silence, puis remontée en 4 ms.
+        // At the cut (t = 0.1): silence, then ramp up in 4 ms.
         assert!(at(100).abs() < 1e-3);
         assert!(at(102) > 0.0 && at(102) < 102.0);
         assert!(out[199] == 0.0 || at(199) > 0.0);

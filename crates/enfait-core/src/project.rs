@@ -1,8 +1,8 @@
-//! Le projet : réglages et blocs du storyboard.
+//! The project: settings and storyboard blocks.
 //!
-//! Les blocs se suivent sans trou ni chevauchement. Ils ne se modifient que par
-//! des [`Edit`](crate::history::Edit), qui valident tout avant d'écrire : une
-//! édition refusée laisse le projet intact.
+//! Blocks follow each other without gap or overlap. They only change
+//! through [`Edit`](crate::history::Edit)s, which validate everything before
+//! writing: a refused edit leaves the project untouched.
 
 use crate::block::{Block, BlockKind, Broll, Moment, Transition};
 use crate::error::{EditError, ProjectError};
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::mem;
 
-/// Version du format de fichier `project.json`.
+/// Version of the `project.json` file format.
 pub const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
@@ -25,10 +25,10 @@ pub enum AspectRatio {
 }
 
 impl AspectRatio {
-    /// Formats proposés, dans l'ordre de l'interface.
+    /// Offered formats, in interface order.
     pub const ALL: [Self; 3] = [Self::Landscape16x9, Self::Portrait9x16, Self::Square1x1];
 
-    /// Définition de travail et d'export.
+    /// Working and export resolution.
     pub const fn resolution(self) -> Resolution {
         match self {
             Self::Landscape16x9 => Resolution {
@@ -46,16 +46,16 @@ impl AspectRatio {
         }
     }
 
-    /// Nom du format dans l'interface.
+    /// Name of the format (CLI, MCP; the app translates it).
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Landscape16x9 => "Grand format",
-            Self::Portrait9x16 => "Court vertical",
-            Self::Square1x1 => "Carré",
+            Self::Landscape16x9 => "Landscape",
+            Self::Portrait9x16 => "Vertical short",
+            Self::Square1x1 => "Square",
         }
     }
 
-    /// Format le plus proche d'une image `width`×`height`.
+    /// Format closest to a `width`×`height` image.
     pub fn nearest(width: u32, height: u32) -> Self {
         let ratio = f64::from(width) / f64::from(height.max(1));
         if ratio > 1.3 {
@@ -74,20 +74,20 @@ pub struct Resolution {
     pub height: u32,
 }
 
-/// Cadrage de la prise quand son format diffère de celui du projet.
+/// Framing of the take when its format differs from the project's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Framing {
-    /// Image entière, bandes noires autour.
+    /// Whole image, black bars around.
     #[default]
     Fit,
-    /// Cadre rempli, l'image dépasse et est rognée (prise 16:9 dans une
-    /// vidéo verticale).
+    /// Frame filled, the image overflows and is cropped (16:9 take in a
+    /// vertical video).
     Fill,
 }
 
-/// Décalage du cadre rogné, en pourcentage de la marge : −50 (bord gauche
-/// ou haut) à 50 (bord droit ou bas).
+/// Shift of the cropped frame, as a percentage of the margin: −50 (left
+/// or top edge) to 50 (right or bottom edge).
 pub const PAN_LIMIT: i8 = 50;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,13 +97,13 @@ pub struct ProjectSettings {
     pub frame_rate: FrameRate,
     #[serde(default)]
     pub framing: Framing,
-    /// Voir [`PAN_LIMIT`].
+    /// See [`PAN_LIMIT`].
     #[serde(default)]
     pub pan: i8,
 }
 
 impl ProjectSettings {
-    /// Mêmes réglages dans un autre format (définition standard du format).
+    /// Same settings in another format (standard resolution of the format).
     #[must_use]
     pub const fn with_aspect(mut self, aspect: AspectRatio) -> Self {
         self.aspect = aspect;
@@ -111,7 +111,7 @@ impl ProjectSettings {
         self
     }
 
-    /// Décalage du cadre borné à [`PAN_LIMIT`].
+    /// Frame shift bounded to [`PAN_LIMIT`].
     pub fn pan(&self) -> i8 {
         self.pan.clamp(-PAN_LIMIT, PAN_LIMIT)
     }
@@ -152,7 +152,7 @@ impl Project {
         }
     }
 
-    /// Projet avec des blocs existants, après validation.
+    /// Project with existing blocks, after validation.
     pub fn with_blocks(
         name: impl Into<String>,
         settings: ProjectSettings,
@@ -205,7 +205,7 @@ impl Project {
         self.blocks.iter().find(|b| b.id == id)
     }
 
-    /// Durée totale couverte par les blocs.
+    /// Total duration covered by the blocks.
     pub fn duration(&self) -> Flicks {
         self.blocks.last().map_or(Flicks::ZERO, |b| b.range.end())
     }
@@ -253,7 +253,7 @@ impl Project {
             .ok_or(EditError::BlockNotFound(id))
     }
 
-    // --- Opérations élémentaires. Chacune renvoie ce qu'il faut pour l'annuler. ---
+    // --- Elementary operations. Each returns what is needed to undo it. ---
 
     pub(crate) fn set_description(
         &mut self,
@@ -338,10 +338,10 @@ impl Project {
         Ok(mem::replace(&mut moment.note, note))
     }
 
-    /// Coupe le bloc en deux à `at`. La seconde moitié garde le type, le
-    /// détourage et le plan de b-roll (qui reprend là où la première s'arrête),
-    /// reçoit une description vide et hérite de la transition ; la première
-    /// passe en coupe nette.
+    /// Splits the block in two at `at`. The second half keeps the kind, the
+    /// cutout and the b-roll shot (resuming where the first one stops), gets
+    /// an empty description and inherits the transition; the first one gets
+    /// a hard cut.
     pub(crate) fn split(
         &mut self,
         id: BlockId,
@@ -383,8 +383,8 @@ impl Project {
         Ok(())
     }
 
-    /// Fusionne le bloc avec le suivant. Renvoie ce qu'il faut pour défaire la fusion :
-    /// la description et la transition d'origine du premier bloc, et le second bloc.
+    /// Merges the block with the next one. Returns what is needed to undo the
+    /// merge: the original description and transition of the first block, and the second block.
     pub(crate) fn merge_with_next(
         &mut self,
         id: BlockId,
@@ -402,7 +402,7 @@ impl Project {
         }
         let merged_range = TimeRange::new(first.range.start(), next.range.end())?;
 
-        // Tout est validé : on peut écrire.
+        // Everything is validated: we can write.
         self.blocks.remove(next_index);
         let first = self
             .blocks
@@ -422,7 +422,7 @@ impl Project {
         Ok((old_description, old_transition, next))
     }
 
-    /// Inverse exact de [`Project::merge_with_next`].
+    /// Exact inverse of [`Project::merge_with_next`].
     pub(crate) fn unmerge(
         &mut self,
         id: BlockId,

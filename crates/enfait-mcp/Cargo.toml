@@ -1,6 +1,6 @@
 [package]
 name = "enfait-mcp"
-description = "Serveur MCP d'enfait : outils pour les agents (storyboard, bibliothèque, finition) et pont avec l'interface."
+description = "enfait's MCP server: tools for agents (storyboard, library, finish) and bridge with the app."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

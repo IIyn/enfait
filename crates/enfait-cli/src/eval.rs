@@ -1,9 +1,9 @@
-//! `enfait-cli eval` : jeu d'évaluation des prompts.
+//! `enfait-cli eval`: evaluation set for the prompts.
 //!
-//! Chaque cas est un bloc isolé (texte, mots datés, durée, style). La commande
-//! le fait diriger, animer et rendre comme `make`, puis assemble une planche
-//! HTML où l'on note chaque scène. Une passe = un dossier ; l'empreinte des
-//! prompts y est inscrite pour comparer les passes entre elles.
+//! Each case is an isolated block (text, dated words, duration, style). The
+//! command has it directed, animated and rendered like `make`, then builds
+//! an HTML sheet where each scene is rated. One pass = one folder; the
+//! fingerprint of the prompts is written there to compare passes.
 
 use crate::encode;
 use crate::make::{self, Ctx, GpuArg, ProviderChoice, QualityArg};
@@ -26,15 +26,15 @@ const SHEET: &str = include_str!("sheet.html");
 
 #[derive(Debug, clap::Args)]
 pub struct EvalArgs {
-    /// Dossier de la passe (une passe par version des prompts).
+    /// Folder of the pass (one pass per version of the prompts).
     pub work: PathBuf,
-    /// Jeu de cas (voir `eval/generate.py`).
+    /// Set of cases (see `eval/generate.py`).
     #[arg(long, default_value = "eval/cases.json")]
     pub cases: PathBuf,
-    /// Ne traiter que ces cas (identifiants séparés par des virgules).
+    /// Only process these cases (ids separated by commas).
     #[arg(long, value_delimiter = ',')]
     pub only: Vec<String>,
-    /// Refaire direction et animation des cas traités, même déjà faits.
+    /// Redo direction and animation of the processed cases, even if done.
     #[arg(long)]
     pub redo: bool,
     #[arg(long, value_enum, default_value = "polished")]
@@ -43,12 +43,12 @@ pub struct EvalArgs {
     pub provider: ProviderChoice,
     #[arg(long, default_value_t = 30)]
     pub fps: u32,
-    /// Cas traités en parallèle.
+    /// Cases processed in parallel.
     #[arg(long, default_value_t = 3)]
     pub jobs: usize,
     #[arg(long, value_enum, default_value = "auto")]
     pub gpu: GpuArg,
-    /// Refaire seulement la planche, à partir des rendus existants.
+    /// Only redo the sheet, from the existing renders.
     #[arg(long)]
     pub sheet_only: bool,
 }
@@ -72,17 +72,17 @@ struct CaseWord {
     text: String,
 }
 
-/// Ce qui définit une passe : à comparer avant de comparer des notes.
+/// What defines a pass: to compare before comparing ratings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RunInfo {
-    /// Empreinte de l'ensemble des prompts et styles.
+    /// Fingerprint of all the prompts and styles.
     fingerprint: String,
-    /// Empreinte de chaque texte, pour savoir lequel a changé.
+    /// Fingerprint of each text, to know which one changed.
     prompts: BTreeMap<String, String>,
     quality: String,
     model: String,
     provider: String,
-    /// Secondes depuis l'époque Unix.
+    /// Seconds since the Unix epoch.
     created: u64,
 }
 
@@ -108,7 +108,7 @@ fn dimensions(aspect: &str) -> Result<(u32, u32)> {
         "16:9" => Ok((1920, 1080)),
         "9:16" => Ok((1080, 1920)),
         "1:1" => Ok((1080, 1080)),
-        other => anyhow::bail!("format « {other} » inconnu (16:9, 9:16 ou 1:1)"),
+        other => anyhow::bail!("unknown format \"{other}\" (16:9, 9:16 or 1:1)"),
     }
 }
 
@@ -136,19 +136,19 @@ async fn run_case(s: &Shared<'_>, case: &Case) -> Result<()> {
     }
     let preset = match &case.style {
         Some(slug) => Some(
-            enfait_ai::styles::find(slug).with_context(|| format!("style « {slug} » inconnu"))?,
+            enfait_ai::styles::find(slug).with_context(|| format!("unknown style \"{slug}\""))?,
         ),
         None => None,
     };
     let style = enfait_ai::styles::combine(preset, None);
     let (width, height) = dimensions(&case.aspect)?;
-    // Durée de quelques secondes, positive : la conversion ne déborde pas.
+    // Duration of a few seconds, positive: the conversion does not overflow.
     #[allow(clippy::cast_possible_truncation)]
     let millis = (case.duration * 1000.0).round().max(1.0) as i64;
     let range = TimeRange::new(Flicks::ZERO, Flicks::from_millis(millis)?)?;
     let script = format!(
-        "Sujet de la vidéo : {}\n\nCe bloc est évalué isolément : traite-le comme une scène \
-         d'une vidéo plus longue sur ce sujet.",
+        "Topic of the video: {}\n\nThis block is evaluated on its own: treat it as a scene \
+         of a longer video on this topic.",
         case.context
     );
     let direction = make::direct(
@@ -165,7 +165,7 @@ async fn run_case(s: &Shared<'_>, case: &Case) -> Result<()> {
     )
     .await?;
 
-    library::install(&dir.join("comps")).context("bibliothèque des compositions")?;
+    library::install(&dir.join("comps")).context("library of the compositions")?;
     let ctx = Ctx {
         work: dir.clone(),
         provider: s.provider,
@@ -225,14 +225,14 @@ pub async fn run(dirs: &Dirs, args: EvalArgs) -> Result<()> {
     tokio::fs::create_dir_all(&work).await?;
     let data = tokio::fs::read(&args.cases)
         .await
-        .with_context(|| format!("lecture de {}", args.cases.display()))?;
+        .with_context(|| format!("reading {}", args.cases.display()))?;
     let cases: Vec<Case> = serde_json::from_slice(&data).context("jeu de cas illisible")?;
     if let Some(unknown) = args
         .only
         .iter()
         .find(|id| !cases.iter().any(|c| &c.id == *id))
     {
-        anyhow::bail!("cas « {unknown} » absent de {}", args.cases.display());
+        anyhow::bail!("case \"{unknown}\" missing from {}", args.cases.display());
     }
     let selected: Vec<&Case> = cases
         .iter()
@@ -255,9 +255,9 @@ pub async fn run(dirs: &Dirs, args: EvalArgs) -> Result<()> {
                 .map(|(name, _)| name.as_str())
                 .collect();
             tracing::warn!(
-                "les prompts ont changé depuis cette passe ({}) : les cas déjà faits gardent \
-                 l'ancienne version, les nouveaux suivront la nouvelle. Pour comparer, \
-                 lancer une nouvelle passe dans un autre dossier.",
+                "the prompts changed since this pass ({}): cases already done keep the old \
+                 version, new ones will follow the new one. To compare, run a new pass in \
+                 another folder.",
                 changed.join(", ")
             );
         }
@@ -335,7 +335,7 @@ pub async fn run(dirs: &Dirs, args: EvalArgs) -> Result<()> {
             }
         }
         tracing::info!(
-            "{} cas en {} s, {failed} en échec",
+            "{} cases in {} s, {failed} failed",
             selected.len(),
             started.elapsed().as_secs()
         );
@@ -343,11 +343,11 @@ pub async fn run(dirs: &Dirs, args: EvalArgs) -> Result<()> {
     }
 
     let sheet = write_sheet(&work, &cases).await?;
-    tracing::info!("planche à noter : {}", sheet.display());
+    tracing::info!("rating sheet: {}", sheet.display());
     Ok(())
 }
 
-/// Un cas tel que la planche l'affiche.
+/// A case as the sheet shows it.
 #[derive(Serialize)]
 struct SheetCase<'a> {
     #[serde(flatten)]
@@ -361,8 +361,8 @@ struct SheetCase<'a> {
 }
 
 async fn write_sheet(work: &Path, cases: &[Case]) -> Result<PathBuf> {
-    // Polices de l'interface (IBM Plex) pour la planche.
-    library::install(work).context("polices de la planche")?;
+    // Fonts of the app (IBM Plex) for the sheet.
+    library::install(work).context("fonts of the sheet")?;
     let mut rows = Vec::with_capacity(cases.len());
     for case in cases {
         let dir = case_dir(work, &case.id);
@@ -399,21 +399,21 @@ async fn write_sheet(work: &Path, cases: &[Case]) -> Result<PathBuf> {
         .await
         .ok()
         .and_then(|d| serde_json::from_slice(&d).ok());
-    // Notes déjà exportées et rangées dans le dossier de la passe.
+    // Ratings already exported and stored in the folder of the pass.
     let notes: Option<serde_json::Value> = tokio::fs::read(work.join("notes.json"))
         .await
         .ok()
         .and_then(|d| serde_json::from_slice(&d).ok());
     let data = serde_json::json!({ "run": run, "notes": notes, "cases": rows });
-    // Le JSON est placé dans une balise <script> : `</` ne doit pas la fermer.
+    // The JSON goes into a <script> tag: `</` must not close it.
     let json = serde_json::to_string(&data)?.replace("</", "<\\/");
     let path = work.join("planche.html");
     tokio::fs::write(&path, SHEET.replace("/*DATA*/null", &json)).await?;
     Ok(path)
 }
 
-/// Image représentative : aux trois cinquièmes du rendu, quand le geste
-/// principal est en général posé.
+/// Representative frame: at three fifths of the render, when the main
+/// gesture is usually settled.
 async fn poster(dir: &Path) -> Option<String> {
     let frames = dir.join("frames").join("b01");
     let mut count = 0_usize;
@@ -457,7 +457,7 @@ mod tests {
     fn fingerprint_covers_every_prompt() {
         let (all, each) = fingerprint();
         assert_eq!(all.len(), 10);
-        assert!(each.contains_key("director") && each.contains_key("craie"));
+        assert!(each.contains_key("director") && each.contains_key("chalk"));
     }
 
     #[test]

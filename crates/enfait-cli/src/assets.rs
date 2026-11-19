@@ -1,5 +1,5 @@
-//! `enfait-cli search` et `enfait-cli cutout` : les outils d'assets sans
-//! interface (recherche libre de droits, détourage).
+//! `enfait-cli search` and `enfait-cli cutout`: the asset tools without
+//! interface (royalty-free search, cutout).
 
 use crate::paths::Dirs;
 use anyhow::{Context as _, Result};
@@ -9,15 +9,15 @@ use std::path::PathBuf;
 
 #[derive(Debug, clap::Args)]
 pub struct SearchArgs {
-    /// Mots cherchés (en anglais de préférence pour Commons et Openverse).
+    /// Searched words (in English preferably for Commons and Openverse).
     pub query: String,
-    /// Chercher des vidéos plutôt que des images.
+    /// Search videos rather than images.
     #[arg(long, conflicts_with = "audio")]
     pub video: bool,
-    /// Chercher des sons (musiques, effets).
+    /// Search sounds (music, effects).
     #[arg(long)]
     pub audio: bool,
-    /// Télécharge les N premiers résultats dans ce dossier, avec leurs crédits.
+    /// Downloads the first N results into this folder, with their credits.
     #[arg(long)]
     pub download: Option<PathBuf>,
     #[arg(long, default_value_t = 3)]
@@ -29,7 +29,10 @@ pub async fn search_cmd(args: SearchArgs) -> Result<()> {
         if !source.available()
             && let Some(var) = source.key_var()
         {
-            tracing::info!("{} ignoré : définis {var} pour l'utiliser", source.name());
+            tracing::info!(
+                "{} skipped: set its key in the app's Settings or {var}",
+                source.name()
+            );
         }
     }
     let client = client()?;
@@ -85,28 +88,28 @@ pub async fn search_cmd(args: SearchArgs) -> Result<()> {
     }
     let credits = enfait_core::license::credits(&assets);
     std::fs::write(dir.join("credits.txt"), &credits)?;
-    tracing::info!("crédits :\n{credits}");
+    tracing::info!("credits:\n{credits}");
     Ok(())
 }
 
 #[derive(Debug, clap::Args)]
 pub struct CutoutArgs {
-    /// Image à détourer.
+    /// Image to cut out.
     pub input: PathBuf,
-    /// PNG transparent écrit.
+    /// Written transparent PNG.
     pub output: PathBuf,
-    /// Modèle rapide (U²-Net-p) plutôt que précis (ISNet).
+    /// Fast model (U²-Net-p) rather than precise (ISNet).
     #[arg(long)]
     pub fast: bool,
 }
 
-pub async fn cutout_cmd(dirs: &Dirs, args: CutoutArgs) -> Result<()> {
+pub async fn cutout_cmd(_dirs: &Dirs, args: CutoutArgs) -> Result<()> {
     let model = if args.fast {
         Model::Fast
     } else {
         Model::Precise
     };
-    let dir = dirs.models().join("detourage");
+    let dir = enfait_config::paths::cutout_models_dir();
     tokio::fs::create_dir_all(&dir).await?;
     let path = ensure_model(&dir, model).await?;
     let started = std::time::Instant::now();
@@ -115,6 +118,6 @@ pub async fn cutout_cmd(dirs: &Dirs, args: CutoutArgs) -> Result<()> {
         cut_file(&cutter, &args.input, &args.output)
     })
     .await??;
-    tracing::info!("détouré en {:.1} s", started.elapsed().as_secs_f64());
+    tracing::info!("cut out in {:.1} s", started.elapsed().as_secs_f64());
     Ok(())
 }

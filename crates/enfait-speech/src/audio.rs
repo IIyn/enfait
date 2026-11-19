@@ -1,13 +1,13 @@
-//! Décodage audio par ffmpeg (sous-processus).
+//! Audio decoding by ffmpeg (subprocess).
 
 use crate::SpeechError;
 use enfait_core::Flicks;
 use std::path::Path;
 
-/// Fréquence attendue par whisper.
+/// Sample rate expected by whisper.
 pub const WHISPER_RATE: u32 = 16_000;
 
-/// Échantillons mono en flottants.
+/// Mono float samples.
 pub struct Pcm {
     pub samples: Vec<f32>,
     pub rate: u32,
@@ -20,7 +20,7 @@ impl Pcm {
     }
 }
 
-/// Décode n'importe quel média en mono 16 kHz.
+/// Decodes any media to mono 16 kHz.
 pub fn decode_pcm(input: &Path) -> Result<Pcm, SpeechError> {
     let output = enfait_config::process::command("ffmpeg")
         .args(["-nostdin", "-v", "error", "-i"])

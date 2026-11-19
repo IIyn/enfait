@@ -154,9 +154,18 @@ pub(super) fn style_text(preset: &enfait_ai::styles::Preset) -> (SharedString, S
             tr!("side.style.engraving.name"),
             tr!("side.style.engraving.summary"),
         ),
-        "paper" => (tr!("side.style.paper.name"), tr!("side.style.paper.summary")),
-        "swiss" => (tr!("side.style.swiss.name"), tr!("side.style.swiss.summary")),
-        "chalk" => (tr!("side.style.chalk.name"), tr!("side.style.chalk.summary")),
+        "paper" => (
+            tr!("side.style.paper.name"),
+            tr!("side.style.paper.summary"),
+        ),
+        "swiss" => (
+            tr!("side.style.swiss.name"),
+            tr!("side.style.swiss.summary"),
+        ),
+        "chalk" => (
+            tr!("side.style.chalk.name"),
+            tr!("side.style.chalk.summary"),
+        ),
         _ => (preset.name.into(), preset.summary.into()),
     }
 }
@@ -307,11 +316,11 @@ impl Shell {
             )
             .enumerate()
             .map(|(i, (slug, name))| {
-                chip(("style", i), name, current_slug == slug).on_click(
-                    listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                chip(("style", i), name, current_slug == slug).on_click(listeners.listener(
+                    move |shell, _: &ClickEvent, _, cx| {
                         shell.choose_style(slug, cx);
-                    }),
-                )
+                    },
+                ))
             });
         let looks = FX_PRESETS.iter().enumerate().map(|(i, preset)| {
             let preset_fx = preset.fx;

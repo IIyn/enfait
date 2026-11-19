@@ -1,4 +1,4 @@
-//! Requêtes et réponses, indépendantes du fournisseur.
+//! Requests and replies, independent of the provider.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -32,15 +32,15 @@ impl fmt::Display for Effort {
     }
 }
 
-/// Morceau du message utilisateur.
+/// Part of the user message.
 #[derive(Debug, Clone)]
 pub enum Part {
     Text(String),
-    /// Image JPEG ou PNG sur disque.
+    /// JPEG or PNG image on disk.
     Image(PathBuf),
 }
 
-/// Un échange en un seul tour : consigne système (mise en cache) et message.
+/// A single-turn exchange: system instruction (cached) and message.
 #[derive(Debug, Clone)]
 pub struct Request {
     pub model: String,
@@ -56,7 +56,7 @@ pub struct Usage {
     pub output_tokens: u64,
     pub cache_read_input_tokens: u64,
     pub cache_creation_input_tokens: u64,
-    /// Coût annoncé par Claude Code, s'il est connu.
+    /// Cost reported by Claude Code, if known.
     pub cost_usd: f64,
 }
 
@@ -85,21 +85,21 @@ pub struct Reply {
 pub enum AiError {
     #[error("HTTP : {0}")]
     Http(#[from] reqwest::Error),
-    #[error("l'API a répondu {status} : {message}")]
+    #[error("the API answered {status}: {message}")]
     Api { status: u16, message: String },
-    #[error("le modèle a refusé la demande")]
+    #[error("the model refused the request")]
     Refusal,
-    #[error("réponse tronquée (max_tokens atteint)")]
+    #[error("truncated reply (max_tokens reached)")]
     Truncated,
     #[error("Claude Code : {0}")]
     ClaudeCode(String),
-    #[error("entrée-sortie : {0}")]
+    #[error("input-output: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON : {0}")]
     Json(#[from] serde_json::Error),
-    #[error("réponse inattendue : {0}")]
+    #[error("unexpected reply: {0}")]
     Unexpected(String),
-    #[error("ANTHROPIC_API_KEY absente")]
+    #[error("no Anthropic API key (Settings → Models, or ANTHROPIC_API_KEY)")]
     MissingKey,
     #[error("{0}")]
     Config(String),

@@ -1,13 +1,12 @@
-//! Finition sonore : musiques, effets sonores (SFX) et ducking.
+//! Sound finish: music, sound effects (SFX) and ducking.
 //!
-//! Musiques et SFX sont ancrés sur les blocs du storyboard, pas sur des
-//! instants : ils suivent le montage quand une prise ou un découpage change.
-//! Une musique couvre une suite de blocs ; un SFX se place à un décalage
-//! (éventuellement négatif) du début d'un bloc. [`Finish::resolve`] les
-//! traduit en secondes pour le mixage.
+//! Music and SFX are anchored on storyboard blocks, not on times: they
+//! follow the edit when a take or a split changes. A music covers a run of
+//! blocks; a SFX sits at an offset (possibly negative) from the start of a
+//! block. [`Finish::resolve`] turns them into seconds for the mix.
 //!
-//! Le ducking (la musique baisse sous la voix) est calculé à partir des mots
-//! datés de la transcription : déterministe, réglable en dB.
+//! Ducking (the music dips under the voice) is computed from the dated
+//! words of the transcript: deterministic, adjustable in dB.
 
 use crate::id::BlockId;
 use crate::project::Project;
@@ -15,7 +14,7 @@ use crate::transcript::Transcript;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 
-/// Identifiant d'une musique ou d'un SFX dans la finition.
+/// Id of a music or a SFX in the finish.
 pub type CueId = u64;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -24,7 +23,7 @@ pub struct Finish {
     pub music: Vec<Music>,
     pub sfx: Vec<Sfx>,
     pub ducking: Ducking,
-    /// Gain de la voix, en dB.
+    /// Gain of the voice, in dB.
     pub voice_gain_db: f32,
     next_id: CueId,
 }
@@ -41,16 +40,16 @@ impl Default for Finish {
     }
 }
 
-/// Une musique, du début du bloc `from` à la fin du bloc `to`.
+/// A music, from the start of block `from` to the end of block `to`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Music {
     pub id: CueId,
-    /// Fichier de la bibliothèque.
+    /// Library file.
     pub file: String,
     pub from: BlockId,
     pub to: BlockId,
-    /// Instant du morceau où il commence (secondes). Reprise au début s'il
-    /// est plus court que les blocs couverts.
+    /// Time of the track where it starts (seconds). Loops if it is shorter
+    /// than the covered blocks.
     #[serde(default)]
     pub offset: f64,
     #[serde(default = "default_music_gain")]
@@ -61,7 +60,7 @@ pub struct Music {
     pub fade_out: f64,
 }
 
-/// Un effet sonore, à `offset` secondes du début du bloc `block`.
+/// A sound effect, `offset` seconds from the start of block `block`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Sfx {
     pub id: CueId,
@@ -81,16 +80,16 @@ const fn default_fade() -> f64 {
     1.0
 }
 
-/// La musique baisse quand la voix parle.
+/// The music dips while the voice speaks.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ducking {
     pub enabled: bool,
-    /// Baisse sous la voix, en dB (négatif).
+    /// Dip under the voice, in dB (negative).
     pub depth_db: f32,
-    /// Temps de descente avant le premier mot, en secondes.
+    /// Ramp-down time before the first word, in seconds.
     pub attack: f64,
-    /// Temps de remontée après le dernier mot, en secondes.
+    /// Ramp-up time after the last word, in seconds.
     pub release: f64,
 }
 
@@ -105,7 +104,7 @@ impl Default for Ducking {
     }
 }
 
-/// Une musique placée, en secondes du montage.
+/// A placed music, in edit seconds.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlacedMusic {
     pub id: CueId,
@@ -118,7 +117,7 @@ pub struct PlacedMusic {
     pub fade_out: f64,
 }
 
-/// Un SFX placé, en secondes du montage (jamais avant 0).
+/// A placed SFX, in edit seconds (never before 0).
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlacedSfx {
     pub id: CueId,
@@ -127,12 +126,12 @@ pub struct PlacedSfx {
     pub gain_db: f32,
 }
 
-/// La finition traduite en secondes pour un montage donné.
+/// The finish turned into seconds for a given edit.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Placed {
     pub music: Vec<PlacedMusic>,
     pub sfx: Vec<PlacedSfx>,
-    /// Ce qui ne trouve plus son bloc (montage changé).
+    /// What no longer finds its block (edit changed).
     pub orphans: Vec<CueId>,
 }
 
@@ -153,7 +152,7 @@ impl Finish {
         id
     }
 
-    /// Ajoute une musique et renvoie son identifiant.
+    /// Adds a music and returns its id.
     pub fn add_music(&mut self, file: String, from: BlockId, to: BlockId) -> CueId {
         let id = self.take_id();
         self.music.push(Music {
@@ -169,7 +168,7 @@ impl Finish {
         id
     }
 
-    /// Ajoute un SFX et renvoie son identifiant.
+    /// Adds a SFX and returns its id.
     pub fn add_sfx(&mut self, file: String, block: BlockId, offset: f64) -> CueId {
         let id = self.take_id();
         self.sfx.push(Sfx {
@@ -190,19 +189,19 @@ impl Finish {
         self.sfx.iter_mut().find(|s| s.id == id)
     }
 
-    /// Retire une musique ou un SFX.
+    /// Removes a music or a SFX.
     pub fn remove(&mut self, id: CueId) {
         self.music.retain(|m| m.id != id);
         self.sfx.retain(|s| s.id != id);
     }
 
-    /// Retire ce qui utilise un fichier (retiré de la bibliothèque).
+    /// Removes what uses a file (removed from the library).
     pub fn forget_file(&mut self, file: &str) {
         self.music.retain(|m| m.file != file);
         self.sfx.retain(|s| s.file != file);
     }
 
-    /// Place musiques et SFX sur les blocs de `project`.
+    /// Places music and SFX on the blocks of `project`.
     pub fn resolve(&self, project: &Project) -> Placed {
         let mut placed = Placed::default();
         let end = project.duration().as_secs_f64();
@@ -215,7 +214,7 @@ impl Finish {
                 from.range.start().as_secs_f64(),
                 to.range.end().as_secs_f64(),
             );
-            // Blocs donnés à l'envers : on couvre quand même l'intervalle.
+            // Blocks given backwards: still cover the interval.
             let (start, stop) = (a.min(b), a.max(b).min(end));
             if stop - start < 1e-3 {
                 continue;
@@ -248,8 +247,8 @@ impl Finish {
     }
 }
 
-/// Passages parlés `(début, fin)` en secondes, d'après les mots : deux mots
-/// séparés de moins de `gap` secondes sont dans le même passage.
+/// Spoken passages `(start, end)` in seconds, from the words: two words
+/// less than `gap` seconds apart are in the same passage.
 pub fn speech_spans(transcript: &Transcript, gap: f64) -> Vec<(f64, f64)> {
     let mut spans: Vec<(f64, f64)> = Vec::new();
     for word in &transcript.words {
@@ -266,14 +265,14 @@ pub fn speech_spans(transcript: &Transcript, gap: f64) -> Vec<(f64, f64)> {
 }
 
 impl Ducking {
-    /// Passages où la musique baisse : ceux de la voix, regroupés quand
-    /// leurs rampes se toucheraient.
+    /// Passages where the music dips: those of the voice, merged when their
+    /// ramps would touch.
     pub fn spans(&self, transcript: &Transcript) -> Vec<(f64, f64)> {
         let (attack, release) = (self.attack.max(0.01), self.release.max(0.01));
         speech_spans(transcript, attack + release + 0.05)
     }
 
-    /// Amortissement à l'instant `t` : 0 (musique pleine) à 1 (baissée).
+    /// Damping at time `t`: 0 (full music) to 1 (dipped).
     pub fn amount(&self, spans: &[(f64, f64)], t: f64) -> f64 {
         let (attack, release) = (self.attack.max(0.01), self.release.max(0.01));
         spans
@@ -286,7 +285,7 @@ impl Ducking {
             .fold(0.0, f64::max)
     }
 
-    /// Gain linéaire de la musique à l'instant `t`.
+    /// Linear gain of the music at time `t`.
     pub fn gain(&self, spans: &[(f64, f64)], t: f64) -> f64 {
         if !self.enabled {
             return 1.0;
@@ -295,9 +294,9 @@ impl Ducking {
         1.0 - (1.0 - floor) * self.amount(spans, t)
     }
 
-    /// Le même gain en expression ffmpeg (filtre `volume`, `eval=frame`).
-    /// Les passages ne se chevauchant pas (voir [`Ducking::spans`]), leurs
-    /// rampes s'additionnent.
+    /// The same gain as an ffmpeg expression (`volume` filter, `eval=frame`).
+    /// The passages do not overlap (see [`Ducking::spans`]), so their ramps
+    /// add up.
     pub fn expression(&self, spans: &[(f64, f64)]) -> String {
         if !self.enabled || spans.is_empty() {
             return "1".to_owned();
@@ -320,8 +319,8 @@ impl Ducking {
     }
 }
 
-/// Historique annuler / rétablir de la finition (états complets : la
-/// finition est petite).
+/// Undo / redo history of the finish (whole states: the finish is
+/// small).
 #[derive(Debug, Default)]
 pub struct FinishHistory {
     undo: Vec<Finish>,
@@ -331,7 +330,7 @@ pub struct FinishHistory {
 impl FinishHistory {
     const LIMIT: usize = 200;
 
-    /// À appeler avant de modifier `finish`.
+    /// To call before changing `finish`.
     pub fn record(&mut self, finish: &Finish) {
         self.undo.push(finish.clone());
         let excess = self.undo.len().saturating_sub(Self::LIMIT);
@@ -408,7 +407,7 @@ mod tests {
         assert_eq!((placed.music[0].start, placed.music[0].end), (4.0, 12.0));
         assert!((placed.sfx[0].at - 3.8).abs() < 1e-9);
         assert_eq!(placed.orphans, [lost]);
-        // Un SFX avant le début reste à 0.
+        // A SFX before the start stays at 0.
         f.sfx_mut(s).unwrap().offset = -10.0;
         assert_eq!(f.resolve(&p).sfx[0].at, 0.0);
         let json = serde_json::to_string(&f).unwrap();
@@ -416,7 +415,7 @@ mod tests {
         assert_eq!(back, f);
         f.forget_file("theme.mp3");
         assert!(f.music.is_empty());
-        // Un nouvel identifiant après rechargement ne réutilise pas les anciens.
+        // A new id after reloading does not reuse the old ones.
         let mut back = back;
         assert!(back.add_sfx("x.wav".into(), ids[0], 0.0) > lost);
     }
@@ -445,11 +444,14 @@ mod tests {
         assert_eq!(spans.len(), 2);
         assert!((d.gain(&spans, 0.0) - 1.0).abs() < 1e-9, "musique pleine");
         let floor = 10_f64.powf(-10.0 / 20.0);
-        assert!((d.gain(&spans, 1.5) - floor).abs() < 1e-9, "sous la voix");
+        assert!(
+            (d.gain(&spans, 1.5) - floor).abs() < 1e-9,
+            "under the voice"
+        );
         let mid = d.gain(&spans, 2.3);
-        assert!(mid > floor && mid < 1.0, "remontée");
+        assert!(mid > floor && mid < 1.0, "ramp-up");
         assert!((d.gain(&spans, 4.0) - 1.0).abs() < 1e-9);
-        // Deux passages proches sont regroupés : pas de remontée entre eux.
+        // Two close passages are merged: no ramp-up between them.
         let close = transcript(&[(1.0, 2.0), (2.5, 3.0)]);
         assert_eq!(d.spans(&close), [(1.0, 3.0)]);
         let off = Ducking {

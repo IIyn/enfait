@@ -1,4 +1,4 @@
-//! Rendu image par image dans un Chromium sans écran.
+//! Frame-by-frame rendering in a headless Chromium.
 
 use crate::error::MotionError;
 use crate::library;
@@ -18,31 +18,31 @@ use tokio::task::JoinHandle;
 
 const RUNTIME_JS: &str = include_str!("runtime.js");
 
-/// Marge de la zone sûre, en fraction de la largeur et de la hauteur.
+/// Margin of the safe area, as a fraction of width and height.
 pub const SAFE_MARGIN: f64 = 0.05;
 
-/// chromiumoxide ajoute lui-même le `--` devant chaque option : on l'enlève
-/// pour garder des options lisibles ici.
+/// chromiumoxide adds the `--` in front of each option itself: it is
+/// left out here to keep the options readable.
 fn flags(list: &[&str]) -> Vec<String> {
     list.iter()
         .map(|f| f.trim_start_matches("--").to_owned())
         .collect()
 }
 
-/// Accélération du rendu.
+/// Render acceleration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Gpu {
-    /// Rendu logiciel (SwiftShader), partout disponible.
+    /// Software rendering (SwiftShader), available everywhere.
     #[default]
     Software,
-    /// Rendu GPU par ANGLE/Vulkan.
+    /// GPU rendering through ANGLE/Vulkan.
     Vulkan {
-        /// Sur un portable hybride, forcer la carte NVIDIA.
+        /// On a hybrid laptop, force the NVIDIA card.
         nvidia_offload: bool,
     },
 }
 
-/// Un Chromium lancé, partagé entre plusieurs rendus.
+/// A running Chromium, shared by several renders.
 pub struct Renderer {
     browser: Browser,
     handler: JoinHandle<()>,
@@ -65,10 +65,10 @@ impl Renderer {
                 "--mute-audio",
                 "--force-color-profile=srgb",
                 "--font-render-hinting=none",
-                // Aucune requête réseau : seules les ressources locales chargent.
+                // No network request: only local resources load.
                 "--host-resolver-rules=MAP * ~NOTFOUND",
                 "--allow-file-access-from-files",
-                // Images déclenchées une à une par `HeadlessExperimental.beginFrame`.
+                // Frames triggered one by one by `HeadlessExperimental.beginFrame`.
                 "--enable-begin-frame-control",
                 "--run-all-compositor-stages-before-draw",
                 "--disable-new-content-rendering-timeout",
@@ -87,14 +87,14 @@ impl Renderer {
                     "--enable-zero-copy",
                 ]));
                 if nvidia_offload {
-                    // Portable hybride : force la carte NVIDIA plutôt que l'iGPU.
+                    // Hybrid laptop: force the NVIDIA card rather than the iGPU.
                     builder = builder
                         .env("__NV_PRIME_RENDER_OFFLOAD", "1")
                         .env("__VK_LAYER_NV_optimus", "NVIDIA_only");
                 }
             }
         }
-        // Réglage d'expérimentation : options Chromium supplémentaires.
+        // Experimentation setting: extra Chromium options.
         if let Ok(extra) = std::env::var("ENFAIT_CHROME_ARGS") {
             builder = builder.args(flags(&extra.split_whitespace().collect::<Vec<_>>()));
         }
@@ -110,8 +110,8 @@ impl Renderer {
         Ok(Self { browser, handler })
     }
 
-    /// Ouvre `html` dans un nouvel onglet de `width`×`height` et attend que la
-    /// composition soit prête.
+    /// Opens `html` in a new `width`×`height` tab and waits until the
+    /// composition is ready.
     pub async fn open(
         &self,
         html: &Path,
@@ -162,19 +162,19 @@ struct Ready {
     reason: Option<String>,
 }
 
-/// Un onglet ouvert.
+/// An open tab.
 struct Stage {
     page: Page,
 }
 
-/// Une composition chargée, avec sa durée déclarée.
+/// A loaded composition, with its declared duration.
 pub struct OpenStage {
     stage: Stage,
-    /// Dernière image capturée : Chromium n'en produit pas de nouvelle quand
-    /// rien n'a changé à l'écran.
+    /// Last captured frame: Chromium produces no new one when nothing changed
+    /// on screen.
     last: std::sync::Mutex<Option<Vec<u8>>>,
     pub duration: f64,
-    /// Erreurs survenues pendant le chargement.
+    /// Errors raised while loading.
     pub load_errors: Vec<String>,
 }
 
@@ -206,13 +206,13 @@ impl Stage {
     }
 }
 
-/// Images des scènes voisines pour une frame de transition.
+/// Frames of the neighbouring scenes for a transition frame.
 pub struct Scenes<'a> {
     pub from: &'a Path,
     pub to: &'a Path,
 }
 
-/// Problèmes relevés par [`OpenStage::inspect`] à un instant donné.
+/// Problems found by [`OpenStage::inspect`] at a given time.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Inspection {
@@ -230,7 +230,7 @@ pub struct OutsideText {
 }
 
 impl OpenStage {
-    /// Positionne la composition à `t` secondes.
+    /// Moves the composition to `t` seconds.
     pub async fn seek(&self, t: f64, scenes: Option<Scenes<'_>>) -> Result<(), MotionError> {
         let scenes = match scenes {
             Some(s) => {
@@ -248,11 +248,11 @@ impl OpenStage {
         Ok(())
     }
 
-    /// Capture l'image courante en JPEG qualité 95 : le PNG d'une image
-    /// texturée (grain, bruit) coûte jusqu'à 400 ms de compression.
+    /// Captures the current frame as JPEG quality 95: the PNG of a textured
+    /// frame (grain, noise) costs up to 400 ms of compression.
     pub async fn capture_jpeg(&self) -> Result<Vec<u8>, MotionError> {
-        // Mode « contrôle d'image » : on déclenche nous-mêmes l'image et la
-        // capture en sort directement, sans attendre le rythme de Chromium.
+        // "Frame control" mode: we trigger the frame ourselves and the capture
+        // comes out directly, without waiting for Chromium's pace.
         let screenshot = HeadlessScreenshot::builder()
             .format(ScreenshotParamsFormat::Jpeg)
             .quality(95)
@@ -275,7 +275,7 @@ impl OpenStage {
                 }
                 return Ok(png);
             }
-            // Pas de dégât à l'écran : l'image est identique à la précédente.
+            // No damage on screen: the frame is identical to the previous one.
             if !frame.result.has_damage
                 && let Some(previous) = self.last.lock().ok().and_then(|l| l.clone())
             {
@@ -283,16 +283,16 @@ impl OpenStage {
             }
         }
         Err(MotionError::Browser(
-            "aucune image produite par beginFrame".into(),
+            "no frame produced by beginFrame".into(),
         ))
     }
 
-    /// Erreurs JavaScript accumulées depuis l'ouverture.
+    /// JavaScript errors gathered since opening.
     pub async fn errors(&self) -> Result<Vec<String>, MotionError> {
         self.stage.eval("window.__enfait.errors").await
     }
 
-    /// Texte hors zone sûre et polices inconnues à l'instant courant.
+    /// Text outside the safe area and unknown fonts at the current time.
     pub async fn inspect(&self) -> Result<Inspection, MotionError> {
         let families = serde_json::to_string(&library::font_families())?;
         self.stage

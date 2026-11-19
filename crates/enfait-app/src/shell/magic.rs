@@ -203,9 +203,9 @@ impl Shell {
                     self.go_to(STEP_FINISH, cx);
                     Some(MagicStage::Done { path, message })
                 }
-                ExportState::Failed(e) => {
-                    Some(MagicStage::Exporting.failed(tr!("magic.export_failed", error = e).to_string()))
-                }
+                ExportState::Failed(e) => Some(
+                    MagicStage::Exporting.failed(tr!("magic.export_failed", error = e).to_string()),
+                ),
                 _ => None,
             },
             MagicStage::Done { .. } | MagicStage::Failed { .. } => None,
@@ -290,9 +290,11 @@ impl Shell {
                 )
             }
             MagicStage::Exporting => match self.worker.export_state() {
-                ExportState::Running { progress, .. } => {
-                    tr!("magic.exporting_pct", pct = format!("{:.0}", progress * 100.0)).to_string()
-                }
+                ExportState::Running { progress, .. } => tr!(
+                    "magic.exporting_pct",
+                    pct = format!("{:.0}", progress * 100.0)
+                )
+                .to_string(),
                 _ => tr!("magic.exporting").to_string(),
             },
             MagicStage::Done { message, .. } => {

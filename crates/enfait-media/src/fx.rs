@@ -1,14 +1,13 @@
-//! Post-FX globaux traduits en filtres ffmpeg.
+//! Global post-FX turned into ffmpeg filters.
 //!
-//! Même chaîne pour l'aperçu (images du proxy) et l'export : seules les
-//! grandeurs en pixels (décalage des couches) suivent la hauteur de l'image.
+//! Same chain for the preview (proxy frames) and the export: only the
+//! pixel sizes (channel shift) follow the frame height.
 
 use enfait_core::{Framing, PostFx};
 
-/// Mise au cadre `width`×`height` d'une image quelconque (la prise) :
-/// entière avec bandes noires, ou rognée pour remplir le cadre, décalée de
-/// `pan` % de la marge (voir [`enfait_core::PAN_LIMIT`]). Se termine par
-/// `setsar=1`.
+/// Framing of any image (the take) in `width`×`height`: whole with black
+/// bars, or cropped to fill the frame, shifted by `pan` % of the margin
+/// (see [`enfait_core::PAN_LIMIT`]). Ends with `setsar=1`.
 pub fn framing(width: u32, height: u32, framing: Framing, pan: i8) -> String {
     let (w, h) = (width.max(2), height.max(2));
     match framing {
@@ -27,8 +26,8 @@ pub fn framing(width: u32, height: u32, framing: Framing, pan: i8) -> String {
     }
 }
 
-/// Chaîne de filtres (`-vf`) pour une image de `height` lignes ; `None` si
-/// l'effet est neutre.
+/// Filter chain (`-vf`) for a frame of `height` lines; `None` if the
+/// effect is neutral.
 pub fn filter(fx: &PostFx, height: u32) -> Option<String> {
     let fx = fx.clamped();
     if fx.is_neutral() {
@@ -36,7 +35,7 @@ pub fn filter(fx: &PostFx, height: u32) -> Option<String> {
     }
     let mut parts: Vec<String> = Vec::new();
     if fx.contrast.abs() > 1e-3 || fx.saturation.abs() > 1e-3 {
-        // Contraste de 0,6 à 1,4 ; saturation de 0 (noir et blanc) à 2.
+        // Contrast from 0.6 to 1.4; saturation from 0 (black and white) to 2.
         parts.push(format!(
             "eq=contrast={:.3}:saturation={:.3}",
             1.0 + 0.4 * fx.contrast,
@@ -44,7 +43,7 @@ pub fn filter(fx: &PostFx, height: u32) -> Option<String> {
         ));
     }
     if fx.temperature.abs() > 1e-3 {
-        // 6 500 K neutre ; chaud vers 3 500 K, froid vers 10 000 K.
+        // 6,500 K neutral; warm towards 3,500 K, cold towards 10,000 K.
         let kelvin = if fx.temperature > 0.0 {
             6500.0 - 3000.0 * fx.temperature
         } else {
@@ -53,19 +52,18 @@ pub fn filter(fx: &PostFx, height: u32) -> Option<String> {
         parts.push(format!("colortemperature=temperature={kelvin:.0}:mix=0.85"));
     }
     if fx.aberration > 1e-3 {
-        // Jusqu'à 6 px à 1080 lignes, au moins 1 px.
+        // Up to 6 px at 1080 lines, at least 1 px.
         let shift = (fx.aberration * 6.0 * height as f32 / 1080.0)
             .round()
             .max(1.0);
         parts.push(format!("rgbashift=rh=-{shift:.0}:bh={shift:.0}"));
     }
     if fx.vignette > 1e-3 {
-        // Angle de l'objectif simulé : plus il est grand, plus les bords
-        // s'assombrissent.
+        // Angle of the simulated lens: the wider, the darker the edges.
         parts.push(format!("vignette=angle={:.3}", 0.2 + 0.75 * fx.vignette));
     }
     if fx.grain > 1e-3 {
-        // Grain temporel (t) et uniforme (u), plus fort sur la luminance.
+        // Temporal (t) and uniform (u) grain, stronger on luminance.
         parts.push(format!("noise=alls={:.0}:allf=t+u", 4.0 + 26.0 * fx.grain));
     }
     Some(parts.join(","))
@@ -113,7 +111,7 @@ mod tests {
         for p in FX_PRESETS {
             assert_eq!(
                 filter(&p.fx, 1080).is_some(),
-                p.slug != "neutre",
+                p.slug != "neutral",
                 "{}",
                 p.slug
             );

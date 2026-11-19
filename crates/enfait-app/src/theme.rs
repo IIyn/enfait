@@ -156,10 +156,12 @@ impl Palette {
         } else {
             (mix(signal, 0x000000, 0.10), mix(signal, 0x000000, 0.20))
         };
-        let on_signal = if luminance(signal) > 0.45 {
-            0x0E1110
+        // Dark or white text, whichever reads better on the accent.
+        let (dark, white) = (0x0E1110, 0xFFFFFF);
+        let on_signal = if contrast(signal, dark) >= contrast(signal, white) {
+            dark
         } else {
-            0xFFFFFF
+            white
         };
         Self {
             base,
@@ -180,6 +182,12 @@ fn mix(a: u32, b: u32, t: f32) -> u32 {
         v << shift
     };
     channel(16) | channel(8) | channel(0)
+}
+
+/// WCAG contrast ratio between two colours (1 to 21).
+fn contrast(a: u32, b: u32) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
 /// Relative luminance (sRGB, WCAG).
@@ -426,10 +434,9 @@ static CURRENT: RwLock<Palette> = RwLock::new(Palette {
 });
 
 fn current() -> Palette {
-    CURRENT.read().map_or_else(
-        |poisoned| *poisoned.into_inner(),
-        |palette| *palette,
-    )
+    CURRENT
+        .read()
+        .map_or_else(|poisoned| *poisoned.into_inner(), |palette| *palette)
 }
 
 /// Row height of lists, in px.
@@ -611,8 +618,7 @@ mod tests {
         for theme in ThemeId::ALL {
             for accent in Accent::ALL {
                 let p = Palette::new(base(theme, WindowAppearance::Dark), accent);
-                let (a, b) = (luminance(p.signal), luminance(p.on_signal));
-                let ratio = (a.max(b) + 0.05) / (a.min(b) + 0.05);
+                let ratio = contrast(p.signal, p.on_signal);
                 assert!(ratio >= 3.0, "{theme:?} {accent:?}: contrast {ratio:.2}");
             }
         }

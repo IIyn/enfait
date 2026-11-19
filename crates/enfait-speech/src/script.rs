@@ -1,19 +1,19 @@
-//! Script : phrases à dire et mots normalisés pour l'alignement.
+//! Script: sentences to say and normalised words for the alignment.
 //!
-//! Le script est du texte libre (ou du Markdown). Ce qui n'est pas dit est
-//! ignoré : titres (`# …`), indications entre crochets (`[pause]`),
-//! commentaires HTML. Les marqueurs de liste sont retirés.
+//! The script is free text (or Markdown). What is not spoken is ignored:
+//! headings (`# …`), directions in brackets (`[pause]`), HTML comments.
+//! List markers are removed.
 
-/// Une phrase du script.
+/// A sentence of the script.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sentence {
-    /// Texte tel qu'écrit (espaces normalisés).
+    /// Text as written (normalised spaces).
     pub text: String,
-    /// Mots normalisés (voir [`tokens`]).
+    /// Normalised words (see [`tokens`]).
     pub tokens: Vec<String>,
 }
 
-/// Phrases du script, dans l'ordre. Les phrases sans mot sont ignorées.
+/// Sentences of the script, in order. Sentences without words are ignored.
 pub fn sentences(script: &str) -> Vec<Sentence> {
     let spoken = spoken_text(script);
     let mut out = Vec::new();
@@ -27,8 +27,8 @@ pub fn sentences(script: &str) -> Vec<Sentence> {
             if !matches!(c, '.' | '!' | '?' | '…') {
                 continue;
             }
-            // Garder avec la phrase la ponctuation qui suit et les guillemets
-            // fermants, même précédés d'une espace (« non. »).
+            // Keep with the sentence the punctuation that follows and the closing
+            // quotes, even after a space ("« non. »").
             loop {
                 match (chars.get(i), chars.get(i.saturating_add(1))) {
                     (Some(n), _) if matches!(n, '»' | '"' | ')' | '.' | '!' | '?') => {
@@ -53,7 +53,7 @@ pub fn sentences(script: &str) -> Vec<Sentence> {
     out
 }
 
-/// Paragraphes à dire, sans titres ni notes : le texte du prompteur.
+/// Paragraphs to say, without headings or notes: the prompter text.
 pub fn spoken_paragraphs(script: &str) -> Vec<String> {
     spoken_text(script)
         .split("\n\n")
@@ -70,7 +70,7 @@ fn push_sentence(out: &mut Vec<Sentence>, text: &str) {
     }
 }
 
-/// Retire ce qui n'est pas dit.
+/// Removes what is not spoken.
 fn spoken_text(script: &str) -> String {
     let mut text = String::with_capacity(script.len());
     let mut in_comment = false;
@@ -119,9 +119,9 @@ fn spoken_text(script: &str) -> String {
     text
 }
 
-/// Mots normalisés : minuscules, sans accents ni ponctuation, apostrophes
-/// et traits d'union séparant les mots (`l'oxygène` → `l`, `oxygene`).
-/// Les nombres gardent leurs chiffres (`3 300` → `3300`, `2,5` → `25`).
+/// Normalised words: lowercase, no accents or punctuation, apostrophes
+/// and hyphens separating words (`l'oxygène` → `l`, `oxygene`). Numbers
+/// keep their digits (`3 300` → `3300`, `2,5` → `25`).
 pub fn tokens(text: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -131,7 +131,7 @@ pub fn tokens(text: &str) -> Vec<String> {
             return;
         }
         let digits = current.chars().all(|c| c.is_ascii_digit());
-        // « 3 300 » : un groupe de trois chiffres après un nombre le prolonge.
+        // "3 300": a group of three digits after a number extends it.
         if digits && *previous && current.len() == 3 {
             if let Some(last) = out.last_mut() {
                 last.push_str(current);
@@ -155,7 +155,7 @@ pub fn tokens(text: &str) -> Vec<String> {
                 separator = false;
             }
         }
-        // Séparateur décimal ou de milliers à l'intérieur d'un nombre.
+        // Decimal or thousands separator inside a number.
         if separator
             && matches!(c, ',' | '.' | '\u{202f}' | '\u{a0}')
             && current.chars().last().is_some_and(|d| d.is_ascii_digit())
@@ -174,7 +174,7 @@ pub fn tokens(text: &str) -> Vec<String> {
     out
 }
 
-/// Lettres accentuées courantes vers leur forme simple.
+/// Common accented letters to their plain form.
 fn fold(c: char) -> Option<&'static str> {
     Some(match c {
         'à' | 'â' | 'ä' | 'á' | 'ã' | 'å' => "a",

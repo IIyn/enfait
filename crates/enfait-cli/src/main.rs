@@ -1,4 +1,4 @@
-//! `enfait-cli` : prototype en ligne de commande de la chaîne complète.
+//! `enfait-cli`: command-line version of the whole pipeline.
 
 mod assets;
 mod cut;
@@ -19,7 +19,7 @@ use tracing_subscriber::EnvFilter;
 #[command(
     name = "enfait-cli",
     version,
-    about = "Voix off → vidéo en motion design"
+    about = "Voice-over → motion design video"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -28,27 +28,26 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Télécharge Chromium et le modèle whisper.
+    /// Downloads Chromium and the whisper model.
     Setup,
-    /// Liste les styles prédéfinis.
+    /// Lists the style presets.
     Styles,
-    /// Produit la vidéo à partir d'une voix off.
+    /// Makes the video from a voice-over.
     Make(Box<make::MakeArgs>),
-    /// Découpe une prise selon le script (règle « dernière prise »).
+    /// Cuts a take following the script ("last take" rule).
     Cut(cut::CutArgs),
-    /// Prépare un média pour la lecture (analyse, proxy, son, forme d'onde).
+    /// Prepares a media for playback (analysis, proxy, sound, waveform).
     Media(media::MediaArgs),
-    /// Génère le jeu d'évaluation et une planche à noter.
+    /// Generates the evaluation set and a rating sheet.
     Eval(Box<eval::EvalArgs>),
-    /// Exporte la vidéo finale ou le montage Premiere (XML) de la session de
-    /// l'interface.
+    /// Exports the final video or the Premiere edit (XML) of the app's
+    /// session.
     Export(export::ExportArgs),
-    /// Cherche des images ou des vidéos libres de droits.
+    /// Searches royalty-free images or videos.
     Search(assets::SearchArgs),
-    /// Détoure une image (PNG transparent).
+    /// Cuts out an image (transparent PNG).
     Cutout(assets::CutoutArgs),
-    /// Serveur MCP sur la session de l'interface (pour Claude Code et les
-    /// agents).
+    /// MCP server on the app's session (for Claude Code and other agents).
     Mcp(mcp::McpArgs),
 }
 
@@ -59,7 +58,7 @@ async fn main() -> std::process::ExitCode {
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_target(false)
-        // La sortie standard est réservée aux résultats (et au protocole MCP).
+        // Standard output is reserved for the results (and the MCP protocol).
         .with_writer(std::io::stderr)
         .without_time()
         .init();

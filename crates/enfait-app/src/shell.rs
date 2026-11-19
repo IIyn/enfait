@@ -233,24 +233,20 @@ impl Shell {
         let description = cx.new(|cx| {
             TextareaState::new(window, cx).placeholder(tr!("board.description_placeholder"))
         });
-        let transition_text = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(tr!("board.transition_placeholder"))
-        });
-        let moment_note = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(tr!("board.moment_placeholder"))
-        });
+        let transition_text = cx
+            .new(|cx| InputState::new(window, cx).placeholder(tr!("board.transition_placeholder")));
+        let moment_note =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("board.moment_placeholder")));
         let rules = session.look.style.rules.clone();
         let style_rules = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .placeholder(tr!("side.rules_placeholder"))
                 .default_value(rules)
         });
-        let asset_note = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(tr!("assets.note_placeholder"))
-        });
-        let search_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(tr!("assets.search_placeholder"))
-        });
+        let asset_note =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("assets.note_placeholder")));
+        let search_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("assets.search_placeholder")));
         let (fx_sliders, slider_subscriptions) = side::fx_sliders(&session.look.fx, cx);
         let (knobs, knob_subscriptions) = finish::knobs(&session.finish, cx);
         let fx = session.look.fx;
@@ -324,9 +320,8 @@ impl Shell {
         ];
         subscriptions.extend(slider_subscriptions);
         subscriptions.extend(knob_subscriptions);
-        let retouch = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(tr!("board.retouch_placeholder"))
-        });
+        let retouch =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("board.retouch_placeholder")));
         // Not bound to the window: the shell survives it when enfait keeps
         // running in the tray.
         subscriptions.push(cx.subscribe(
@@ -827,10 +822,8 @@ impl Shell {
                             .hover(|d| d.bg(color(tokens::HOVER)))
                             .child(gpui_kit::component::IconName::Settings)
                             .tooltip(|window, cx| {
-                                gpui_kit::component::tooltip::Tooltip::new(tr!(
-                                    "settings.title"
-                                ))
-                                .build(window, cx)
+                                gpui_kit::component::tooltip::Tooltip::new(tr!("settings.title"))
+                                    .build(window, cx)
                             })
                             .on_click(cx.listener(|shell, _: &gpui_kit::ClickEvent, _, cx| {
                                 if shell.settings.open {

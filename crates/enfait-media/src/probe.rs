@@ -1,4 +1,4 @@
-//! Analyse d'un média par ffprobe.
+//! Analysing a media with ffprobe.
 
 use crate::MediaError;
 use enfait_core::FrameRate;
@@ -8,7 +8,7 @@ use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MediaInfo {
-    /// Durée en secondes.
+    /// Duration in seconds.
     pub duration: f64,
     pub video: Option<VideoInfo>,
     pub audio: Option<AudioInfo>,
@@ -16,7 +16,7 @@ pub struct MediaInfo {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VideoInfo {
-    /// Dimensions affichées (rotation appliquée).
+    /// Displayed size (rotation applied).
     pub width: u32,
     pub height: u32,
     pub frame_rate: FrameRate,
@@ -44,7 +44,7 @@ pub fn probe(path: &Path) -> Result<MediaInfo, MediaError> {
     parse(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// Lit la sortie JSON de ffprobe.
+/// Reads ffprobe's JSON output.
 pub fn parse(json: &str) -> Result<MediaInfo, MediaError> {
     let root: Value = serde_json::from_str(json)?;
     let streams = root
@@ -54,7 +54,7 @@ pub fn parse(json: &str) -> Result<MediaInfo, MediaError> {
         .unwrap_or_default();
     let kind =
         |s: &&Value, wanted: &str| s.get("codec_type").and_then(Value::as_str) == Some(wanted);
-    // Une pochette d'album (mp3, m4a) se déclare comme un flux vidéo.
+    // An album cover (mp3, m4a) declares itself as a video stream.
     let is_cover = |s: &&Value| {
         s.get("disposition")
             .and_then(|d| d.get("attached_pic"))
@@ -72,14 +72,14 @@ pub fn parse(json: &str) -> Result<MediaInfo, MediaError> {
         .map(audio_info)
         .transpose()?;
     if video.is_none() && audio.is_none() {
-        return Err(MediaError::Probe("ni image ni son".into()));
+        return Err(MediaError::Probe("neither picture nor sound".into()));
     }
     let duration = root
         .get("format")
         .and_then(|f| number(f.get("duration")))
         .or_else(|| streams.iter().find_map(|s| number(s.get("duration"))))
         .filter(|d| d.is_finite() && *d > 0.0)
-        .ok_or_else(|| MediaError::Probe("durée inconnue".into()))?;
+        .ok_or_else(|| MediaError::Probe("unknown duration".into()))?;
     Ok(MediaInfo {
         duration,
         video,
@@ -87,7 +87,7 @@ pub fn parse(json: &str) -> Result<MediaInfo, MediaError> {
     })
 }
 
-/// ffprobe écrit les nombres en chaînes (`"12.345"`).
+/// ffprobe writes numbers as strings (`"12.345"`).
 fn number(v: Option<&Value>) -> Option<f64> {
     match v? {
         Value::String(s) => s.parse().ok(),
@@ -111,8 +111,8 @@ fn video_info(stream: &Value) -> Result<VideoInfo, MediaError> {
     let (Some(width), Some(height)) = (width, height) else {
         return Err(MediaError::Probe("dimensions de l'image inconnues".into()));
     };
-    // La cadence moyenne reflète mieux les fichiers de téléphone (cadence
-    // variable) ; `r_frame_rate` sert de repli.
+    // The average rate reflects phone files better (variable frame rate);
+    // `r_frame_rate` is the fallback.
     let frame_rate = ["avg_frame_rate", "r_frame_rate"]
         .iter()
         .find_map(|k| stream.get(*k).and_then(Value::as_str).and_then(rate))
@@ -131,7 +131,7 @@ fn video_info(stream: &Value) -> Result<VideoInfo, MediaError> {
     })
 }
 
-/// Rotation en degrés : matrice d'affichage (récent) ou étiquette `rotate`.
+/// Rotation in degrees: display matrix (recent) or `rotate` tag.
 fn rotation(stream: &Value) -> Option<i64> {
     let from_side_data = stream
         .get("side_data_list")
@@ -146,13 +146,13 @@ fn rotation(stream: &Value) -> Option<i64> {
 fn audio_info(stream: &Value) -> Result<AudioInfo, MediaError> {
     let sample_rate = number(stream.get("sample_rate"))
         .filter(|r| *r >= 1.0)
-        // Fréquence positive et réaliste : la conversion ne déborde pas.
+        // Positive, realistic rate: the conversion does not overflow.
         .map(|r| {
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let r = r.round() as u32;
             r
         })
-        .ok_or_else(|| MediaError::Probe("fréquence audio inconnue".into()))?;
+        .ok_or_else(|| MediaError::Probe("unknown audio sample rate".into()))?;
     let channels = stream
         .get("channels")
         .and_then(Value::as_u64)

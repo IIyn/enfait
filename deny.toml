@@ -1,4 +1,4 @@
-# Configuration de cargo-deny : vulnérabilités connues, licences, sources.
+# cargo-deny configuration: known vulnerabilities, licences, sources.
 
 [graph]
 all-features = false
@@ -6,9 +6,8 @@ all-features = false
 [advisories]
 version = 2
 yanked = "deny"
-# Les crates abandonnées ne sont signalées que si nous en dépendons
-# directement : celles qui viennent de gpui ou de chromiumoxide ne se
-# remplacent pas de notre côté.
+# Unmaintained crates are only reported when we depend on them directly:
+# those coming from gpui or chromiumoxide cannot be replaced on our side.
 unmaintained = "workspace"
 
 [licenses]

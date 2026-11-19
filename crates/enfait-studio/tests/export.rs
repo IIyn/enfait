@@ -1,6 +1,6 @@
-//! Export réel par ffmpeg sur une session synthétique : vidéo verticale,
-//! prise 16:9 rognée, un bloc animé, musique et SFX ; puis le montage
-//! Premiere de la même session.
+//! Real export by ffmpeg on a synthetic session: vertical video, cropped
+//! 16:9 take, one animated block, music and SFX; then the Premiere edit of
+//! the same session.
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 
@@ -33,7 +33,7 @@ fn probe(file: &Path, entries: &str) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
-/// Couleur moyenne de l'image à `t` secondes.
+/// Average colour of the frame at `t` seconds.
 fn pixel(file: &Path, t: f64) -> Vec<u8> {
     Command::new("ffmpeg")
         .args(["-nostdin", "-v", "error", "-ss", &t.to_string(), "-i"])
@@ -45,7 +45,7 @@ fn pixel(file: &Path, t: f64) -> Vec<u8> {
         .stdout
 }
 
-/// Loudness intégrée (LUFS) du son de `file`.
+/// Integrated loudness (LUFS) of the sound of `file`.
 fn lufs(file: &Path) -> f64 {
     let out = Command::new("ffmpeg")
         .args(["-nostdin", "-hide_banner", "-nostats", "-i"])
@@ -67,8 +67,8 @@ fn secs(ms: i64) -> Flicks {
     Flicks::from_millis(ms).unwrap()
 }
 
-/// Session : prise de 6 s (mire 16:9 + voix à 440 Hz faible), montage
-/// [0 ; 2 s) + [3 ; 5 s), bloc 1 sur la prise, bloc 2 animé (clip rouge).
+/// Session: 6 s take (16:9 test pattern + faint 440 Hz voice), edit
+/// [0; 2 s) + [3; 5 s), block 1 on the take, block 2 animated (red clip).
 fn session(d: &Path) -> SessionFiles {
     let rush = d.join("prise.mp4");
     ffmpeg(
@@ -92,7 +92,7 @@ fn session(d: &Path) -> SessionFiles {
         &rush,
     );
     let mut settings = ProjectSettings::default().with_aspect(AspectRatio::Portrait9x16);
-    // Petite définition : l'essai reste rapide.
+    // Small definition: the test stays fast.
     settings.resolution = Resolution {
         width: 180,
         height: 320,
@@ -191,15 +191,15 @@ async fn video_is_framed_mixed_and_normalized() {
     );
     let duration: f64 = probe(&out, "format=duration").parse().unwrap();
     assert!((duration - 4.0).abs() < 0.1, "{duration}");
-    // Le bloc animé montre son clip rouge.
+    // The animated block shows its red clip.
     let red = pixel(&out, 3.0);
     assert!(red[0] > 200 && red[1] < 60 && red[2] < 60, "{red:?}");
-    // Loudness ramenée à −14 LUFS (le mixage, musique pleine sans ducking
-    // faute de mots, était bien plus fort).
+    // Loudness brought to −14 LUFS (the mix, full music without ducking for
+    // lack of words, was much louder).
     assert!(report.measured_lufs.unwrap() > -11.0, "{report:?}");
     let level = lufs(&out);
     assert!((level + 14.0).abs() < 1.0, "{level}");
-    // Le dossier de travail est retiré.
+    // The working folder is removed.
     let left: Vec<_> = std::fs::read_dir(out.parent().unwrap())
         .unwrap()
         .map(|e| e.unwrap().file_name())
@@ -216,29 +216,29 @@ async fn premiere_sequence_with_and_without_sfx() {
     let text = std::fs::read_to_string(&xml).unwrap();
     assert!(text.starts_with("<?xml"));
     assert!(text.contains("<width>180</width><height>320</height>"));
-    // V1 (prise, deux morceaux), V2 (le bloc animé), V3 (vide).
+    // V1 (take, two pieces), V2 (the animated block), V3 (empty).
     assert_eq!(text.matches("<track>").count(), 3 + 1 + 2 + 2);
     assert!(
         text.contains("<in>75</in><out>125</out>"),
-        "second morceau de la prise"
+        "second piece of the take"
     );
-    // Prise 640×360 rognée dans 180×320 : 320/360 = 88,9 %.
+    // 640×360 take cropped in 180×320: 320/360 = 88.9 %.
     assert!(text.contains("<value>88.889</value>"));
     for file in [
-        "bloc-02-animation.mp4",
+        "block-02-animation.mp4",
         "musique.wav",
         "pop.wav",
-        "LISEZMOI.txt",
+        "README.txt",
     ] {
         assert!(report.media.join(file).is_file(), "{file}");
     }
-    // Musique d'1,5 s sur 4 s : trois passages.
+    // 1.5 s music over 4 s: three passes.
     assert_eq!(text.matches("<name>musique.wav</name>").count(), 2 * 3 + 1);
-    let without = dir.path().join("sans.xml");
+    let without = dir.path().join("without.xml");
     let report = export(&session.sources(), PremiereOptions { sfx: false }, &without).unwrap();
     let text = std::fs::read_to_string(&without).unwrap();
     assert!(!text.contains("pop.wav"));
     assert!(!report.media.join("pop.wav").exists());
-    let readme = std::fs::read_to_string(report.media.join("LISEZMOI.txt")).unwrap();
-    assert!(readme.contains("sans les SFX"), "{readme}");
+    let readme = std::fs::read_to_string(report.media.join("README.txt")).unwrap();
+    assert!(readme.contains("without the SFX"), "{readme}");
 }

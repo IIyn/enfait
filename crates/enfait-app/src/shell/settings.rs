@@ -171,9 +171,8 @@ impl SettingsUi {
                 (secret, input)
             })
             .collect();
-        let local_url = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(enfait_config::DEFAULT_LOCAL_URL)
-        });
+        let local_url =
+            cx.new(|cx| InputState::new(window, cx).placeholder(enfait_config::DEFAULT_LOCAL_URL));
         let local_model = cx.new(|cx| {
             InputState::new(window, cx).placeholder(tr!("settings.local_model_placeholder"))
         });
@@ -332,11 +331,7 @@ fn field(title: impl Into<SharedString>, help: Option<SharedString>) -> Div {
         .py(px(12.))
         .border_b_1()
         .border_color(color(tokens::LINE))
-        .child(
-            div()
-                .font_weight(FontWeight::MEDIUM)
-                .child(title.into()),
-        )
+        .child(div().font_weight(FontWeight::MEDIUM).child(title.into()))
         .when_some(help, |d, h| d.child(small(h, tokens::MUTE)))
 }
 
@@ -378,8 +373,7 @@ impl Shell {
                         ));
                     }
                     Err(e) => {
-                        shell.settings.notice =
-                            Some((tr!("settings.key_failed", error = e), true));
+                        shell.settings.notice = Some((tr!("settings.key_failed", error = e), true));
                     }
                 }
                 cx.notify();
@@ -505,11 +499,12 @@ impl Shell {
                     .children(nav)
                     .child(div().flex_1())
                     .child(
-                        chip("settings-close", tr!("settings.close"), false, true)
-                            .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                        chip("settings-close", tr!("settings.close"), false, true).on_click(
+                            cx.listener(|shell, _: &ClickEvent, _, cx| {
                                 shell.settings.open = false;
                                 cx.notify();
-                            })),
+                            }),
+                        ),
                     ),
             )
             .child(
@@ -584,7 +579,24 @@ impl Shell {
             Some(tr!("settings.close_window_help")),
         )
         .child(div().flex().gap(px(6.)).children(choices))
-        .when(!tray, |d| d.child(small(tr!("settings.no_tray"), tokens::MIXED)))
+        .when(!tray, |d| {
+            d.child(small(tr!("settings.no_tray"), tokens::MIXED))
+        })
+    }
+
+    fn notifications_field(&self, cx: &mut Context<Self>) -> Div {
+        let on = prefs::settings(cx).notifications;
+        field(
+            tr!("settings.notifications"),
+            Some(tr!("settings.notifications_help")),
+        )
+        .child(div().flex().child(
+            chip("notifications", tr!("settings.notifications_on"), on, true).on_click(
+                cx.listener(move |_, _: &ClickEvent, _, cx| {
+                    prefs::update(cx, |s| s.notifications = !on);
+                }),
+            ),
+        ))
     }
 
     fn general_section(&self, cx: &mut Context<Self>) -> Div {
@@ -596,27 +608,34 @@ impl Shell {
             .flex_col()
             .child(self.language_field(cx))
             .child(self.close_field(cx))
+            .child(self.notifications_field(cx))
             .child(
                 field(tr!("settings.session"), Some(tr!("settings.session_help")))
                     .child(super::mono(shown).text_size(px(12.)))
-                    .child(
-                        div().flex().gap(px(6.)).child(
-                            chip("session-reveal", tr!("settings.show_folder"), false, true)
-                                .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
-                                    cx.reveal_path(&session);
-                                })),
+                    .child(div().flex().gap(px(6.)).child(
+                        chip("session-reveal", tr!("settings.show_folder"), false, true).on_click(
+                            cx.listener(move |_, _: &ClickEvent, _, cx| {
+                                cx.reveal_path(&session);
+                            }),
                         ),
-                    ),
+                    )),
             )
             .child(
                 field(tr!("settings.onboarding"), None).child(
                     div().flex().child(
-                        chip("onboarding-again", tr!("settings.onboarding_again"), false, true)
-                            .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                        chip(
+                            "onboarding-again",
+                            tr!("settings.onboarding_again"),
+                            false,
+                            true,
+                        )
+                        .on_click(cx.listener(
+                            |shell, _: &ClickEvent, _, cx| {
                                 shell.settings.step = 0;
                                 shell.settings.open = false;
                                 prefs::update(cx, |s| s.onboarded = false);
-                            })),
+                            },
+                        )),
                     ),
                 ),
             )
@@ -670,19 +689,14 @@ impl Shell {
                 .rounded(px(3.))
                 .cursor_pointer()
                 .border_1()
-                .border_color(color(if on {
-                    tokens::FG2
-                } else {
-                    tokens::LINE_STRONG
-                }))
+                .border_color(color(if on { tokens::FG2 } else { tokens::LINE_STRONG }))
                 .when(on, |d| d.bg(color(tokens::RAISED)))
                 .hover(|d| d.bg(color(tokens::HOVER)))
-                .child(
-                    div()
-                        .size(px(12.))
-                        .rounded_full()
-                        .bg(theme::accent_color(settings.theme, accent, appearance)),
-                )
+                .child(div().size(px(12.)).rounded_full().bg(theme::accent_color(
+                    settings.theme,
+                    accent,
+                    appearance,
+                )))
                 .child(div().text_size(px(12.)).child(accent_name(accent)))
                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                     prefs::update(cx, |s| s.accent = accent);
@@ -702,7 +716,13 @@ impl Shell {
     }
 
     fn key_field(&self, secret: Secret, cx: &mut Context<Self>) -> Option<Div> {
-        let input = self.settings.keys.iter().find(|(s, _)| *s == secret)?.1.clone();
+        let input = self
+            .settings
+            .keys
+            .iter()
+            .find(|(s, _)| *s == secret)?
+            .1
+            .clone();
         let status = match self.settings.key_status.get(&secret) {
             None => (tr!("settings.key_status.checking"), tokens::MUTE),
             Some(None) => (tr!("settings.key_status.none"), tokens::MUTE),
@@ -726,11 +746,18 @@ impl Shell {
                         .gap(px(6.))
                         .child(div().flex_1().min_w(px(0.)).child(Input::new(&input)))
                         .child(
-                            chip(("key-save", secret as usize), tr!("settings.save"), false, true)
-                                .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                            chip(
+                                ("key-save", secret as usize),
+                                tr!("settings.save"),
+                                false,
+                                true,
+                            )
+                            .on_click(cx.listener(
+                                move |shell, _: &ClickEvent, _, cx| {
                                     let value = save_input.read(cx).value().to_string();
                                     shell.save_key(secret, Some(value), cx);
-                                })),
+                                },
+                            )),
                         )
                         .when(set, |d| {
                             d.child(
@@ -768,14 +795,17 @@ impl Shell {
         let provider = self.session.data.provider;
         let quality = self.session.data.quality;
         let providers = ProviderChoice::ALL.iter().enumerate().map(|(i, &p)| {
-            chip(("settings-provider", i), provider_name(p), p == provider, true).on_click(
-                cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_provider(p, cx)),
+            chip(
+                ("settings-provider", i),
+                provider_name(p),
+                p == provider,
+                true,
             )
+            .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_provider(p, cx)))
         });
         let qualities = QUALITIES.iter().enumerate().map(|(i, &q)| {
-            chip(("settings-quality", i), quality_name(q), q == quality, true).on_click(
-                cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_quality(q, cx)),
-            )
+            chip(("settings-quality", i), quality_name(q), q == quality, true)
+                .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_quality(q, cx)))
         });
         let missing = super::studio::provider_hint(provider, prefs::settings(cx));
         let claude = enfait_config::process::which("claude");
@@ -783,9 +813,12 @@ impl Shell {
             .flex()
             .flex_col()
             .child(
-                field(tr!("settings.provider"), Some(tr!("settings.provider_help")))
-                    .child(div().flex().flex_wrap().gap(px(6.)).children(providers))
-                    .when_some(missing, |d, m| d.child(small(m, tokens::MIXED))),
+                field(
+                    tr!("settings.provider"),
+                    Some(tr!("settings.provider_help")),
+                )
+                .child(div().flex().flex_wrap().gap(px(6.)).children(providers))
+                .when_some(missing, |d, m| d.child(small(m, tokens::MIXED))),
             )
             .child(
                 field(tr!("settings.quality"), Some(tr!("settings.quality_help")))
@@ -838,26 +871,38 @@ impl Shell {
         if running {
             let text = download.and_then(Download::fraction).map_or_else(
                 || tr!("settings.tools.downloading"),
-                |f| tr!("settings.tools.downloading_pct", pct = format!("{:.0}", f * 100.0)),
+                |f| {
+                    tr!(
+                        "settings.tools.downloading_pct",
+                        pct = format!("{:.0}", f * 100.0)
+                    )
+                },
             );
             return row.child(small(text, tokens::FG2));
         }
         let row = match installed {
             Some(text) => row.child(small(text, tokens::OK)),
-            None => row.child(small(tr!("settings.tools.missing"), tokens::MIXED)).child(
-                chip(
-                    ("download", tool as usize),
-                    tr!("settings.tools.download", size = size),
-                    false,
-                    true,
-                )
-                .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
-                    shell.start_download(tool, cx);
-                })),
-            ),
+            None => row
+                .child(small(tr!("settings.tools.missing"), tokens::MIXED))
+                .child(
+                    chip(
+                        ("download", tool as usize),
+                        tr!("settings.tools.download", size = size),
+                        false,
+                        true,
+                    )
+                    .on_click(cx.listener(
+                        move |shell, _: &ClickEvent, _, cx| {
+                            shell.start_download(tool, cx);
+                        },
+                    )),
+                ),
         };
         row.when_some(failed, |d, e| {
-            d.child(small(tr!("settings.tools.failed", error = e), tokens::ERROR))
+            d.child(small(
+                tr!("settings.tools.failed", error = e),
+                tokens::ERROR,
+            ))
         })
     }
 
@@ -887,14 +932,24 @@ impl Shell {
                     tr!("settings.tools.whisper"),
                     Some(tr!("settings.tools.whisper_help")),
                 )
-                .child(self.download_row(Tool::Whisper, whisper_ok, "550 MB".into(), cx)),
+                .child(self.download_row(
+                    Tool::Whisper,
+                    whisper_ok,
+                    "550 MB".into(),
+                    cx,
+                )),
             )
             .child(
                 field(
                     tr!("settings.tools.browser"),
                     Some(tr!("settings.tools.browser_help")),
                 )
-                .child(self.download_row(Tool::Browser, browser, "100 MB".into(), cx)),
+                .child(self.download_row(
+                    Tool::Browser,
+                    browser,
+                    "100 MB".into(),
+                    cx,
+                )),
             )
     }
 
@@ -934,7 +989,11 @@ impl Shell {
             _ => (
                 tr!("onboarding.ready"),
                 tr!("onboarding.ready_help", key = crate::shortcut(",")),
-                div().flex().flex_col().child(self.close_field(cx)),
+                div()
+                    .flex()
+                    .flex_col()
+                    .child(self.close_field(cx))
+                    .child(self.notifications_field(cx)),
             ),
         };
         let last = step == STEPS - 1;
@@ -949,14 +1008,19 @@ impl Shell {
                     tokens::LINE_STRONG
                 }))
         });
+        // A column: the card keeps its height and overflows into the scroll.
         div()
             .id("onboarding")
-            .size_full()
+            .flex_1()
+            .min_h(px(0.))
+            .w_full()
             .overflow_y_scroll()
             .flex()
-            .justify_center()
+            .flex_col()
+            .items_center()
             .child(
                 div()
+                    .flex_none()
                     .w_full()
                     .max_w(px(760.))
                     .px(px(32.))
@@ -996,19 +1060,24 @@ impl Shell {
                             .gap(px(8.))
                             .pt(px(24.))
                             .when(step > 0, |d| {
-                                d.child(chip("onboarding-back", tr!("onboarding.back"), false, true)
-                                    .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
-                                        shell.settings.step = shell.settings.step.saturating_sub(1);
-                                        shell.settings.notice = None;
-                                        cx.notify();
-                                    })))
+                                d.child(
+                                    chip("onboarding-back", tr!("onboarding.back"), false, true)
+                                        .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                                            shell.settings.step =
+                                                shell.settings.step.saturating_sub(1);
+                                            shell.settings.notice = None;
+                                            cx.notify();
+                                        })),
+                                )
                             })
                             .child(div().flex_1())
                             .when(!last, |d| {
-                                d.child(chip("onboarding-skip", tr!("onboarding.skip"), false, true)
-                                    .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
-                                        shell.finish_onboarding(cx);
-                                    })))
+                                d.child(
+                                    chip("onboarding-skip", tr!("onboarding.skip"), false, true)
+                                        .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                                            shell.finish_onboarding(cx);
+                                        })),
+                                )
                             })
                             .child(
                                 chip(
@@ -1022,15 +1091,17 @@ impl Shell {
                                     true,
                                 )
                                 .cursor_pointer()
-                                .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
-                                    if last {
-                                        shell.finish_onboarding(cx);
-                                    } else {
-                                        shell.settings.step = step.saturating_add(1);
-                                        shell.settings.notice = None;
-                                        cx.notify();
-                                    }
-                                })),
+                                .on_click(cx.listener(
+                                    move |shell, _: &ClickEvent, _, cx| {
+                                        if last {
+                                            shell.finish_onboarding(cx);
+                                        } else {
+                                            shell.settings.step = step.saturating_add(1);
+                                            shell.settings.notice = None;
+                                            cx.notify();
+                                        }
+                                    },
+                                )),
                             ),
                     ),
             )

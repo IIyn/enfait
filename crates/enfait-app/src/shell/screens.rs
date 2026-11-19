@@ -158,9 +158,9 @@ impl Shell {
         let current = playing.and_then(|t| self.cut.sentence_at(t));
 
         let notice: Option<(SharedString, crate::theme::Token)> = match &self.cut.status {
-            CutStatus::NoRush => Some((tr!("cut.no_rush", key = crate::shortcut("I")),
-                tokens::MUTE,
-            )),
+            CutStatus::NoRush => {
+                Some((tr!("cut.no_rush", key = crate::shortcut("I")), tokens::MUTE))
+            }
             CutStatus::Transcribing => Some((tr!("cut.transcribing"), tokens::FG2)),
             CutStatus::Failed(e) => Some((e.clone(), tokens::ERROR)),
             CutStatus::Ready
@@ -320,11 +320,13 @@ impl Shell {
                         cx.listener(|shell, _: &ClickEvent, _, cx| shell.reset_choices(cx)),
                     ))
                     .when(self.cut.derived(), |d| {
-                        d.child(button("derive-script", tr!("cut.write_script"), false).on_click(
-                            cx.listener(|shell, _: &ClickEvent, window, cx| {
-                                shell.script_from_take(window, cx);
-                            }),
-                        ))
+                        d.child(
+                            button("derive-script", tr!("cut.write_script"), false).on_click(
+                                cx.listener(|shell, _: &ClickEvent, window, cx| {
+                                    shell.script_from_take(window, cx);
+                                }),
+                            ),
+                        )
                     }),
             )
             .when_some(notice, |d, (text, tone)| {

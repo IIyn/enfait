@@ -1,6 +1,6 @@
 [package]
 name = "enfait-studio"
-description = "Atelier d'animation : réalisateur, animateurs, retouches et rendu, commun au CLI et à l'interface."
+description = "Animation studio: director, animators, retouches and rendering, shared by the CLI and the interface."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

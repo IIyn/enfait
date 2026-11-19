@@ -1,11 +1,11 @@
-//! « Écrire le storyboard » et mode magique : la passe monteur, la
-//! recherche des plans réels et des sons qu'elle demande, puis leur
-//! application au projet (une seule étape d'annulation) et à la finition.
+//! "Write the storyboard" and magic mode: the editor pass, the search for
+//! the real shots and sounds it asks for, then applying them to the project
+//! (a single undo step) and to the finish.
 //!
-//! Commun à l'interface, au CLI et au serveur MCP ; le code décide de tout
-//! ce qui n'est pas du goût : un plan ou un son n'est retenu que si sa
-//! licence permet de l'utiliser sans condition gênante (ni usage non
-//! commercial, ni interdiction de modifier, ni partage à l'identique).
+//! Shared by the interface, the CLI and the MCP server; the code decides
+//! everything that is not a matter of taste: a shot or a sound is only
+//! kept if its licence allows using it without an awkward condition (no
+//! non-commercial only, no ban on changes, no share-alike).
 
 use anyhow::Result;
 use enfait_ai::editor::{EditPlan, EditorInput, PlanKind, editor_request, parse_plan};
@@ -18,25 +18,24 @@ use enfait_core::{
 use std::collections::BTreeMap;
 use std::path::Path;
 
-/// Un effet sonore plus long n'en est pas un (ambiance, morceau).
+/// A longer sound effect is not one (ambience, track).
 const MAX_SFX_SECONDS: f64 = 6.0;
-/// Durée minimale d'une musique de fond (elle est reprise au début si elle
-/// est plus courte que la vidéo).
+/// Minimum duration of a background music (it loops if it is shorter than
+/// the video).
 const MIN_MUSIC_SECONDS: f64 = 45.0;
-/// Les musiques trop longues sont souvent des mixes d'une heure.
+/// Music that is too long is often an hour-long mix.
 const MAX_MUSIC_SECONDS: f64 = 900.0;
-/// Le son tombe un peu avant le mot : on l'entend avec l'image qui apparaît.
+/// The sound falls a little before the word: heard with the picture appearing.
 const SFX_LEAD: f64 = 0.05;
-/// Musique baissée sous la voix, par défaut (dB).
+/// Music dipped under the voice, by default (dB).
 const MUSIC_GAIN: f32 = -16.0;
-/// Recherches menées en même temps (Wikimedia limite vite les clients
-/// pressés).
+/// Searches run at the same time (Wikimedia quickly limits hasty
+/// clients).
 const PARALLEL_SEARCHES: usize = 2;
-/// Résultats essayés pour une même demande, si les premiers ne se
-/// téléchargent pas.
+/// Results tried for one request, if the first ones do not download.
 const MAX_CANDIDATES: usize = 4;
 
-/// Modèle et effort du monteur selon le niveau de soin.
+/// Model and effort of the editor depending on the quality level.
 pub fn editor_model(quality: Quality) -> (&'static str, Effort) {
     match quality {
         Quality::Fast => ("claude-sonnet-5-5", Effort::Medium),
@@ -44,8 +43,8 @@ pub fn editor_model(quality: Quality) -> (&'static str, Effort) {
     }
 }
 
-/// Demande le storyboard au monteur (deux essais si la réponse est
-/// illisible). Ses notes vont dans `work/editor.notes.md`, le plan lu dans
+/// Asks the editor for the storyboard (two tries if the answer is
+/// unreadable). Its notes go to `work/editor.notes.md`, the parsed plan to
 /// `work/editor.json`.
 pub async fn write_plan(
     provider: &Provider,
@@ -67,36 +66,36 @@ pub async fn write_plan(
                 return Ok(plan);
             }
             Err(e) => {
-                tracing::warn!("réponse du monteur illisible : {e}");
+                tracing::warn!("unreadable editor answer: {e}");
                 last_error = Some(e);
             }
         }
     }
-    Err(last_error.map_or_else(|| anyhow::anyhow!("storyboard impossible"), Into::into))
+    Err(last_error.map_or_else(|| anyhow::anyhow!("no storyboard"), Into::into))
 }
 
-/// Les fichiers trouvés pour un plan, déjà copiés dans la bibliothèque.
+/// The files found for a plan, already copied into the library.
 #[derive(Debug, Default)]
 pub struct Gathered {
-    /// Nouvelles entrées de la bibliothèque (avec leur licence).
+    /// New library entries (with their licence).
     pub assets: Vec<Asset>,
-    /// Plan de chaque bloc `broll` (numéro à partir de 1 → fichier).
+    /// Shot of each `broll` block (number from 1 → file).
     pub brolls: BTreeMap<usize, String>,
     pub music: Option<String>,
-    /// Effet sonore trouvé pour chaque requête.
+    /// Sound effect found for each query.
     pub sfx: BTreeMap<String, String>,
-    /// Ce qui n'a pas été trouvé, en clair.
+    /// What was not found, in plain words.
     pub missing: Vec<String>,
 }
 
-/// Licence utilisable sans condition gênante : libre, ou citer l'auteur.
+/// Licence usable without an awkward condition: free, or credit the author.
 pub fn usable(hit: &Hit) -> bool {
     let terms = hit.origin.license.terms();
     terms.known && !terms.non_commercial && !terms.no_derivatives && !terms.share_alike
 }
 
-/// Mots d'une requête qui comptent pour juger un titre (trois lettres ou
-/// plus, sans les mots vides anglais).
+/// Words of a query that count to judge a title (three letters or more,
+/// without English stop words).
 fn query_words(query: &str) -> Vec<String> {
     const STOP: [&str; 8] = ["the", "and", "with", "for", "from", "into", "over", "of"];
     query
@@ -106,7 +105,7 @@ fn query_words(query: &str) -> Vec<String> {
         .collect()
 }
 
-/// Nombre de mots de la requête présents dans le titre du résultat.
+/// Number of words of the query present in the title of the result.
 pub fn relevance(hit: &Hit, query: &str) -> usize {
     let title = hit.origin.title.to_lowercase();
     query_words(query)
@@ -115,8 +114,8 @@ pub fn relevance(hit: &Hit, query: &str) -> usize {
         .count()
 }
 
-/// Les résultats retenus, du plus pertinent au moins pertinent (l'ordre des
-/// banques départage), `MAX_CANDIDATES` au plus.
+/// The kept results, from the most to the least relevant (the order of the
+/// banks breaks ties), `MAX_CANDIDATES` at most.
 fn ranked<'a>(hits: impl Iterator<Item = &'a Hit>, query: &str) -> Vec<&'a Hit> {
     let mut scored: Vec<(usize, &Hit)> = hits.map(|h| (relevance(h, query), h)).collect();
     scored.sort_by_key(|s| std::cmp::Reverse(s.0));
@@ -127,9 +126,9 @@ fn ranked<'a>(hits: impl Iterator<Item = &'a Hit>, query: &str) -> Vec<&'a Hit> 
         .collect()
 }
 
-/// Plans réels candidats : licence utilisable, ni GIF ni SVG, au moins un
-/// mot de la requête dans le titre (mieux vaut une animation qu'un plan hors
-/// sujet), une vidéo assez longue de préférence.
+/// Candidate real shots: usable licence, neither GIF nor SVG, at least one
+/// word of the query in the title (better an animation than an off-topic
+/// shot), a long enough video preferably.
 pub fn broll_candidates<'a>(
     hits: &'a [Hit],
     media: Media,
@@ -154,7 +153,7 @@ pub fn broll_candidates<'a>(
     out
 }
 
-/// Effets sonores candidats : courts, licence utilisable.
+/// Candidate sound effects: short, usable licence.
 pub fn sfx_candidates<'a>(hits: &'a [Hit], query: &str) -> Vec<&'a Hit> {
     ranked(
         hits.iter().filter(|h| {
@@ -166,8 +165,8 @@ pub fn sfx_candidates<'a>(hits: &'a [Hit], query: &str) -> Vec<&'a Hit> {
     )
 }
 
-/// Musiques candidates : assez longues (mais pas un mix d'une heure) ;
-/// à défaut, d'au moins 20 s.
+/// Candidate music: long enough (but not an hour-long mix); failing that,
+/// at least 20 s.
 pub fn music_candidates<'a>(hits: &'a [Hit], query: &str) -> Vec<&'a Hit> {
     let fits = |h: &&Hit| h.kind == AssetKind::Audio && usable(h);
     let good = |h: &&Hit| {
@@ -186,7 +185,7 @@ pub fn music_candidates<'a>(hits: &'a [Hit], query: &str) -> Vec<&'a Hit> {
     out
 }
 
-/// Ce qu'on cherche pour un plan.
+/// What is searched for a plan.
 #[derive(Debug, Clone)]
 enum Want {
     Broll {
@@ -206,16 +205,16 @@ enum Want {
 impl Want {
     fn label(&self) -> String {
         match self {
-            Self::Broll { index, query, .. } => format!("plan du bloc {index} (« {query} »)"),
-            Self::Sfx { query } => format!("effet sonore « {query} »"),
-            Self::Music { query } => format!("musique « {query} »"),
+            Self::Broll { index, query, .. } => format!("shot of block {index} (“{query}”)"),
+            Self::Sfx { query } => format!("sound effect “{query}”"),
+            Self::Music { query } => format!("music “{query}”"),
         }
     }
 }
 
-/// Cherche et télécharge les plans et les sons du plan de montage, en
-/// réutilisant les fichiers de la bibliothèque quand le monteur les cite.
-/// `progress` reçoit une ligne par recherche.
+/// Searches and downloads the shots and sounds of the edit plan, reusing
+/// the library files when the editor mentions them. `progress` gets one
+/// line per search.
 pub async fn gather(
     plan: &EditPlan,
     project: &Project,
@@ -232,7 +231,7 @@ pub async fn gather(
             && let Some(search) = &b.broll
         {
             let query = search.query.trim().to_owned();
-            // Un fichier de la bibliothèque cité par son nom.
+            // A library file mentioned by name.
             let own = look.assets.iter().find(|a| {
                 matches!(a.kind, AssetKind::Video | AssetKind::Image)
                     && (a.file == query || a.name.eq_ignore_ascii_case(&query))
@@ -289,7 +288,7 @@ pub async fn gather(
         .await;
     tokio::fs::create_dir_all(downloads).await?;
     for (n, (want, hits)) in found.into_iter().enumerate() {
-        progress(&format!("téléchargement : {}…", want.label()));
+        progress(&format!("downloading: {}…", want.label()));
         let Some(mut asset) = fetch(
             client,
             &hits,
@@ -299,18 +298,18 @@ pub async fn gather(
         .await
         else {
             if !hits.is_empty() {
-                tracing::warn!("{} : aucun téléchargement n'a abouti", want.label());
+                tracing::warn!("{}: no download succeeded", want.label());
             }
             out.missing.push(want.label());
             continue;
         };
         asset.description = match &want {
             Want::Broll { index, query, .. } => {
-                format!("Plan réel du bloc {index}, trouvé par le monteur (« {query} »).")
+                format!("Real shot of block {index}, found by the editor (“{query}”).")
             }
-            Want::Sfx { query } => format!("Effet sonore « {query} », posé par le monteur."),
+            Want::Sfx { query } => format!("Sound effect “{query}”, placed by the editor."),
             Want::Music { query } => {
-                format!("Musique de fond « {query} », choisie par le monteur.")
+                format!("Background music “{query}”, chosen by the editor.")
             }
         };
         let file = asset.file.clone();
@@ -328,9 +327,9 @@ pub async fn gather(
     Ok(out)
 }
 
-/// Télécharge le premier candidat qui veut bien venir et le copie dans la
-/// bibliothèque. Une banque qui demande de ralentir (Wikimedia, 429) est
-/// laissée de côté pour les candidats suivants.
+/// Downloads the first candidate that comes and copies it into the
+/// library. A bank asking to slow down (Wikimedia, 429) is left aside for
+/// the next candidates.
 async fn fetch(
     client: &reqwest::Client,
     hits: &[Hit],
@@ -363,14 +362,14 @@ async fn fetch(
         let _ = tokio::fs::remove_file(&tmp).await;
         match added {
             Ok(asset) => return Some(asset),
-            Err(e) => tracing::debug!("candidat écarté : {e}"),
+            Err(e) => tracing::debug!("candidate discarded: {e}"),
         }
     }
     None
 }
 
-/// Une recherche et ses meilleurs candidats (une vidéo introuvable est
-/// cherchée en photo ; une musique introuvable, en musique d'ambiance).
+/// A search and its best candidates (a video not found is searched as a
+/// photo; a music not found, as ambient music).
 async fn find(client: &reqwest::Client, want: &Want) -> Vec<Hit> {
     use enfait_assets::search::search;
     let owned = |v: Vec<&Hit>| v.into_iter().cloned().collect::<Vec<_>>();
@@ -406,7 +405,7 @@ async fn find(client: &reqwest::Client, want: &Want) -> Vec<Hit> {
     }
 }
 
-/// Le type de bloc d'un plan.
+/// The block kind of a plan.
 pub const fn block_kind(kind: PlanKind) -> BlockKind {
     match kind {
         PlanKind::Animation => BlockKind::Animation,
@@ -417,7 +416,7 @@ pub const fn block_kind(kind: PlanKind) -> BlockKind {
     }
 }
 
-/// Le type d'un bloc, pour le monteur.
+/// The kind of a block, for the editor.
 pub const fn plan_kind(kind: BlockKind) -> PlanKind {
     match kind {
         BlockKind::Animation => PlanKind::Animation,
@@ -428,16 +427,16 @@ pub const fn plan_kind(kind: BlockKind) -> PlanKind {
     }
 }
 
-/// Un bloc écrit par l'auteur : sa description n'est pas vide. Le monteur
-/// ne le réécrit pas (« écrire le storyboard » complète, il ne remplace pas).
+/// A block written by the author: its description is not empty. The
+/// editor does not rewrite it ("Write the storyboard" completes, it does not replace).
 pub fn authored(block: &Block) -> bool {
     !block.description.trim().is_empty()
 }
 
-/// Les éditions qui appliquent le plan au projet, à passer d'un coup
-/// (`Edit::Batch`). `keep_authored` : les blocs déjà décrits gardent type
-/// et description. Les plans réels introuvables laissent le bloc en
-/// animation, avec sa description.
+/// The edits applying the plan to the project, to pass at once
+/// (`Edit::Batch`). `keep_authored`: blocks already described keep kind
+/// and description. Real shots not found leave the block as an
+/// animation, with its description.
 pub fn edits(
     project: &Project,
     transcript: &Transcript,
@@ -491,7 +490,7 @@ pub fn edits(
                 });
             }
         }
-        // Moments : sur un mot du bloc, sans écraser ceux de l'auteur.
+        // Moments: on a word of the block, without overwriting the author's.
         for m in &p.moments {
             let Some(at) = word_time(transcript, block, &m.word) else {
                 continue;
@@ -511,8 +510,8 @@ pub fn edits(
                 });
             }
         }
-        // Transition : pas après le dernier bloc, pas au-delà du nombre
-        // permis, pas à la place d'une transition choisie par l'auteur.
+        // Transition: not after the last block, not beyond the allowed number,
+        // not instead of a transition chosen by the author.
         let last = i.saturating_add(1) >= blocks.len();
         if let Some(t) = &p.transition
             && !last
@@ -538,9 +537,9 @@ pub fn edits(
     out
 }
 
-/// Pose la musique et les effets sonores trouvés. Les sons déjà posés par
-/// l'auteur restent ; une musique n'est ajoutée que s'il n'y en a pas.
-/// Renvoie le nombre de sons posés.
+/// Places the music and sound effects found. Sounds already placed by the
+/// author stay; a music is only added if there is none.
+/// Returns the number of placed sounds.
 pub fn place_sounds(
     project: &Project,
     transcript: &Transcript,
@@ -588,7 +587,7 @@ pub fn place_sounds(
     placed
 }
 
-/// Mot ramené à l'essentiel pour comparer (minuscules, sans ponctuation).
+/// Word reduced to the essentials to compare (lowercase, no punctuation).
 fn normalize(word: &str) -> String {
     word.chars()
         .filter(|c| c.is_alphanumeric())
@@ -596,8 +595,8 @@ fn normalize(word: &str) -> String {
         .collect()
 }
 
-/// Instant du mot `word` dans le bloc (le premier mot d'une expression ;
-/// à défaut, un mot qui le contient).
+/// Time of word `word` in the block (the first word of a phrase; failing
+/// that, a word containing it).
 pub fn word_time(transcript: &Transcript, block: &Block, word: &str) -> Option<Flicks> {
     let pieces: Vec<String> = word
         .split_whitespace()
@@ -607,8 +606,8 @@ pub fn word_time(transcript: &Transcript, block: &Block, word: &str) -> Option<F
     let first = pieces.first()?;
     let words: Vec<_> = transcript.words_in(block.range).collect();
     let norm: Vec<String> = words.iter().map(|w| normalize(&w.text)).collect();
-    // L'expression entière, puis son premier mot, puis un mot qui le
-    // contient (« l'Europe » pour « Europe »).
+    // The whole phrase, then its first word, then a word containing it
+    // ("l'Europe" for "Europe").
     let whole = (0..norm.len()).find(|&i| {
         pieces
             .iter()
@@ -621,7 +620,7 @@ pub fn word_time(transcript: &Transcript, block: &Block, word: &str) -> Option<F
     words.get(index).map(|w| w.range.start())
 }
 
-/// Texte du mot qui commence à `at`.
+/// Text of the word starting at `at`.
 fn word_text(transcript: &Transcript, at: Flicks) -> String {
     transcript
         .words
@@ -635,7 +634,7 @@ fn word_text(transcript: &Transcript, at: Flicks) -> String {
         .unwrap_or_default()
 }
 
-/// Les blocs vus par le monteur.
+/// The blocks as the editor sees them.
 pub fn editor_blocks(
     project: &Project,
     transcript: &Transcript,
@@ -654,8 +653,7 @@ pub fn editor_blocks(
         .collect()
 }
 
-/// Transitions travaillées permises : environ une pour quatre blocs, quatre
-/// au plus.
+/// Crafted transitions allowed: about one per four blocks, four at most.
 pub const fn max_transitions(blocks: usize) -> usize {
     if blocks < 2 {
         0
@@ -671,8 +669,8 @@ pub const fn max_transitions(blocks: usize) -> usize {
     }
 }
 
-/// La bibliothèque pour le monteur : images, SVG et vidéos, une ligne par
-/// fichier (les polices et les sons ne font pas un plan).
+/// The library for the editor: images, SVG and videos, one line per file
+/// (fonts and sounds do not make a shot).
 pub fn library_lines(look: &Look) -> Option<String> {
     let lines: Vec<String> = look
         .assets
@@ -690,35 +688,25 @@ pub fn library_lines(look: &Look) -> Option<String> {
     (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
-/// Bilan en une phrase pour l'interface.
+/// Summary in a sentence (CLI and MCP; the app builds its own, translated).
 pub fn summary(plan: &EditPlan, gathered: &Gathered, edits: usize, sounds: usize) -> String {
     let brolls = gathered.brolls.len();
     let mut out = format!(
-        "Storyboard écrit : {} bloc{} décrit{}",
-        plan.blocks.len(),
-        if plan.blocks.len() > 1 { "s" } else { "" },
-        if plan.blocks.len() > 1 { "s" } else { "" },
+        "Storyboard written: {} block(s) described",
+        plan.blocks.len()
     );
     if brolls > 0 {
-        out.push_str(&format!(
-            ", {brolls} plan{} réel{}",
-            if brolls > 1 { "s" } else { "" },
-            if brolls > 1 { "s" } else { "" }
-        ));
+        out.push_str(&format!(", {brolls} real shot(s)"));
     }
     if sounds > 0 {
-        out.push_str(&format!(
-            ", {sounds} son{} posé{}",
-            if sounds > 1 { "s" } else { "" },
-            if sounds > 1 { "s" } else { "" }
-        ));
+        out.push_str(&format!(", {sounds} sound(s) placed"));
     }
     if edits == 0 {
-        out.push_str(" (rien à changer)");
+        out.push_str(" (nothing to change)");
     }
     out.push('.');
     if !gathered.missing.is_empty() {
-        out.push_str(&format!(" Introuvable : {}.", gathered.missing.join(", ")));
+        out.push_str(&format!(" Not found: {}.", gathered.missing.join(", ")));
     }
     out
 }
@@ -736,7 +724,7 @@ mod tests {
         Flicks::from_millis((t * 1000.0).round() as i64).unwrap()
     }
 
-    /// Trois blocs de 3 s, trois mots chacun.
+    /// Three 3 s blocks, three words each.
     fn project() -> (Project, Transcript) {
         let texts = [
             ["Bonjour", "à", "tous."],
@@ -777,7 +765,7 @@ mod tests {
                     kind: "rush".into(),
                     description: "face caméra".into(),
                     transition: Some(TransitionPlan {
-                        kind: "decrite".into(),
+                        kind: "described".into(),
                         description: "balayage".into(),
                     }),
                     ..Default::default()
@@ -830,8 +818,7 @@ mod tests {
         g.brolls.insert(2, "gare.mp4".into());
         g.sfx.insert("steam hiss".into(), "vapeur.wav".into());
         g.music = Some("piano.mp3".into());
-        g.missing
-            .push("plan du bloc 3 (« train departure »)".into());
+        g.missing.push("shot of block 3 (“train departure”)".into());
         g
     }
 
@@ -856,18 +843,14 @@ mod tests {
         assert_eq!(
             b[1].transition_after,
             Transition::Cut,
-            "une seule transition permise"
+            "a single transition allowed"
         );
-        assert_eq!(
-            b[2].kind,
-            BlockKind::Animation,
-            "plan introuvable : animation"
-        );
+        assert_eq!(b[2].kind, BlockKind::Animation, "shot not found: animation");
         assert_eq!(b[2].description, "le train démarre");
         assert_eq!(
             b[2].transition_after,
             Transition::Cut,
-            "rien après le dernier bloc"
+            "nothing after the last block"
         );
         history.undo(&mut project).unwrap();
         assert_eq!(project, before);
@@ -888,13 +871,13 @@ mod tests {
             e,
             Edit::SetDescription { block, .. } | Edit::SetKind { block, .. } if *block == id
         )));
-        // Ses moments et sa transition viennent quand même.
+        // Its moments and its transition still come.
         assert!(
             edits
                 .iter()
                 .any(|e| matches!(e, Edit::AddMoment { block, .. } if *block == id))
         );
-        // En mode magique, tout est réécrit.
+        // In magic mode, everything is rewritten.
         let all = super::edits(&project, &transcript, &plan(), &gathered(), false, 3);
         assert!(
             all.iter()
@@ -909,13 +892,13 @@ mod tests {
         let n = place_sounds(&project, &transcript, &plan(), &gathered(), &mut finish);
         assert_eq!(n, 2);
         assert_eq!(finish.music.len(), 1);
-        assert_eq!(finish.music[0].gain_db, -30.0, "volume borné");
+        assert_eq!(finish.music[0].gain_db, -30.0, "volume bounded");
         assert_eq!(finish.sfx.len(), 1);
         let sfx = &finish.sfx[0];
         assert_eq!(sfx.block, project.blocks()[1].id);
-        // « fume. » commence à 1,8 s dans le bloc, le son un peu avant.
+        // "fume." starts at 1.8 s in the block, the sound a little before.
         assert!((sfx.offset - 1.75).abs() < 1e-9, "{}", sfx.offset);
-        // Une seconde fois : pas de doublon, pas de deuxième musique.
+        // A second time: no duplicate, no second music.
         assert_eq!(
             place_sounds(&project, &transcript, &plan(), &gathered(), &mut finish),
             0
@@ -928,7 +911,7 @@ mod tests {
         let b = &project.blocks()[0];
         assert_eq!(word_time(&transcript, b, "TOUS"), Some(secs(1.8)));
         assert_eq!(word_time(&transcript, b, "à tous"), Some(secs(1.0)));
-        assert_eq!(word_time(&transcript, b, "gare"), None, "pas dans ce bloc");
+        assert_eq!(word_time(&transcript, b, "gare"), None, "not in this block");
     }
 
     fn hit(kind: AssetKind, license: &str, duration: Option<f64>, ext: &str, title: &str) -> Hit {
@@ -987,10 +970,10 @@ mod tests {
         ];
         let q = "train station";
         let c = broll_candidates(&hits, Media::Video, 5.0, q);
-        assert_eq!(c.len(), 2, "licences gênantes et hors sujet écartés");
+        assert_eq!(c.len(), 2, "awkward licences and off-topic discarded");
         assert_eq!(c[0].ext, "webm", "assez longue d'abord");
         let c = broll_candidates(&hits, Media::Video, 30.0, q);
-        assert_eq!(c[0].origin.title, "Old train station", "plus pertinente");
+        assert_eq!(c[0].origin.title, "Old train station", "most relevant");
         let maps = vec![
             hit(
                 AssetKind::Image,
@@ -1025,8 +1008,8 @@ mod tests {
             hit(AssetKind::Audio, "CC BY 4.0", Some(120.0), "mp3", "Piano"),
         ];
         let c = sfx_candidates(&sounds, "steam hiss");
-        assert_eq!(c[0].ext, "ogg", "le titre qui correspond");
-        assert_eq!(c.len(), 2, "trop long : pas un effet");
+        assert_eq!(c[0].ext, "ogg", "the matching title");
+        assert_eq!(c.len(), 2, "too long: not an effect");
         assert_eq!(
             music_candidates(&sounds, "calm piano")[0].duration,
             Some(120.0)
@@ -1044,7 +1027,9 @@ mod tests {
     #[test]
     fn summary_says_what_is_missing() {
         let text = summary(&plan(), &gathered(), 5, 2);
-        assert!(text.starts_with("Storyboard écrit : 3 blocs décrits, 1 plan réel, 2 sons posés."));
-        assert!(text.contains("Introuvable : plan du bloc 3"));
+        assert!(text.starts_with(
+            "Storyboard written: 3 block(s) described, 1 real shot(s), 2 sound(s) placed."
+        ));
+        assert!(text.contains("Not found: shot of block 3"));
     }
 }

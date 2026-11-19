@@ -1,5 +1,5 @@
-//! Chaîne complète sans modèle : réponses préenregistrées, vrai Chromium.
-//! Création, critique, rendu en clip, retouche.
+//! Whole pipeline without a model: canned answers, real Chromium.
+//! Creation, critique, render into a clip, retouch.
 
 #![allow(clippy::unwrap_used, clippy::print_stderr, clippy::indexing_slicing)]
 
@@ -39,7 +39,7 @@ async fn create_render_and_revise_without_a_model() {
         .map(|d| d.cache_dir().join("chromium"))
         .filter(|d| d.is_dir())
     else {
-        eprintln!("Chromium absent (enfait-cli setup) : test ignoré");
+        eprintln!("Chromium missing (enfait-cli setup): test skipped");
         return;
     };
     let chrome = enfait_motion::ensure_browser(&chromium).await.unwrap();
@@ -54,12 +54,12 @@ async fn create_render_and_revise_without_a_model() {
         move |request: &Request| -> Result<String, AiError> {
             let user = text(request);
             log.lock().unwrap().push(user.clone());
-            Ok(if user.contains("Mode : CRÉER") {
+            Ok(if user.contains("Mode: CREATE") {
                 format!("```html\n{}\n```", scene("red"))
-            } else if user.contains("Mode : RETOUCHER") {
+            } else if user.contains("Mode: RETOUCH") {
                 format!("```html\n{}\n```", scene("blue"))
             } else {
-                "VERDICT: GARDER\nTrès bien.".into()
+                "VERDICT: KEEP\nVery good.".into()
             })
         },
     ));
@@ -134,17 +134,17 @@ async fn create_render_and_revise_without_a_model() {
     let requests = seen.lock().unwrap();
     assert!(
         requests[0].contains("le carré s'arrête"),
-        "moments dans le brief"
+        "moments in the brief"
     );
-    assert!(requests.iter().any(|r| r.contains("Mode : CRITIQUER")));
+    assert!(requests.iter().any(|r| r.contains("Mode: CRITIQUE")));
     assert!(
         requests
             .iter()
-            .any(|r| r.contains("Mode : RETOUCHER") && r.contains("à 0.50 s : le carré en bleu"))
+            .any(|r| r.contains("Mode: RETOUCH") && r.contains("at 0.50 s: le carré en bleu"))
     );
 }
 
-/// Aperçu : prise montée (deux morceaux), un bloc remplacé par un clip rouge.
+/// Preview: edited take (two pieces), one block replaced by a red clip.
 #[tokio::test]
 async fn preview_replaces_animated_blocks() {
     use enfait_studio::preview::{Output, assemble, pieces};
@@ -226,7 +226,7 @@ async fn preview_replaces_animated_blocks() {
         .parse()
         .unwrap();
     assert!((duration - 4.0).abs() < 0.15, "{duration}");
-    // Image à 2 s : le clip rouge.
+    // Frame at 2 s: the red clip.
     let frame = std::process::Command::new("ffmpeg")
         .args(["-nostdin", "-v", "error", "-ss", "2.0", "-i"])
         .arg(&out)
@@ -247,8 +247,8 @@ async fn preview_replaces_animated_blocks() {
     assert!(rgb[0] > 200 && rgb[1] < 60 && rgb[2] < 60, "{rgb:?}");
 }
 
-/// Composition qui montre l'image de scène `from` (jusqu'à `switch` s) puis
-/// `to`, en plein cadre.
+/// Composition showing scene image `from` (until `switch` s) then `to`,
+/// full frame.
 fn scene_page(switch: f64) -> String {
     format!(
         r#"<!doctype html><html><head><style>
@@ -276,7 +276,7 @@ fn color_clip(dir: &std::path::Path, name: &str, color: &str) -> std::path::Path
     path
 }
 
-/// Couleur moyenne de l'image `index` d'un clip.
+/// Average colour of frame `index` of a clip.
 fn pixel(clip: &std::path::Path, index: usize) -> Vec<u8> {
     std::process::Command::new("ffmpeg")
         .args(["-nostdin", "-v", "error", "-i"])
@@ -288,7 +288,7 @@ fn pixel(clip: &std::path::Path, index: usize) -> Vec<u8> {
         .stdout
 }
 
-/// Couleur du pixel (`x`, `y`) de l'image `index` d'un clip.
+/// Colour of pixel (`x`, `y`) of frame `index` of a clip.
 fn pixel_at(clip: &std::path::Path, index: usize, x: u32, y: u32) -> Vec<u8> {
     std::process::Command::new("ffmpeg")
         .args(["-nostdin", "-v", "error", "-i"])
@@ -314,7 +314,7 @@ async fn scenes_reach_mixed_blocks_and_transitions() {
         .map(|d| d.cache_dir().join("chromium"))
         .filter(|d| d.is_dir())
     else {
-        eprintln!("Chromium absent (enfait-cli setup) : test ignoré");
+        eprintln!("Chromium missing (enfait-cli setup): test skipped");
         return;
     };
     let chrome = enfait_motion::ensure_browser(&chromium).await.unwrap();
@@ -326,10 +326,10 @@ async fn scenes_reach_mixed_blocks_and_transitions() {
         let user = text(request);
         Ok(if user.contains("transition") {
             format!("```html\n{}\n```", scene_page(0.5))
-        } else if user.contains("Mode : CRÉER") || user.contains("Mode : RETOUCHER") {
+        } else if user.contains("Mode: CREATE") || user.contains("Mode: RETOUCH") {
             format!("```html\n{}\n```", scene_page(9.0))
         } else {
-            "VERDICT: GARDER".into()
+            "VERDICT: KEEP".into()
         })
     }));
     let usage = Mutex::new(Usage::default());
@@ -339,7 +339,7 @@ async fn scenes_reach_mixed_blocks_and_transitions() {
     let blue = color_clip(dir.path(), "blue.mp4", "blue");
 
     let result = async {
-        // Bloc « Mixte » : la prise (ici rouge) arrive dans la composition.
+        // Mixed block: the take (red here) arrives in the composition.
         let frames = work.join("rush-frames");
         let count =
             enfait_studio::extract_frames(&red, &[(0.0, 1.0)], 10.0, (320, 180), &frames).await?;
@@ -384,11 +384,11 @@ async fn scenes_reach_mixed_blocks_and_transitions() {
         let rgb = pixel(&clip, 5);
         assert!(
             rgb[0] > 200 && rgb[2] < 60,
-            "la prise rouge est rendue : {rgb:?}"
+            "the red take is rendered: {rgb:?}"
         );
 
-        // Personne détourée (ici : moitié gauche verte, droite transparente),
-        // passée en `to` et posée par-dessus la prise.
+        // Cut-out person (here: left half green, right transparent), passed as
+        // `to` and laid on top of the take.
         let cutouts = work.join("rush-cutouts");
         std::fs::create_dir_all(&cutouts)?;
         let half = cutouts.join("demi.png");
@@ -419,19 +419,16 @@ async fn scenes_reach_mixed_blocks_and_transitions() {
         let left = pixel_at(&clip, 5, 40, 90);
         let right = pixel_at(&clip, 5, 280, 90);
         assert!(left[1] > 200 && left[0] < 60, "personne devant : {left:?}");
-        assert!(
-            right[0] > 200 && right[1] < 60,
-            "prise derrière : {right:?}"
-        );
+        assert!(right[0] > 200 && right[1] < 60, "take behind: {right:?}");
 
-        // Retouche puis retour à la version 1.
+        // Retouch, then back to version 1.
         brief.moments.clear();
         enfait_studio::revise(&studio, "mixte", &brief, &[(0.2, "rien".into())]).await?;
         assert_eq!(enfait_studio::versions(&work, "mixte"), [1]);
         enfait_studio::restore(&studio, "mixte", 1).await?;
         assert_eq!(enfait_studio::versions(&work, "mixte"), [1, 2]);
 
-        // Transition : rouge, puis bleu après la moitié.
+        // Transition: red, then blue after half.
         let from = work.join("t-from");
         let to = work.join("t-to");
         enfait_studio::extract_frames(&red, &[(0.0, 0.5)], 10.0, (320, 180), &from).await?;
@@ -457,8 +454,8 @@ async fn scenes_reach_mixed_blocks_and_transitions() {
         enfait_studio::transition_clip(&studio, "transition", &brief, &scenes, true, &clip).await?;
         let first = pixel(&clip, 1);
         let last = pixel(&clip, 8);
-        assert!(first[0] > 200 && first[2] < 60, "départ rouge : {first:?}");
-        assert!(last[2] > 200 && last[0] < 60, "arrivée bleue : {last:?}");
+        assert!(first[0] > 200 && first[2] < 60, "red start: {first:?}");
+        assert!(last[2] > 200 && last[0] < 60, "blue end: {last:?}");
         anyhow::Ok(())
     }
     .await;

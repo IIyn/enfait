@@ -1,0 +1,22 @@
+_version: 2
+"notify.block_done":
+  en: "Block %{n} animated."
+  fr: "Bloc %{n} animé."
+"notify.block_failed":
+  en: "Block %{n} failed: %{error}"
+  fr: "Échec du bloc %{n} : %{error}"
+"notify.many":
+  en: "%{count} animations done."
+  fr: "%{count} animations terminées."
+"notify.many_failed":
+  en: "%{done} animations done, %{failed} failed."
+  fr: "%{done} animations terminées, %{failed} en échec."
+"notify.transition_done":
+  en: "Transition after block %{n} ready."
+  fr: "Transition après le bloc %{n} prête."
+"notify.transition_failed":
+  en: "Transition after block %{n} failed: %{error}"
+  fr: "Échec de la transition après le bloc %{n} : %{error}"
+"notify.written":
+  en: "Storyboard written."
+  fr: "Storyboard écrit."

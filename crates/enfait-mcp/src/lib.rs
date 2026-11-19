@@ -1,11 +1,11 @@
-//! Serveur MCP d'enfait : un agent (Claude Code, Claude Desktop, un modèle
-//! local avec un client MCP) lit et modifie la session — storyboard,
-//! bibliothèque, recherche libre de droits, finition sonore — et demande des
-//! générations à l'interface ouverte.
+//! enfait's MCP server: an agent (Claude Code, Claude Desktop, a local
+//! model with an MCP client) reads and changes the session — storyboard,
+//! library, royalty-free search, sound finish — and asks the open app for
+//! generations.
 //!
-//! - [`server`] : le protocole (JSON-RPC sur l'entrée et la sortie standard) ;
-//! - [`tools`] : les outils ;
-//! - [`bridge`] : le pont par fichiers avec l'interface.
+//! - [`server`]: the protocol (JSON-RPC over standard input and output);
+//! - [`tools`]: the tools;
+//! - [`bridge`]: the file bridge with the app.
 
 pub mod bridge;
 pub mod server;

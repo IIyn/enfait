@@ -1,11 +1,11 @@
-//! Compositions animées d'enfait.
+//! enfait's animated compositions.
 //!
-//! Une composition est un document HTML qui respecte le [contrat]
-//! (`window.enfait = { duration, seek(t) }`). Ce crate prépare la page
-//! ([`composition`]), installe la [`library`] (polices, anime.js), la rend image
-//! par image dans Chromium ([`render`]) et la vérifie ([`job`]).
+//! A composition is an HTML document that follows the [contract]
+//! (`window.enfait = { duration, seek(t) }`). This crate prepares the page
+//! ([`composition`]), installs the [`library`] (fonts, anime.js), renders it
+//! frame by frame in Chromium ([`render`]) and checks it ([`job`]).
 //!
-//! [contrat]: composition::CONTRACT
+//! [contract]: composition::CONTRACT
 
 pub mod browser;
 pub mod composition;

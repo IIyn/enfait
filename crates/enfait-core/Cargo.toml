@@ -1,6 +1,6 @@
 [package]
 name = "enfait-core"
-description = "Modèle de projet d'enfait : temps, storyboard, historique d'édition."
+description = "enfait's project model: time, storyboard, edit history."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

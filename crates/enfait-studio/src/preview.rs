@@ -1,36 +1,36 @@
-//! Aperçu du storyboard : la prise montée, où chaque bloc animé est
-//! remplacé par son clip, avec le son du montage. Un seul fichier, que le
-//! lecteur ouvre comme n'importe quel média.
+//! Storyboard preview: the edited take, where each animated block is
+//! replaced by its clip, with the sound of the edit. A single file, which
+//! the player opens like any media.
 
 use anyhow::{Context as _, Result};
 use enfait_media::Edl;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-/// Un morceau de l'aperçu, en temps montage.
+/// A piece of the preview, in edit time.
 pub struct Piece {
     pub start: f64,
     pub end: f64,
     pub source: Source,
 }
 
-/// D'où viennent les images d'un morceau.
+/// Where the frames of a piece come from.
 pub enum Source {
-    /// La prise montée.
+    /// The edited take.
     Rush,
-    /// Un clip rendu, lu à partir de `offset` secondes.
+    /// A rendered clip, played from `offset` seconds.
     Clip { path: PathBuf, offset: f64 },
 }
 
-/// Morceaux de l'aperçu : chaque bloc (son clip s'il en a un, sinon la
-/// prise), puis les fenêtres de transition `(début, fin, clip)` par-dessus.
+/// Pieces of the preview: each block (its clip if it has one, else the
+/// take), then the transition windows `(start, end, clip)` on top.
 pub fn pieces(
     blocks: &[(f64, f64, Option<PathBuf>)],
     transitions: &[(f64, f64, PathBuf)],
 ) -> Vec<Piece> {
     let mut out = Vec::new();
     for (start, end, clip) in blocks {
-        // Parties du bloc hors des fenêtres de transition.
+        // Parts of the block outside the transition windows.
         let mut cursor = *start;
         let mut cuts: Vec<(f64, f64)> = transitions
             .iter()
@@ -70,11 +70,11 @@ pub fn pieces(
     out
 }
 
-/// Dimensions de l'aperçu pour une image `width`×`height` : 540 lignes
-/// (ou colonnes en portrait), paires.
+/// Size of the preview for a `width`×`height` image: 540 lines (or
+/// columns in portrait), even.
 pub fn preview_size(width: u32, height: u32) -> (u32, u32) {
     let even = |x: f64| {
-        // Dimensions raisonnables : la conversion ne déborde pas.
+        // Reasonable size: the conversion does not overflow.
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let v = (x / 2.0).round().max(1.0) as u32 * 2;
         v
@@ -87,30 +87,30 @@ pub fn preview_size(width: u32, height: u32) -> (u32, u32) {
     }
 }
 
-/// Qualité de l'assemblage.
+/// Quality of the assembly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Quality {
-    /// Aperçu rapide, avec la voix du montage.
+    /// Fast preview, with the voice of the edit.
     Preview,
-    /// Export : image seule, en haute qualité (le son est mixé à part).
+    /// Export: picture only, in high quality (the sound is mixed separately).
     Final,
 }
 
-/// Format de sortie de l'assemblage.
+/// Output format of the assembly.
 pub struct Output<'a> {
     pub size: (u32, u32),
     pub fps: f64,
-    /// Mise au cadre de la prise (voir [`enfait_media::fx::framing`]).
+    /// Framing of the take (see [`enfait_media::fx::framing`]).
     pub framing: String,
     pub quality: Quality,
-    /// Post-FX appliqués à toute l'image (voir [`enfait_media::fx::filter`]).
+    /// Post-FX applied to the whole picture (see [`enfait_media::fx::filter`]).
     pub post_fx: Option<String>,
-    /// Avancement, de 0 à 1.
+    /// Progress, from 0 to 1.
     pub progress: Option<&'a (dyn Fn(f64) + Sync)>,
 }
 
 impl Output<'_> {
-    /// Aperçu rapide à `size`, prise entière (bandes noires si besoin).
+    /// Fast preview at `size`, whole take (black bars if needed).
     pub fn preview(size: (u32, u32), fps: f64) -> Self {
         Self {
             size,
@@ -123,8 +123,8 @@ impl Output<'_> {
     }
 }
 
-/// Son de la voix du montage : les morceaux de l'entrée 0 bout à bout,
-/// avec des fondus de 4 ms aux coupes. Sortie : `[a]`.
+/// Sound of the voice of the edit: the pieces of input 0 end to end, with
+/// 4 ms fades at the cuts. Output: `[a]`.
 pub fn voice_graph(parts: &[(f64, f64)]) -> String {
     let edl = Edl::from_ranges(parts);
     let mut graph = String::new();
@@ -144,9 +144,9 @@ pub fn voice_graph(parts: &[(f64, f64)]) -> String {
     graph
 }
 
-/// Assemble l'aperçu (ou l'image de l'export). `rush` : la prise ; `video` :
-/// elle a des images (sinon fond noir) ; `parts` : morceaux de la prise qui
-/// forment le montage ; `pieces` : voir [`pieces`].
+/// Assembles the preview (or the picture of the export). `rush`: the
+/// take; `video`: it has pictures (else black background); `parts`: pieces
+/// of the take forming the edit; `pieces`: see [`pieces`].
 pub async fn assemble(
     rush: &Path,
     video: bool,
@@ -155,11 +155,11 @@ pub async fn assemble(
     output: &Output<'_>,
     out: &Path,
 ) -> Result<()> {
-    anyhow::ensure!(!parts.is_empty() && !pieces.is_empty(), "montage vide");
+    anyhow::ensure!(!parts.is_empty() && !pieces.is_empty(), "empty edit");
     let edl = Edl::from_ranges(parts);
     let (w, h) = output.size;
     let fps = output.fps;
-    // Les clips sont déjà au format : mis au cadre sans rognage.
+    // Clips are already in the format: framed without cropping.
     let clip_fit = format!(
         "fps={fps},{}",
         enfait_media::fx::framing(w, h, enfait_core::Framing::Fit, 0)
@@ -179,8 +179,8 @@ pub async fn assemble(
             let k = inputs.len().saturating_sub(1);
             let _ = write!(
                 graph,
-                // Un clip un peu court garde sa dernière image : l'aperçu
-                // reste calé sur le son.
+                // A slightly short clip keeps its last frame: the preview stays in
+                // sync with the sound.
                 "[{k}:v]{clip_fit},tpad=stop_mode=clone:stop_duration=2,\
                  trim=start={offset:.4}:duration={duration:.4},setpts=PTS-STARTPTS[v{n}];"
             );
@@ -252,7 +252,7 @@ pub async fn assemble(
     let total: f64 = edl.parts().iter().map(|p| p.duration()).sum();
     crate::ffmpeg::run(cmd, total, output.progress)
         .await
-        .context("assemblage")?;
+        .context("assembling")?;
     tokio::fs::rename(&tmp, out).await?;
     Ok(())
 }
@@ -272,7 +272,7 @@ mod tests {
         let spans: Vec<(f64, f64)> = p.iter().map(|p| (p.start, p.end)).collect();
         assert_eq!(spans, [(0.0, 1.6), (1.6, 2.6), (2.6, 4.0)]);
         assert!(matches!(&p[1].source, Source::Clip { path, .. } if *path == t));
-        // Le clip du bloc 2 reprend 0,6 s après son début.
+        // The clip of block 2 resumes 0.6 s after its start.
         assert!(matches!(&p[2].source, Source::Clip { offset, .. } if (offset - 0.6).abs() < 1e-9));
     }
 

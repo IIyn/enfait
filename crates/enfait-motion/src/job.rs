@@ -1,4 +1,4 @@
-//! Rendu d'une séquence d'images avec cache, et vérification d'une composition.
+//! Rendering a frame sequence with a cache, and checking a composition.
 
 use crate::error::MotionError;
 use crate::render::{Inspection, OutsideText, Renderer, Scenes};
@@ -6,24 +6,24 @@ use image::{GenericImageView as _, ImageFormat};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// Version du moteur : la changer invalide tous les caches de frames.
+/// Engine version: changing it invalidates all frame caches.
 const ENGINE_VERSION: &str = "2";
 
-/// Nom du fichier de la frame `index` dans un dossier de rendu.
+/// File name of frame `index` in a render folder.
 pub fn frame_name(index: usize) -> String {
     format!("{index:06}.jpg")
 }
 
-/// Une séquence d'images à produire depuis une composition.
+/// A frame sequence to produce from a composition.
 pub struct FrameJob<'a> {
     pub html: &'a Path,
     pub width: u32,
     pub height: u32,
-    /// Instant local (secondes) de chaque image à produire.
+    /// Local time (seconds) of each frame to produce.
     pub times: Vec<f64>,
-    /// Pour une transition : images des scènes voisines, une paire par frame.
+    /// For a transition: frames of the neighbouring scenes, a pair per frame.
     pub scenes: Option<Vec<(PathBuf, PathBuf)>>,
-    /// Ajouté à la clé de cache (par exemple les clés des scènes voisines).
+    /// Added to the cache key (for example the keys of the neighbouring scenes).
     pub extra_key: String,
     pub out_dir: &'a Path,
 }
@@ -33,7 +33,7 @@ pub struct FrameOutcome {
     pub key: String,
     pub frames: usize,
     pub errors: Vec<String>,
-    /// Vrai si le cache a servi.
+    /// True if the cache was used.
     #[serde(skip)]
     pub cached: bool,
 }
@@ -54,7 +54,7 @@ impl FrameJob<'_> {
         hasher.finalize().to_hex().to_string()
     }
 
-    /// Produit les images, ou réutilise le rendu précédent s'il correspond.
+    /// Produces the frames, or reuses the previous render if it matches.
     pub async fn run(&self, renderer: &Renderer) -> Result<FrameOutcome, MotionError> {
         let html = tokio::fs::read(self.html).await?;
         let key = self.key(&html);
@@ -99,20 +99,20 @@ impl FrameJob<'_> {
     }
 }
 
-/// Résultat de la vérification d'une composition.
+/// Result of checking a composition.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Report {
-    /// La page ne déclare pas le contrat, ou plante au chargement.
+    /// The page does not declare the contract, or crashes while loading.
     pub contract_error: Option<String>,
     pub js_errors: Vec<String>,
     pub declared_duration: f64,
     pub expected_duration: f64,
-    /// Texte hors zone sûre, par instant.
+    /// Text outside the safe area, per time.
     pub outside: Vec<(f64, OutsideText)>,
     pub unknown_fonts: Vec<String>,
-    /// Instants où l'image est d'une seule couleur.
+    /// Times when the frame is a single colour.
     pub blank_at: Vec<f64>,
-    /// Images échantillons (JPEG réduits) pour la critique visuelle.
+    /// Sample frames (reduced JPEGs) for the visual critique.
     pub samples: Vec<Sample>,
 }
 
@@ -123,11 +123,11 @@ pub struct Sample {
 }
 
 impl Report {
-    /// Problèmes à corriger avant toute critique esthétique.
+    /// Problems to fix before any aesthetic critique.
     pub fn blocking(&self) -> Vec<String> {
         let mut out = Vec::new();
         if let Some(e) = &self.contract_error {
-            out.push(format!("La page ne respecte pas le contrat : {e}"));
+            out.push(format!("The page does not follow the contract: {e}"));
             return out;
         }
         for e in &self.js_errors {
@@ -135,20 +135,20 @@ impl Report {
         }
         if (self.declared_duration - self.expected_duration).abs() > 0.05 {
             out.push(format!(
-                "window.enfait.duration vaut {:.3} s au lieu de {:.3} s.",
+                "window.enfait.duration is {:.3} s instead of {:.3} s.",
                 self.declared_duration, self.expected_duration
             ));
         }
         if !self.unknown_fonts.is_empty() {
             out.push(format!(
-                "Polices non disponibles (remplacées par une police système) : {}.",
+                "Fonts not available (replaced by a system font): {}.",
                 self.unknown_fonts.join(", ")
             ));
         }
         let samples = self.samples.len().max(1);
         if self.blank_at.len().saturating_mul(2) > samples {
             out.push(format!(
-                "L'image est vide (une seule couleur) à {} des {} instants échantillonnés.",
+                "The frame is empty (a single colour) at {} of the {} sampled times.",
                 self.blank_at.len(),
                 samples
             ));
@@ -156,12 +156,12 @@ impl Report {
         out
     }
 
-    /// Problèmes strictement techniques (contrat, JavaScript, polices), sans
-    /// jugement sur l'image : pour les transitions, rendues ici sans scènes.
+    /// Strictly technical problems (contract, JavaScript, fonts), no
+    /// judgement on the frame: for transitions, rendered here without scenes.
     pub fn technical(&self) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         if let Some(e) = &self.contract_error {
-            out.push(format!("La page ne respecte pas le contrat : {e}"));
+            out.push(format!("The page does not follow the contract: {e}"));
             return out;
         }
         out.extend(
@@ -178,13 +178,13 @@ impl Report {
         out
     }
 
-    /// Remarques utiles à la critique, non bloquantes.
+    /// Remarks useful to the critique, not blocking.
     pub fn warnings(&self) -> Vec<String> {
         self.outside
             .iter()
             .map(|(t, o)| {
                 format!(
-                    "À {t:.2} s, le texte « {} » sort de la zone sûre (x {:.0}→{:.0}, y {:.0}→{:.0}).",
+                    "At {t:.2} s, the text \"{}\" leaves the safe area (x {:.0}→{:.0}, y {:.0}→{:.0}).",
                     o.text, o.left, o.right, o.top, o.bottom
                 )
             })
@@ -192,16 +192,16 @@ impl Report {
     }
 }
 
-/// Vérifie une composition et produit des échantillons pour la critique.
+/// Checks a composition and produces samples for the critique.
 pub struct CheckJob<'a> {
     pub html: &'a Path,
     pub width: u32,
     pub height: u32,
     pub expected_duration: f64,
     pub sample_times: Vec<f64>,
-    /// Largeur des échantillons JPEG (la hauteur suit).
+    /// Width of the JPEG samples (the height follows).
     pub sample_width: u32,
-    /// Images de scène (prise, plans voisins), une paire par échantillon.
+    /// Scene frames (take, neighbouring shots), one pair per sample.
     pub scenes: Option<Vec<(PathBuf, PathBuf)>>,
     pub out_dir: &'a Path,
 }
@@ -258,7 +258,7 @@ impl CheckJob<'_> {
     }
 }
 
-/// Indique si l'image est unie et la réduit en JPEG de largeur `width`.
+/// Tells whether the frame is plain and reduces it to a JPEG of width `width`.
 fn analyse(png: &[u8], width: u32) -> Result<(bool, Vec<u8>), MotionError> {
     let img = image::load_from_memory(png)?;
     let (w, h) = img.dimensions();

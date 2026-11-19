@@ -1,10 +1,10 @@
-//! Recherche d'images et de vidéos libres de droits.
+//! Royalty-free image and video search.
 //!
-//! Sans clé : Wikimedia Commons (images, SVG, vidéos, sons) et Openverse
-//! (images et sons sous Creative Commons). Avec une clé gratuite : Pexels
-//! (`PEXELS_API_KEY`) et Pixabay (`PIXABAY_API_KEY`), riches en vidéos
-//! d'illustration, et Freesound (`FREESOUND_API_KEY`) pour les effets
-//! sonores. Chaque résultat porte son origine et sa licence.
+//! Without a key: Wikimedia Commons (images, SVG, videos, sounds) and
+//! Openverse (Creative Commons images and sounds). With a free key: Pexels
+//! and Pixabay, rich in illustration videos, and Freesound for sound
+//! effects (keys in Settings → Asset banks, or `PEXELS_API_KEY`,
+//! `PIXABAY_API_KEY`, `FREESOUND_API_KEY`). Each result carries its origin and licence.
 
 use crate::AssetError;
 use enfait_core::{AssetKind, License, Origin};
@@ -13,21 +13,21 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// Fichiers plus lourds ignorés (vidéos de Commons en très haute définition).
+/// Heavier files are ignored (very high definition Commons videos).
 const MAX_BYTES: u64 = 200 * 1024 * 1024;
-/// Résultats demandés à chaque banque.
+/// Results asked from each bank.
 const PER_SOURCE: usize = 20;
 
-/// Ce qu'on cherche.
+/// What is searched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Media {
     Image,
     Video,
-    /// Musiques et effets sonores.
+    /// Music and sound effects.
     Audio,
 }
 
-/// Une banque d'images.
+/// An image bank.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Source {
     Commons,
@@ -56,7 +56,6 @@ impl Source {
         }
     }
 
-    /// Variable d'environnement de la clé, pour les banques qui en demandent une.
     /// API key the bank needs, if any.
     pub const fn secret(self) -> Option<enfait_config::Secret> {
         match self {
@@ -75,7 +74,7 @@ impl Source {
         }
     }
 
-    /// La banque propose ce type de média.
+    /// The bank offers this kind of media.
     pub const fn offers(self, media: Media) -> bool {
         match self {
             Self::Commons => true,
@@ -89,44 +88,44 @@ impl Source {
         enfait_config::secrets::get(self.secret()?)
     }
 
-    /// La banque est utilisable (clé présente si elle en demande une).
+    /// The bank is usable (key present if it needs one).
     pub fn available(self) -> bool {
         self.secret().is_none() || self.key().is_some()
     }
 }
 
-/// Un résultat de recherche.
+/// A search result.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Hit {
     pub source: Source,
     pub kind: AssetKind,
-    /// Vignette (adresse ; vide pour un son sans image).
+    /// Thumbnail (URL; empty for a sound without picture).
     pub thumb: String,
-    /// Fichier à télécharger.
+    /// File to download.
     pub file: String,
-    /// Extension du fichier téléchargé, sans le point.
+    /// Extension of the downloaded file, without the dot.
     pub ext: String,
     pub width: u32,
     pub height: u32,
-    /// Durée d'une vidéo ou d'un son, en secondes.
+    /// Duration of a video or a sound, in seconds.
     pub duration: Option<f64>,
     pub origin: Origin,
 }
 
-/// Résultats d'une recherche, et les banques qui ont échoué.
+/// Results of a search, and the banks that failed.
 #[derive(Debug, Default)]
 pub struct Results {
     pub hits: Vec<Hit>,
     pub errors: Vec<String>,
 }
 
-/// Client HTTP des banques (identifiant d'enfait, délais raisonnables).
+/// HTTP client of the banks (enfait's identifier, reasonable timeouts).
 pub fn client() -> Result<reqwest::Client, AssetError> {
     Ok(reqwest::Client::builder()
         .user_agent(concat!(
             "enfait/",
             env!("CARGO_PKG_VERSION"),
-            " (logiciel libre de montage video)"
+            " (free software video editor)"
         ))
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(120))
@@ -143,8 +142,8 @@ pub fn download_client() -> Result<reqwest::Client, AssetError> {
         .build()?)
 }
 
-/// Cherche `text` dans toutes les banques disponibles, en parallèle ; les
-/// résultats sont entrelacés pour que chaque banque soit visible.
+/// Searches `text` in every available bank, in parallel; the results are
+/// interleaved so that each bank is visible.
 pub async fn search(client: &reqwest::Client, text: &str, media: Media) -> Results {
     let text = text.trim();
     let mut results = Results::default();
@@ -294,7 +293,7 @@ fn num(v: &Value, key: &str) -> u32 {
         .map_or(0, |n| u32::try_from(n).unwrap_or(u32::MAX))
 }
 
-/// Texte d'un fragment HTML (Commons donne l'auteur en HTML).
+/// Text of an HTML fragment (Commons gives the author in HTML).
 pub fn strip_html(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut in_tag = false;
@@ -317,7 +316,7 @@ pub fn strip_html(html: &str) -> String {
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Extension d'une adresse, en minuscules, sans le point.
+/// Extension of a URL, lowercase, without the dot.
 fn extension(url: &str) -> String {
     let path = url.split(['?', '#']).next().unwrap_or_default();
     path.rsplit('/')
@@ -327,13 +326,13 @@ fn extension(url: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Titre lisible tiré du nom d'un fichier ou d'une adresse.
+/// Readable title taken from a file name or a URL.
 fn title_from(name: &str) -> String {
     let name = name.trim_end_matches('/');
     let last = name.rsplit('/').next().unwrap_or(name);
     let stem = last.rsplit_once('.').map_or(last, |(s, _)| s);
     let stem = stem.strip_prefix("File:").unwrap_or(stem);
-    // Pexels : « un-train-qui-passe-1234567 ».
+    // Pexels: "a-train-passing-by-1234567".
     let stem = stem
         .rsplit_once('-')
         .filter(|(_, id)| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
@@ -341,7 +340,7 @@ fn title_from(name: &str) -> String {
     stem.replace(['-', '_'], " ").trim().to_owned()
 }
 
-/// Auteur raccourci : certaines pages donnent un paragraphe entier.
+/// Shortened author: some pages give a whole paragraph.
 fn short(text: &str) -> String {
     const MAX: usize = 120;
     if text.chars().count() <= MAX {
@@ -352,8 +351,8 @@ fn short(text: &str) -> String {
     out
 }
 
-/// Vignette de Commons à 1920 px de large, pour une photo plus large que
-/// 2400 px (le fichier d'origine pèse souvent plus de 10 Mo).
+/// Commons thumbnail 1920 px wide, for a photo wider than 2400 px (the
+/// original file often weighs more than 10 MB).
 fn resized(thumb: &str, ext: &str, width: u32) -> Option<String> {
     if width <= 2400 || !matches!(ext, "jpg" | "jpeg" | "png" | "webp") {
         return None;
@@ -407,7 +406,7 @@ pub fn parse_commons(json: &Value) -> Vec<Hit> {
             };
             let duration = info.get("duration").and_then(Value::as_f64);
             let (mut width, mut height) = (num(info, "width"), num(info, "height"));
-            // Grande photo : la version de 1920 px de large suffit.
+            // Large photo: the 1920 px wide version is enough.
             let (file, ext) = match resized(&thumb, &ext, width) {
                 Some(url) => {
                     height = u32::try_from(u64::from(height) * 1920 / u64::from(width.max(1)))
@@ -474,7 +473,7 @@ pub fn parse_openverse(json: &Value) -> Vec<Hit> {
                 (_, AssetKind::Audio) => String::new(),
                 _ => file.clone(),
             };
-            // Openverse donne la durée d'un son en millisecondes.
+            // Openverse gives the duration of a sound in milliseconds.
             let duration = r
                 .get("duration")
                 .and_then(Value::as_f64)
@@ -504,8 +503,8 @@ pub fn parse_openverse(json: &Value) -> Vec<Hit> {
         .collect()
 }
 
-/// Nom court d'une licence Creative Commons d'après son adresse
-/// (`…/licenses/by-nc/4.0/` → « CC BY-NC 4.0 »).
+/// Short name of a Creative Commons licence from its URL
+/// (`…/licenses/by-nc/4.0/` → "CC BY-NC 4.0").
 pub fn license_from_url(url: &str) -> String {
     let lower = url.to_ascii_lowercase();
     if lower.contains("publicdomain/zero") {
@@ -614,8 +613,8 @@ pub fn parse_pexels_photos(json: &Value) -> Vec<Hit> {
         .collect()
 }
 
-/// Fichier vidéo à garder parmi plusieurs définitions : le plus petit d'au
-/// moins 1920 de large, sinon le plus grand.
+/// Video file to keep among several definitions: the smallest at least
+/// 1920 wide, else the largest.
 fn pick_video(files: &[(u32, u32, String)]) -> Option<&(u32, u32, String)> {
     files
         .iter()
@@ -743,8 +742,8 @@ pub fn parse_pixabay_videos(json: &Value) -> Vec<Hit> {
         .collect()
 }
 
-/// GET qui patiente quand le serveur demande de ralentir (429, 503) :
-/// jusqu'à trois nouvelles tentatives, en suivant `Retry-After` (borné).
+/// GET that waits when the server asks to slow down (429, 503): up to
+/// three retries, following `Retry-After` (bounded).
 async fn get_patiently(
     client: &reqwest::Client,
     url: &str,
@@ -770,7 +769,7 @@ async fn get_patiently(
     Ok(client.get(url).send().await?.error_for_status()?)
 }
 
-/// Télécharge `url` dans `path` (fichier temporaire puis renommage).
+/// Downloads `url` to `path` (temporary file, then rename).
 pub async fn download(client: &reqwest::Client, url: &str, path: &Path) -> Result<(), AssetError> {
     use futures::StreamExt as _;
     use tokio::io::AsyncWriteExt as _;
@@ -779,7 +778,7 @@ pub async fn download(client: &reqwest::Client, url: &str, path: &Path) -> Resul
     }
     let response = get_patiently(client, url).await?;
     if response.content_length().is_some_and(|n| n > MAX_BYTES) {
-        return Err(AssetError::Source("fichier trop lourd".into()));
+        return Err(AssetError::Source("file too large".into()));
     }
     let partial = path.with_extension("part");
     let mut file = tokio::fs::File::create(&partial).await?;
@@ -791,7 +790,7 @@ pub async fn download(client: &reqwest::Client, url: &str, path: &Path) -> Resul
         if total > MAX_BYTES {
             drop(file);
             let _ = tokio::fs::remove_file(&partial).await;
-            return Err(AssetError::Source("fichier trop lourd".into()));
+            return Err(AssetError::Source("file too large".into()));
         }
         file.write_all(&chunk).await?;
     }
@@ -834,8 +833,8 @@ pub async fn download_large(
     Ok(())
 }
 
-/// Vignettes des résultats, téléchargées dans `dir` (une par adresse, gardée
-/// en cache) ; `None` pour celles qui ont échoué.
+/// Thumbnails of the results, downloaded into `dir` (one per URL, kept in
+/// the cache); `None` for those that failed.
 pub async fn thumbnails(
     client: &reqwest::Client,
     hits: &[Hit],
@@ -882,7 +881,7 @@ mod tests {
     #[test]
     fn commons() {
         let hits = parse_commons(&fixture("commons.json"));
-        assert_eq!(hits.len(), 2, "le TIFF est écarté");
+        assert_eq!(hits.len(), 2, "the TIFF is discarded");
         let video = &hits[0];
         assert_eq!(video.kind, AssetKind::Video);
         assert_eq!(video.ext, "webm");
@@ -891,7 +890,7 @@ mod tests {
         assert_eq!(video.origin.author, "Whpq");
         assert_eq!(video.origin.license.name, "CC BY-SA 3.0");
         assert!(video.origin.license.terms().share_alike);
-        assert_eq!(extension(&video.thumb), "jpg", "vignette fixe d'une vidéo");
+        assert_eq!(extension(&video.thumb), "jpg", "still thumbnail of a video");
         let svg = &hits[1];
         assert_eq!(svg.kind, AssetKind::Svg);
         assert_eq!(svg.origin.title, "Montreal public transit icons - Train");
@@ -917,7 +916,7 @@ mod tests {
         let videos = parse_pexels_videos(&fixture("pexels-videos.json"));
         assert_eq!(videos.len(), 1);
         let v = &videos[0];
-        assert_eq!((v.width, v.height), (1920, 1080), "le plus petit HD");
+        assert_eq!((v.width, v.height), (1920, 1080), "the smallest HD");
         assert_eq!(v.origin.title, "train passing through a station");
         assert_eq!(v.duration, Some(14.0));
     }
@@ -936,7 +935,7 @@ mod tests {
     #[test]
     fn sounds() {
         let hits = parse_freesound(&fixture("freesound.json"));
-        assert_eq!(hits.len(), 1, "sans aperçu : écarté");
+        assert_eq!(hits.len(), 1, "no preview: discarded");
         let h = &hits[0];
         assert_eq!(h.kind, AssetKind::Audio);
         assert_eq!(h.origin.license.name, "CC BY 4.0");
@@ -946,7 +945,7 @@ mod tests {
         assert_eq!(ov.len(), 1);
         assert_eq!(ov[0].kind, AssetKind::Audio);
         assert_eq!(ov[0].duration, Some(95.5));
-        assert!(ov[0].thumb.is_empty(), "pas de son en guise de vignette");
+        assert!(ov[0].thumb.is_empty(), "no sound as thumbnail");
         assert!(Source::Freesound.offers(Media::Audio));
         assert!(!Source::Pexels.offers(Media::Audio));
     }

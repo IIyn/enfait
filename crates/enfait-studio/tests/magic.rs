@@ -1,6 +1,6 @@
-//! « Écrire le storyboard » sans modèle : le monteur répond d'abord
-//! n'importe quoi, puis un storyboard ; le plan lu s'applique au projet en
-//! une étape d'annulation.
+//! "Write the storyboard" without a model: the editor first answers
+//! nonsense, then a storyboard; the parsed plan applies to the project in
+//! a single undo step.
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 
@@ -56,10 +56,10 @@ async fn storyboard_written_without_a_model() {
     let counter = Arc::clone(&calls);
     let provider = Provider::Canned(Arc::new(
         move |request: &Request| -> Result<String, AiError> {
-            assert!(request.system.contains("monteur"));
-            assert_eq!(request.model, "claude-sonnet-5-5", "Rapide : Sonnet");
+            assert!(request.system.contains("editor"));
+            assert_eq!(request.model, "claude-sonnet-5-5", "Fast: Sonnet");
             Ok(if counter.fetch_add(1, Ordering::SeqCst) == 0 {
-                "Je réfléchis, sans JSON.".into()
+                "Thinking, without JSON.".into()
             } else {
                 r#"Le propos : un départ.
 ```json
@@ -97,16 +97,16 @@ async fn storyboard_written_without_a_model() {
     assert_eq!(
         calls.load(Ordering::SeqCst),
         2,
-        "une réponse illisible, un nouvel essai"
+        "an unreadable answer, a new try"
     );
     assert!(work.path().join("editor.json").is_file());
     assert!(work.path().join("editor.notes.md").is_file());
     assert_eq!(
         plan.blocks[1].kind, "animation",
-        "voix seule : pas de bloc filmé"
+        "voice only: no filmed block"
     );
 
-    // Rien à chercher : pas de réseau.
+    // Nothing to search: no network.
     let library = work.path().join("library");
     let gathered = magic::gather(
         &plan,

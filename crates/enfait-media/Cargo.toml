@@ -1,6 +1,6 @@
 [package]
 name = "enfait-media"
-description = "Moteur média : analyse, proxys, audio, forme d'onde, décodage d'images et lecture (horloge, sortie audio)."
+description = "Media engine: analysis, proxies, audio, waveform, frame decoding and playback (clock, audio output)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

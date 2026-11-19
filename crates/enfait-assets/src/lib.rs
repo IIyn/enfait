@@ -1,12 +1,12 @@
-//! Outils d'assets d'enfait :
+//! enfait's asset tools:
 //!
-//! - [`search`] : recherche d'images et de vidéos libres de droits
-//!   (Wikimedia Commons, Openverse, Pexels, Pixabay, Freesound), avec la licence de
-//!   chaque résultat, et téléchargement ;
-//! - [`cutout`] : détourage d'une image ou des images d'une prise ;
-//! - [`library`] : ajout d'un fichier à la bibliothèque de l'utilisateur.
+//! - [`search`]: royalty-free image and video search (Wikimedia Commons,
+//!   Openverse, Pexels, Pixabay, Freesound), with the licence of each
+//!   result, and download;
+//! - [`cutout`]: cutout of an image or of the frames of a take;
+//! - [`library`]: adding a file to the user's library.
 //!
-//! Les licences elles-mêmes (conditions, crédits) sont dans
+//! The licences themselves (terms, credits) live in
 //! `enfait_core::license`.
 
 pub mod cutout;
@@ -15,13 +15,13 @@ pub mod search;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AssetError {
-    #[error("réseau : {0}")]
+    #[error("network: {0}")]
     Http(#[from] reqwest::Error),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Source(String),
-    #[error("modèle de détourage : {0}")]
+    #[error("cutout model: {0}")]
     Model(String),
     #[error("image : {0}")]
     Image(String),

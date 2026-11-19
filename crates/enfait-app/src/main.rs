@@ -6,6 +6,7 @@
 mod cut;
 mod fonts;
 mod jobs;
+mod notify;
 mod player;
 mod prefs;
 mod prompter;

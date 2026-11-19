@@ -1,11 +1,11 @@
-//! La session de l'interface vue par l'atelier : où sont rangés les clips
-//! de chaque bloc, ce que montre chaque bloc, et lecture de la session sur
-//! disque (pour l'export depuis le CLI ou le serveur MCP).
+//! The interface session seen by the studio: where the clips of each block
+//! are stored, what each block shows, and reading the session from disk
+//! (for the export from the CLI or the MCP server).
 //!
-//! Les fichiers d'un bloc (composition, images, clip) portent le format du
-//! projet dans leur nom (rien pour le grand format 16:9, qui garde les noms
-//! d'origine) : changer de format ne mélange pas les rendus, et revenir au
-//! format précédent retrouve ses animations.
+//! The files of a block (composition, frames, clip) carry the project
+//! format in their name (nothing for the 16:9 landscape format, which
+//! keeps the original names): changing format does not mix renders, and
+//! going back to the previous format finds its animations again.
 
 use anyhow::{Context as _, Result};
 use enfait_core::{
@@ -16,7 +16,7 @@ use enfait_media::Edl;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Part de la transition placée avant la coupe.
+/// Share of the transition placed before the cut.
 pub const TRANSITION_BEFORE: f64 = 0.4;
 
 fn suffix(settings: &ProjectSettings) -> &'static str {
@@ -27,36 +27,37 @@ fn suffix(settings: &ProjectSettings) -> &'static str {
     }
 }
 
-/// Nom des fichiers d'un bloc dans l'atelier.
+/// Name of the files of a block in the studio (`bloc-` kept from the
+/// first versions: existing renders stay attached).
 pub fn block_name(id: BlockId, settings: &ProjectSettings) -> String {
     format!("bloc-{id}{}", suffix(settings))
 }
 
-/// Nom des fichiers de la transition qui suit un bloc.
+/// Name of the files of the transition after a block.
 pub fn transition_name(id: BlockId, settings: &ProjectSettings) -> String {
     format!("transition-{id}{}", suffix(settings))
 }
 
-/// Clip rendu d'un bloc.
+/// Rendered clip of a block.
 pub fn clip_path(dir: &Path, id: BlockId, settings: &ProjectSettings) -> PathBuf {
     dir.join("clips")
         .join(format!("{}.mp4", block_name(id, settings)))
 }
 
-/// Clip de la transition qui suit un bloc.
+/// Clip of the transition after a block.
 pub fn transition_clip_path(dir: &Path, id: BlockId, settings: &ProjectSettings) -> PathBuf {
     dir.join("clips")
         .join(format!("{}.mp4", transition_name(id, settings)))
 }
 
-/// Clip du plan de b-roll d'un bloc.
+/// Clip of the b-roll shot of a block.
 pub fn broll_clip_path(dir: &Path, id: BlockId, settings: &ProjectSettings) -> PathBuf {
     dir.join("clips")
         .join(format!("broll-{id}{}.mp4", suffix(settings)))
 }
 
-/// Ce dont dépend le clip de b-roll d'un bloc (fichier, départ, durée,
-/// format) : écrit à côté du clip, il dit si le clip est à jour.
+/// What the b-roll clip of a block depends on (file, start, duration,
+/// format): written next to the clip, it tells whether the clip is current.
 pub fn broll_key(block: &Block, settings: &ProjectSettings) -> Option<String> {
     let broll = block.broll.as_ref()?;
     let rate = settings.frame_rate;
@@ -72,7 +73,7 @@ pub fn broll_key(block: &Block, settings: &ProjectSettings) -> Option<String> {
     ))
 }
 
-/// Le clip de b-roll du bloc existe et correspond à son plan actuel.
+/// The b-roll clip of the block exists and matches its current shot.
 pub fn broll_ready(dir: &Path, block: &Block, settings: &ProjectSettings) -> bool {
     let Some(key) = broll_key(block, settings) else {
         return false;
@@ -81,8 +82,8 @@ pub fn broll_ready(dir: &Path, block: &Block, settings: &ProjectSettings) -> boo
     clip.is_file() && std::fs::read_to_string(clip.with_extension("key")).is_ok_and(|k| k == key)
 }
 
-/// Images montrées pendant un bloc, si ce n'est pas la prise : son plan de
-/// b-roll, ou son animation.
+/// Frames shown during a block, if not the take: its b-roll shot, or its
+/// animation.
 pub fn visual_clip(dir: &Path, block: &Block, settings: &ProjectSettings) -> Option<PathBuf> {
     match block.kind {
         BlockKind::Rush => None,
@@ -93,7 +94,7 @@ pub fn visual_clip(dir: &Path, block: &Block, settings: &ProjectSettings) -> Opt
     }
 }
 
-/// Fenêtre (temps montage) de la transition entre `block` et `next`.
+/// Window (edit time) of the transition between `block` and `next`.
 pub fn transition_window(block: &Block, next: &Block) -> (f64, f64) {
     let boundary = block.range.end().as_secs_f64();
     let length = crate::TRANSITION_LENGTH;
@@ -103,8 +104,8 @@ pub fn transition_window(block: &Block, next: &Block) -> (f64, f64) {
     )
 }
 
-/// Morceaux de la prise (début, fin) qui donnent l'intervalle `[a, b)` du
-/// montage.
+/// Pieces of the take (start, end) giving the interval `[a, b)` of the
+/// edit.
 pub fn source_pieces(parts: &[(f64, f64)], a: f64, b: f64) -> Vec<(f64, f64)> {
     let edl = Edl::from_ranges(parts);
     edl.parts()
@@ -119,12 +120,12 @@ pub fn source_pieces(parts: &[(f64, f64)], a: f64, b: f64) -> Vec<(f64, f64)> {
         .collect()
 }
 
-/// Ce qu'on voit, bloc par bloc, en temps montage.
+/// What is shown, block by block, in edit time.
 #[derive(Debug, Clone, Default)]
 pub struct Visuals {
-    /// `(début, fin, clip)` de chaque bloc ; sans clip, la prise.
+    /// `(start, end, clip)` of each block; without a clip, the take.
     pub blocks: Vec<(f64, f64, Option<PathBuf>)>,
-    /// `(début, fin, clip)` des transitions rendues, par-dessus.
+    /// `(start, end, clip)` of the rendered transitions, on top.
     pub transitions: Vec<(f64, f64, PathBuf)>,
 }
 
@@ -157,13 +158,13 @@ impl Visuals {
         }
     }
 
-    /// Aucun clip : seule la prise est montrée.
+    /// No clip: only the take is shown.
     pub fn rush_only(&self) -> bool {
         self.blocks.iter().all(|b| b.2.is_none()) && self.transitions.is_empty()
     }
 
-    /// Blocs qui devraient montrer autre chose que la prise mais n'ont pas
-    /// encore de clip (rang à partir de 1).
+    /// Blocks that should show something other than the take but have no
+    /// clip yet (rank from 1).
     pub fn missing(&self, project: &Project) -> Vec<usize> {
         project
             .blocks()
@@ -176,25 +177,25 @@ impl Visuals {
     }
 }
 
-/// Tout ce qu'il faut pour monter la vidéo finale.
+/// Everything needed to edit the final video.
 #[derive(Debug, Clone)]
 pub struct Sources<'a> {
-    /// Atelier : clips des blocs et des transitions.
+    /// Studio: clips of the blocks and transitions.
     pub studio: &'a Path,
     pub library: &'a Path,
     pub project: &'a Project,
-    /// Transcription du montage.
+    /// Transcript of the edit.
     pub transcript: &'a Transcript,
     pub look: &'a Look,
     pub finish: &'a Finish,
-    /// La prise d'origine.
+    /// The original take.
     pub rush: &'a Path,
-    /// Morceaux de la prise qui forment le montage.
+    /// Pieces of the take forming the edit.
     pub parts: &'a [(f64, f64)],
 }
 
 impl Sources<'_> {
-    /// Chemin d'un fichier de la bibliothèque, s'il y est encore.
+    /// Path of a library file, if it is still there.
     pub fn library_file(&self, file: &str) -> Option<PathBuf> {
         self.look
             .assets
@@ -205,7 +206,7 @@ impl Sources<'_> {
     }
 }
 
-/// La session lue sur disque.
+/// The session read from disk.
 #[derive(Debug, Clone)]
 pub struct SessionFiles {
     pub dir: PathBuf,
@@ -219,7 +220,7 @@ pub struct SessionFiles {
     pub library: PathBuf,
 }
 
-/// `montage.json` : la transcription du montage et ses morceaux.
+/// `montage.json`: the transcript of the edit and its pieces.
 #[derive(Deserialize)]
 struct Montage {
     key: String,
@@ -233,7 +234,7 @@ struct SessionData {
     rush: Option<PathBuf>,
 }
 
-/// Morceaux d'un montage d'après son empreinte (`a-b,c-d`, en secondes).
+/// Pieces of an edit from its fingerprint (`a-b,c-d`, in seconds).
 pub fn parts_from_key(key: &str) -> Option<Vec<(f64, f64)>> {
     key.split(',')
         .filter(|p| !p.is_empty())
@@ -248,18 +249,18 @@ impl SessionFiles {
     pub fn load(dir: &Path) -> Result<Self> {
         let json = std::fs::read_to_string(dir.join("project.json")).with_context(|| {
             format!(
-                "pas de storyboard dans {} (ouvrir la prise dans l'interface, écran Storyboard)",
+                "no storyboard in {} (open the take in the app, Storyboard screen)",
                 dir.display()
             )
         })?;
         let project = Project::from_json(&json).context("project.json")?;
         let montage: Montage = serde_json::from_slice(
-            &std::fs::read(dir.join("montage.json")).context("montage.json manquant")?,
+            &std::fs::read(dir.join("montage.json")).context("montage.json missing")?,
         )
         .context("montage.json")?;
         let parts = match montage.parts {
             Some(p) => p,
-            None => parts_from_key(&montage.key).context("montage.json : morceaux illisibles")?,
+            None => parts_from_key(&montage.key).context("montage.json: unreadable pieces")?,
         };
         let read = |name: &str| std::fs::read(dir.join(name)).ok();
         let look: Look = read("look.json")
@@ -271,8 +272,8 @@ impl SessionFiles {
         let rush = read("session.json")
             .and_then(|d| serde_json::from_slice::<SessionData>(&d).ok())
             .and_then(|s| s.rush)
-            .context("aucune prise dans la session")?;
-        anyhow::ensure!(!parts.is_empty(), "montage vide");
+            .context("no take in the session")?;
+        anyhow::ensure!(!parts.is_empty(), "empty edit");
         Ok(Self {
             dir: dir.to_path_buf(),
             project,
@@ -306,7 +307,7 @@ mod tests {
 
     #[test]
     fn pieces_of_the_rush_follow_the_cut() {
-        // Montage : [2 s ; 4 s) puis [10 s ; 11 s).
+        // Edit: [2 s; 4 s) then [10 s; 11 s).
         let parts = [(2.0, 4.0), (10.0, 11.0)];
         assert_eq!(source_pieces(&parts, 0.5, 1.5), [(2.5, 3.5)]);
         let across = source_pieces(&parts, 1.5, 2.5);

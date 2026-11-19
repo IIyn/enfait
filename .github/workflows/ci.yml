@@ -17,14 +17,14 @@ env:
 
 jobs:
   check:
-    name: fmt, clippy, tests
+    name: fmt, clippy, tests (Linux)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      # En-têtes nécessaires à gpui (fenêtrage, polices), à whisper.cpp (cmake,
-      # libclang) et à cpal (ALSA) ; ffmpeg pour les tests du moteur média.
-      - name: Dépendances système
+      # Headers needed by gpui (windowing, fonts), whisper.cpp (cmake,
+      # libclang) and cpal (ALSA); ffmpeg for the media engine tests.
+      - name: System dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -32,9 +32,9 @@ jobs:
             libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
             libx11-dev libx11-xcb-dev libxcb1-dev \
             libfontconfig1-dev libfreetype-dev libvulkan-dev \
-            libasound2-dev ffmpeg
+            libasound2-dev libdbus-1-dev ffmpeg
 
-      # Installe la version fixée par rust-toolchain.toml.
+      # Installs the version pinned by rust-toolchain.toml.
       - name: Toolchain
         run: rustup toolchain install
 
@@ -43,8 +43,47 @@ jobs:
       - name: CI
         run: ./scripts/ci.sh
 
+  platforms:
+    name: build, clippy, tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # macOS: Xcode's clang and the runner's cmake; Windows: MSVC, cmake and
+      # LLVM (libclang for bindgen) come with the runner image.
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      # The model-free crates; the app and the media pipeline are covered by
+      # the Linux job (they need a display, Chromium and long runs).
+      - name: Tests
+        run: >
+          cargo test --locked
+          -p enfait-core -p enfait-config -p enfait-speech -p enfait-ai
+          -p enfait-mcp -p enfait-media
+
+      - name: Release build
+        run: cargo build --release --locked -p enfait-app -p enfait-cli
+
   deny:
-    name: licences et failles (cargo-deny)
+    name: licences and advisories (cargo-deny)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

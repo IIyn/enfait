@@ -1,6 +1,6 @@
 [package]
 name = "enfait-cli"
-description = "Chaîne complète en ligne de commande : voix off → vidéo en motion design."
+description = "The whole pipeline on the command line: voice-over → motion design video."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

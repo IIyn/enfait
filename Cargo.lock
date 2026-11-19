@@ -1953,6 +1953,7 @@ dependencies = [
  "enfait-studio",
  "gpui-kit",
  "image",
+ "notify-rust",
  "rust-i18n",
  "serde",
  "serde_json",

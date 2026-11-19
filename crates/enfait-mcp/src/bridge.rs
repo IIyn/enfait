@@ -1,13 +1,13 @@
-//! Pont entre le serveur MCP (ou tout autre outil) et l'interface ouverte,
-//! par des fichiers de la session :
+//! Bridge between the MCP server (or any other tool) and the open app,
+//! through session files:
 //!
-//! - les modifications du storyboard, du look et de la finition sont
-//!   écrites dans `project.json`, `look.json` et `finish.json` ; l'interface
-//!   les relit quand ils changent ;
-//! - les demandes de génération sont déposées dans `studio/requests/`,
-//!   un fichier par demande, que l'interface met dans sa file de jobs ;
-//! - l'interface touche `studio/bridge.alive` régulièrement : on sait si
-//!   elle est ouverte.
+//! - changes to the storyboard, look and finish are written to
+//!   `project.json`, `look.json` and `finish.json`; the app reloads them
+//!   when they change;
+//! - generation requests are dropped in `studio/requests/`, one file per
+//!   request, which the app puts in its job queue;
+//! - the app touches `studio/bridge.alive` regularly: we know whether it
+//!   is open.
 
 use enfait_core::BlockId;
 use serde::{Deserialize, Serialize};
@@ -15,10 +15,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
-/// L'interface est considérée ouverte si elle a donné signe de vie depuis…
+/// The app is considered open if it gave a sign of life within…
 const ALIVE: Duration = Duration::from_secs(15);
 
-/// Dossier de la session (`ENFAIT_SESSION` pour en utiliser un autre).
+/// Session folder (`ENFAIT_SESSION` to use another one).
 pub fn session_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("ENFAIT_SESSION") {
         return dir.into();
@@ -39,31 +39,31 @@ fn heartbeat_path(session: &Path) -> PathBuf {
     session.join("studio").join("bridge.alive")
 }
 
-/// Ce qu'on demande à l'interface de générer.
+/// What the app is asked to generate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RequestKind {
-    /// L'animation (ou le plan) du bloc.
+    /// The animation (or the shot) of the block.
     Animation,
-    /// La transition qui suit le bloc.
+    /// The transition after the block.
     Transition,
-    /// Faire écrire par le monteur les blocs sans description (tout le
-    /// storyboard, sans bloc).
+    /// Have the editor write the blocks without a description (the whole
+    /// storyboard, no block).
     Storyboard,
-    /// Le mode magique sur la prise de la session : storyboard, plans,
-    /// sons, animations et export (sans bloc).
+    /// Magic mode on the take of the session: storyboard, shots, sounds,
+    /// animations and export (no block).
     Magic,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
-    /// Le bloc visé ; aucun pour une demande sur tout le projet.
+    /// The block aimed at; none for a request on the whole project.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block: Option<BlockId>,
     pub kind: RequestKind,
 }
 
-/// Écriture atomique (fichier temporaire puis renommage).
+/// Atomic write (temporary file, then rename).
 pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
@@ -75,7 +75,7 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
     std::fs::rename(&tmp, path)
 }
 
-/// Dépose une demande pour l'interface.
+/// Drops a request for the app.
 pub fn send_request(session: &Path, request: &Request) -> std::io::Result<()> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let stamp = SystemTime::now()
@@ -87,7 +87,7 @@ pub fn send_request(session: &Path, request: &Request) -> std::io::Result<()> {
     write_atomic(&requests_dir(session).join(name), &json)
 }
 
-/// Demandes en attente, dans l'ordre de dépôt ; elles sont retirées.
+/// Pending requests, in drop order; they are removed.
 pub fn take_requests(session: &Path) -> Vec<Request> {
     let Ok(entries) = std::fs::read_dir(requests_dir(session)) else {
         return Vec::new();
@@ -109,7 +109,7 @@ pub fn take_requests(session: &Path) -> Vec<Request> {
         .collect()
 }
 
-/// L'interface signale qu'elle est ouverte.
+/// The app signals that it is open.
 pub fn touch_heartbeat(session: &Path) {
     let _ = write_atomic(
         &heartbeat_path(session),
@@ -117,12 +117,12 @@ pub fn touch_heartbeat(session: &Path) {
     );
 }
 
-/// L'interface s'en va.
+/// The app goes away.
 pub fn clear_heartbeat(session: &Path) {
     let _ = std::fs::remove_file(heartbeat_path(session));
 }
 
-/// L'interface est ouverte sur cette session.
+/// The app is open on this session.
 pub fn app_alive(session: &Path) -> bool {
     std::fs::metadata(heartbeat_path(session))
         .and_then(|m| m.modified())
@@ -171,13 +171,13 @@ mod tests {
         .unwrap();
         let taken = take_requests(&dir);
         assert_eq!(taken.len(), 3);
-        assert_eq!(taken[0].block, Some(a), "dans l'ordre de dépôt");
+        assert_eq!(taken[0].block, Some(a), "in drop order");
         assert_eq!(taken[1].kind, RequestKind::Transition);
         assert_eq!(taken[2].block, None);
-        // Une demande sans bloc s'écrit sans champ `block`.
+        // A request without a block is written without a `block` field.
         let json = serde_json::to_string(&taken[2]).unwrap();
         assert_eq!(json, r#"{"kind":"magic"}"#);
-        assert!(take_requests(&dir).is_empty(), "retirées une fois lues");
+        assert!(take_requests(&dir).is_empty(), "removed once read");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

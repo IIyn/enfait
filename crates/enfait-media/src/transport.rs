@@ -1,33 +1,33 @@
-//! Horloge de lecture et commandes de transport (J/K/L).
+//! Playback clock and transport commands (J/K/L).
 //!
-//! L'horloge est partagée entre l'interface (qui lit la position et envoie
-//! des commandes), la sortie audio (qui la fait avancer, et sert donc de
-//! référence : l'image suit le son) et le décodeur d'images (qui la lit).
-//! Elle ne prend aucun verrou : la sortie audio ne doit jamais attendre.
+//! The clock is shared between the interface (which reads the position
+//! and sends commands), the audio output (which drives it, and is thus the
+//! reference: the picture follows the sound) and the frame decoder (which
+//! reads it). It takes no lock: the audio output must never wait.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
-/// Vitesses de navette, en multiples de la vitesse normale.
+/// Shuttle speeds, as multiples of normal speed.
 const SHUTTLE: [f64; 4] = [1.0, 2.0, 4.0, 8.0];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Command {
-    /// L : avant ; répété, accélère (×2, ×4, ×8). Depuis l'arrière, repart à ×1.
+    /// L: forward; repeated, speeds up (×2, ×4, ×8). From backward, restarts at ×1.
     Forward,
-    /// J : arrière, même logique.
+    /// J: backward, same logic.
     Backward,
-    /// K : pause.
+    /// K: pause.
     Pause,
-    /// Espace : lecture ou pause.
+    /// Space: play or pause.
     Toggle,
-    /// Une image en avant (positif) ou en arrière, en pause.
+    /// One frame forward (positive) or backward, paused.
     Step(i64),
-    /// Aller à un instant, en secondes, sans changer la vitesse.
+    /// Go to a time, in seconds, without changing the speed.
     Seek(f64),
 }
 
-/// Vitesse après une commande de navette.
+/// Speed after a shuttle command.
 pub fn shuttle(speed: f64, command: Command) -> f64 {
     let faster = |sign: f64| {
         let current = speed * sign;
@@ -56,16 +56,16 @@ pub fn shuttle(speed: f64, command: Command) -> f64 {
     }
 }
 
-/// Avance d'une horloge pendant un intervalle.
+/// Progress of a clock over an interval.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Tick {
-    /// Position au début de l'intervalle, en secondes.
+    /// Position at the start of the interval, in seconds.
     pub start: f64,
-    /// Vitesse pendant l'intervalle (0 en pause).
+    /// Speed during the interval (0 when paused).
     pub speed: f64,
 }
 
-/// `f64` rangé dans un `AtomicU64`.
+/// `f64` stored in an `AtomicU64`.
 #[derive(Debug)]
 struct AtomicF64(AtomicU64);
 
@@ -87,25 +87,25 @@ impl AtomicF64 {
 #[derive(Debug)]
 pub struct Clock {
     duration: f64,
-    /// Durée d'une image (pour les pas image par image).
+    /// Duration of a frame (for frame steps).
     frame: f64,
-    /// Origine des instants mémorisés ci-dessous.
+    /// Origin of the times stored below.
     epoch: Instant,
-    /// Position du curseur de la sortie : la fin du dernier intervalle
-    /// envoyé à la carte son. Elle est en avance sur ce qu'on entend.
+    /// Position of the output cursor: the end of the last interval sent to
+    /// the sound card. It is ahead of what is heard.
     cursor: AtomicF64,
     speed: AtomicF64,
-    /// Saut demandé par l'interface, appliqué au prochain [`Clock::tick`]
-    /// (NaN : aucun).
+    /// Seek asked by the interface, applied at the next [`Clock::tick`] (NaN:
+    /// none).
     pending: AtomicF64,
-    /// Ce qu'on entend : position `heard` à l'instant `heard_at` (secondes
-    /// depuis `epoch`), extrapolée ensuite à la vitesse courante.
+    /// What is heard: position `heard` at time `heard_at` (seconds since
+    /// `epoch`), then extrapolated at the current speed.
     heard: AtomicF64,
     heard_at: AtomicF64,
 }
 
 impl Clock {
-    /// `frame_duration` : durée d'une image en secondes (1/25 sans vidéo).
+    /// `frame_duration`: duration of a frame in seconds (1/25 without video).
     pub fn new(duration: f64, frame_duration: f64) -> Self {
         Self {
             duration: duration.max(0.0),
@@ -131,8 +131,8 @@ impl Clock {
         self.epoch.elapsed().as_secs_f64()
     }
 
-    /// Position de ce qu'on entend (ou verrait) maintenant, en secondes :
-    /// c'est elle que l'image et l'interface suivent.
+    /// Position of what is heard (or would be seen) now, in seconds: the
+    /// picture and the interface follow it.
     pub fn position(&self) -> f64 {
         self.position_at(self.now())
     }
@@ -177,32 +177,31 @@ impl Clock {
         match command {
             Command::Seek(t) => self.jump(t),
             Command::Step(n) => {
-                // Se caler sur le début d'une image, puis avancer de `n`.
+                // Snap to the start of a frame, then move by `n`.
                 #[allow(clippy::cast_precision_loss)]
                 let frames = (position / self.frame + 1e-6).floor() + n as f64;
                 self.jump(frames * self.frame);
             }
             Command::Forward | Command::Toggle if next > 0.0 && position >= self.duration => {
-                // Relancer depuis le début quand on est au bout.
+                // Start again from the beginning at the end.
                 self.jump(0.0);
             }
-            // Au début, J ne fait rien (comme dans les logiciels de montage).
+            // At the start, J does nothing (as in editing software).
             Command::Backward if position <= 0.0 => {
                 self.speed.store(0.0);
                 return;
             }
-            // Changement de vitesse : repartir de ce qu'on entend, pas du
-            // curseur de la sortie qui a de l'avance.
+            // Speed change: restart from what is heard, not from the output
+            // cursor, which is ahead.
             _ if next != speed => self.jump(position),
             _ => {}
         }
         self.speed.store(next);
     }
 
-    /// Fait avancer l'horloge de `dt` secondes et renvoie ce qu'il faut
-    /// jouer pendant cet intervalle. `delay` : temps avant que le début de
-    /// l'intervalle soit entendu (latence de la sortie). S'arrête aux
-    /// extrémités.
+    /// Moves the clock forward by `dt` seconds and returns what to play during
+    /// that interval. `delay`: time before the start of the interval is heard
+    /// (output latency). Stops at the ends.
     pub fn tick(&self, dt: f64, delay: f64) -> Tick {
         self.tick_at(dt, delay, self.now())
     }
@@ -220,10 +219,10 @@ impl Clock {
         }
         let end = start + speed * dt.max(0.0);
         let clamped = self.clamp(end);
-        // Un saut demandé pendant l'intervalle l'emporte sur l'avance.
+        // A seek asked during the interval wins over the advance.
         if self.pending.load().is_nan() {
             self.cursor.store(clamped);
-            // `start` sera entendu dans `delay` secondes.
+            // `start` will be heard in `delay` seconds.
             self.heard.store(start - speed * delay.max(0.0));
             self.heard_at.store(now);
         }
@@ -258,7 +257,7 @@ mod tests {
     fn tick_advances_and_stops_at_end() {
         let c = Clock::new(1.0, 0.04);
         assert_eq!(c.tick(0.5, 0.0).start, 0.0);
-        assert_eq!(c.position(), 0.0, "en pause, rien ne bouge");
+        assert_eq!(c.position(), 0.0, "paused, nothing moves");
         c.apply(Command::Forward);
         c.tick(0.5, 0.0);
         assert!((c.cursor.load() - 0.5).abs() < 1e-9);
@@ -267,9 +266,9 @@ mod tests {
         assert_eq!(t.speed, 2.0);
         c.tick(0.5, 0.0);
         assert_eq!(c.cursor.load(), 1.0);
-        assert!(!c.is_playing(), "arrêt au bout");
+        assert!(!c.is_playing(), "stop at the end");
         assert_eq!(c.position(), 1.0);
-        // Relancer au bout repart du début.
+        // Playing again at the end restarts from the start.
         c.apply(Command::Toggle);
         assert_eq!(c.tick(0.1, 0.0).start, 0.0);
     }
@@ -285,8 +284,8 @@ mod tests {
         assert!((c.cursor.load() - t.start + 0.25).abs() < 1e-9);
         assert!((c.position_at(10.1) - (t.start - 0.1)).abs() < 1e-9);
         c.apply(Command::Seek(9.0));
-        // Toujours en lecture arrière : la position repart aussitôt de 2.
-        assert!((c.position() - 2.0).abs() < 0.01, "borné à la durée");
+        // Still playing backward: the position restarts from 2 at once.
+        assert!((c.position() - 2.0).abs() < 0.01, "bounded to the duration");
     }
 
     #[test]
@@ -295,7 +294,7 @@ mod tests {
         c.apply(Command::Backward);
         assert!(!c.is_playing());
         assert_eq!(c.position(), 0.0);
-        // Arrivée au début en lecture arrière : arrêt.
+        // Reaching the start playing backward: stop.
         c.apply(Command::Seek(0.1));
         c.apply(Command::Backward);
         c.tick(0.5, 0.0);
@@ -320,17 +319,17 @@ mod tests {
     fn position_follows_what_is_heard() {
         let c = Clock::new(10.0, 0.04);
         c.apply(Command::Forward);
-        // Intervalle [0, 0.1] envoyé à t = 1 s, entendu 0,05 s plus tard.
+        // Interval [0, 0.1] sent at t = 1 s, heard 0.05 s later.
         c.tick_at(0.1, 0.05, 1.0);
         assert!((c.cursor.load() - 0.1).abs() < 1e-9, "curseur en avance");
         assert!((c.position_at(1.0) + 0.05).abs() < 1e-9 || c.position_at(1.0) == 0.0);
         assert!((c.position_at(1.05) - 0.0).abs() < 1e-9);
         assert!((c.position_at(1.08) - 0.03).abs() < 1e-9);
-        // En pause, on repart de ce qu'on entendait, pas du curseur.
+        // Paused, restart from what was heard, not from the cursor.
         c.heard_at.store(c.now() - 0.08);
         c.apply(Command::Pause);
         let p = c.position();
         assert!(p < 0.1 && (p - 0.03).abs() < 0.01, "{p}");
-        assert_eq!(c.tick(0.1, 0.05).start, p, "le son reprendra là");
+        assert_eq!(c.tick(0.1, 0.05).start, p, "the sound will resume there");
     }
 }

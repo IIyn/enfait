@@ -1,4 +1,4 @@
-//! Emplacements des outils téléchargés et des dossiers de travail.
+//! Locations of the downloaded tools and the working folders.
 
 use anyhow::{Context as _, Result};
 use std::path::{Path, PathBuf};
@@ -13,8 +13,8 @@ pub struct Dirs {
 
 impl Dirs {
     pub fn new() -> Result<Self> {
-        let dirs = directories::ProjectDirs::from("", "", "enfait")
-            .context("dossier personnel introuvable")?;
+        let dirs =
+            directories::ProjectDirs::from("", "", "enfait").context("no home folder found")?;
         Ok(Self {
             cache: dirs.cache_dir().to_path_buf(),
         })
@@ -28,7 +28,7 @@ impl Dirs {
         self.cache.join("profile")
     }
 
-    /// Cache des médias préparés, partagé avec l'interface.
+    /// Cache of the prepared media, shared with the app.
     pub fn media(&self) -> PathBuf {
         self.cache.join("media")
     }
@@ -44,7 +44,7 @@ impl Dirs {
 
 pub use enfait_config::process::which as find_in_path;
 
-/// Dossier de travail par défaut : `<voix>.enfait/` à côté du fichier.
+/// Default working folder: `<voice>.enfait/` next to the file.
 pub fn default_work_dir(voice: &Path) -> PathBuf {
     let stem = voice
         .file_stem()

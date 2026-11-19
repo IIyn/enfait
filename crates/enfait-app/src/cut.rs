@@ -244,7 +244,11 @@ mod tests {
         let mut saved = BTreeMap::new();
         state.analyze(SCRIPT, &saved);
         assert_eq!(state.choice, vec![Some(1), Some(2)], "last take");
-        assert_eq!(state.ranges().len(), 1, "2nd take + sentence 2: in one piece");
+        assert_eq!(
+            state.ranges().len(),
+            1,
+            "2nd take + sentence 2: in one piece"
+        );
         // Choose the first take of sentence 1.
         state.choose(0, 0, &mut saved);
         assert_eq!(saved.get("Un deux trois quatre."), Some(&0));

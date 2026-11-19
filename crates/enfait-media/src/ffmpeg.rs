@@ -1,12 +1,12 @@
-//! Lancement de ffmpeg avec suivi de progression.
+//! Running ffmpeg with progress tracking.
 
 use crate::MediaError;
 use std::ffi::OsStr;
 use std::io::{BufRead as _, BufReader, Read as _};
 use std::process::Stdio;
 
-/// Lance `ffmpeg` avec `args` (sans les options communes) et rapporte la
-/// progression entre 0 et 1, d'après la durée attendue de la sortie.
+/// Runs `ffmpeg` with `args` (without the common options) and reports the
+/// progress from 0 to 1, from the expected output duration.
 pub(crate) fn run<I, S>(
     args: I,
     duration: f64,
@@ -25,7 +25,7 @@ where
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| MediaError::spawn("ffmpeg", &e))?;
-    // stderr est lu à part pour que ffmpeg ne bloque jamais sur un tube plein.
+    // stderr is read separately so that ffmpeg never blocks on a full pipe.
     let stderr = child.stderr.take();
     let errors = std::thread::spawn(move || {
         let mut text = String::new();
@@ -55,13 +55,13 @@ where
     }
 }
 
-/// Lit une ligne `out_time_us=…` de `-progress`.
+/// Reads an `out_time_us=…` line of `-progress`.
 fn parse_progress(line: &str, duration: f64) -> Option<f32> {
     let micros: f64 = line.strip_prefix("out_time_us=")?.trim().parse().ok()?;
     if duration <= 0.0 {
         return None;
     }
-    // Rapport borné entre 0 et 1 : la conversion en f32 ne perd rien d'utile.
+    // Ratio bounded between 0 and 1: nothing useful lost converting to f32.
     #[allow(clippy::cast_possible_truncation)]
     Some((micros / 1e6 / duration).clamp(0.0, 1.0) as f32)
 }

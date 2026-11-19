@@ -1,5 +1,5 @@
-//! Le « look » d'un projet : style des animations, effets globaux appliqués
-//! à toute la vidéo (post-FX) et bibliothèque de l'utilisateur.
+//! The "look" of a project: animation style, global effects applied to the
+//! whole video (post-FX) and the user's library.
 
 use crate::license::Origin;
 use serde::{Deserialize, Serialize};
@@ -10,21 +10,21 @@ pub struct Look {
     pub style: StyleChoice,
     pub fx: PostFx,
     pub assets: Vec<Asset>,
-    /// Règles retenues à partir des retouches (« jamais de rose »),
-    /// appliquées à toutes les animations.
+    /// Rules remembered from retouches ("never pink"), applied to every
+    /// animation.
     pub memory: Vec<String>,
 }
 
 impl Look {
-    /// Règles de style données aux animateurs : celles de l'utilisateur puis
-    /// les règles retenues.
+    /// Style rules given to the animators: the user's, then the remembered
+    /// rules.
     pub fn rules(&self) -> Option<String> {
         let mut rules = self.style.rules.trim().to_owned();
         if !self.memory.is_empty() {
             if !rules.is_empty() {
                 rules.push_str("\n\n");
             }
-            rules.push_str("Règles retenues lors des retouches :\n");
+            rules.push_str("Rules remembered from retouches:\n");
             for rule in &self.memory {
                 rules.push_str("- ");
                 rules.push_str(rule.trim());
@@ -35,32 +35,32 @@ impl Look {
     }
 }
 
-/// Style des animations : un style prédéfini (voir `enfait-ai`) et des
-/// règles personnelles, prioritaires.
+/// Animation style: a preset (see `enfait-ai`) and personal rules, which
+/// take precedence.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct StyleChoice {
-    /// Identifiant du style prédéfini (`gravure`, `craie`…) ; aucun : libre.
+    /// Id of the preset (`engraving`, `chalk`…); none: free.
     pub preset: Option<String>,
-    /// Règles de l'utilisateur, en texte libre.
+    /// The user's rules, as free text.
     pub rules: String,
 }
 
-/// Effets appliqués à toute la vidéo. Toutes les valeurs à 0 : aucun effet.
+/// Effects applied to the whole video. All values at 0: no effect.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PostFx {
-    /// Grain de pellicule, 0 à 1.
+    /// Film grain, 0 to 1.
     pub grain: f32,
-    /// Assombrissement des bords, 0 à 1.
+    /// Darkened edges, 0 to 1.
     pub vignette: f32,
-    /// −1 à 1.
+    /// −1 to 1.
     pub contrast: f32,
-    /// −1 (noir et blanc) à 1.
+    /// −1 (black and white) to 1.
     pub saturation: f32,
-    /// −1 (froid) à 1 (chaud).
+    /// −1 (cold) to 1 (warm).
     pub temperature: f32,
-    /// Décalage des couches rouge et bleue, 0 à 1.
+    /// Shift of the red and blue channels, 0 to 1.
     pub aberration: f32,
 }
 
@@ -74,7 +74,7 @@ impl PostFx {
         aberration: 0.0,
     };
 
-    /// Valeurs ramenées dans leurs bornes (NaN : 0).
+    /// Values brought back within bounds (NaN: 0).
     #[must_use]
     pub fn clamped(self) -> Self {
         let c = |v: f32, lo: f32| if v.is_nan() { 0.0 } else { v.clamp(lo, 1.0) };
@@ -103,7 +103,7 @@ impl PostFx {
     }
 }
 
-/// Un look prêt à l'emploi.
+/// A ready-made look.
 pub struct FxPreset {
     pub slug: &'static str,
     pub name: &'static str,
@@ -112,13 +112,13 @@ pub struct FxPreset {
 
 pub const FX_PRESETS: &[FxPreset] = &[
     FxPreset {
-        slug: "neutre",
-        name: "Neutre",
+        slug: "neutral",
+        name: "Neutral",
         fx: PostFx::NEUTRAL,
     },
     FxPreset {
-        slug: "pellicule",
-        name: "Pellicule",
+        slug: "film",
+        name: "Film",
         fx: PostFx {
             grain: 0.45,
             vignette: 0.35,
@@ -142,7 +142,7 @@ pub const FX_PRESETS: &[FxPreset] = &[
     },
     FxPreset {
         slug: "neon",
-        name: "Néon",
+        name: "Neon",
         fx: PostFx {
             grain: 0.1,
             vignette: 0.25,
@@ -153,8 +153,8 @@ pub const FX_PRESETS: &[FxPreset] = &[
         },
     },
     FxPreset {
-        slug: "doux",
-        name: "Doux",
+        slug: "soft",
+        name: "Soft",
         fx: PostFx {
             grain: 0.15,
             vignette: 0.15,
@@ -165,8 +165,8 @@ pub const FX_PRESETS: &[FxPreset] = &[
         },
     },
     FxPreset {
-        slug: "noir-blanc",
-        name: "Noir et blanc",
+        slug: "black-white",
+        name: "Black & white",
         fx: PostFx {
             grain: 0.3,
             vignette: 0.3,
@@ -185,12 +185,12 @@ pub enum AssetKind {
     Svg,
     Video,
     Font,
-    /// Musique ou effet sonore (finition).
+    /// Music or sound effect (finish).
     Audio,
 }
 
 impl AssetKind {
-    /// Type d'après l'extension d'un fichier (sans le point).
+    /// Kind from a file extension (without the dot).
     pub fn from_extension(ext: &str) -> Option<Self> {
         Some(match ext.to_ascii_lowercase().as_str() {
             "png" | "jpg" | "jpeg" | "webp" | "gif" | "avif" => Self::Image,
@@ -206,27 +206,27 @@ impl AssetKind {
         match self {
             Self::Image => "image",
             Self::Svg => "SVG",
-            Self::Video => "vidéo",
-            Self::Font => "police",
-            Self::Audio => "son",
+            Self::Video => "video",
+            Self::Font => "font",
+            Self::Audio => "sound",
         }
     }
 }
 
-/// Un fichier de la bibliothèque de l'utilisateur.
+/// A file of the user's library.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Asset {
-    /// Nom du fichier, dans le dossier de la bibliothèque.
+    /// File name, in the library folder.
     pub file: String,
     pub kind: AssetKind,
-    /// Nom affiché ; pour une police, la famille (`font-family`).
+    /// Displayed name; for a font, the family (`font-family`).
     pub name: String,
-    /// À quoi il sert, pour les animateurs (« logo de la marque, à mettre
-    /// en fin de vidéo »).
+    /// What it is for, for the animators ("brand logo, to put at the end of
+    /// the video").
     #[serde(default)]
     pub description: String,
-    /// Banque, auteur et licence d'un fichier trouvé par la recherche ;
-    /// aucun : fichier de l'utilisateur.
+    /// Bank, author and licence of a file found by the search; none: the
+    /// user's file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<Origin>,
 }

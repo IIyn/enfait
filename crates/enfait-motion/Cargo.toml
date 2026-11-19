@@ -1,6 +1,6 @@
 [package]
 name = "enfait-motion"
-description = "Compositions HTML d'enfait : contrat, rendu Chromium image par image, validation."
+description = "enfait's HTML compositions: contract, frame-by-frame Chromium rendering, validation."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

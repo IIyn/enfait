@@ -1,79 +1,79 @@
-//! Blocs du storyboard : une scène de la vidéo.
+//! Storyboard blocks: a scene of the video.
 
 use crate::id::BlockId;
 use crate::time::{Flicks, TimeRange};
 use serde::{Deserialize, Serialize};
 
-/// Ce qu'on voit pendant le bloc.
+/// What is shown during the block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockKind {
-    /// Le rush tel quel, sans animation. Ne passe pas par un modèle.
+    /// The rush as is, no animation. Does not go through a model.
     Rush,
-    /// Animation seule, sans face cam.
+    /// Animation only, no face cam.
     #[default]
     Animation,
-    /// Face cam avec une animation par-dessus.
+    /// Face cam with an animation on top.
     Mixed,
-    /// Effet appliqué à la face cam.
+    /// Effect applied to the face cam.
     Effect,
-    /// Plan d'illustration (b-roll) : une vidéo ou une image de la
-    /// bibliothèque, montée sans modèle.
+    /// Illustration shot (b-roll): a video or an image of the library,
+    /// edited without a model.
     Broll,
 }
 
-/// Passage d'un bloc au suivant.
+/// Passage from a block to the next.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(tag = "type", content = "description", rename_all = "snake_case")]
 pub enum Transition {
-    /// Coupe nette.
+    /// Hard cut.
     #[default]
     Cut,
-    /// L'agent choisit la transition.
+    /// The agent chooses the transition.
     Auto,
-    /// Transition décrite par l'utilisateur.
+    /// Transition described by the user.
     Described(String),
 }
 
-/// Un moment précis : ce qui doit se passer à un instant de la voix
-/// (« sur "aiguilleur", l'aiguillage bascule »).
+/// A precise moment: what must happen at a time of the voice ("on
+/// 'switchman', the switch flips").
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Moment {
-    /// Instant, dans l'intervalle du bloc.
+    /// Time, within the block interval.
     pub at: Flicks,
-    /// Mot prononcé à cet instant : repère lisible.
+    /// Word spoken at that time: readable landmark.
     pub word: String,
-    /// Ce qui se passe.
+    /// What happens.
     pub note: String,
 }
 
-/// Le plan d'un bloc « B-roll » : un fichier de la bibliothèque.
+/// The shot of a B-roll block: a library file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Broll {
-    /// Nom du fichier dans la bibliothèque.
+    /// File name in the library.
     pub file: String,
-    /// Instant de la vidéo où commence le plan (zéro pour une image).
+    /// Time of the video where the shot starts (zero for an image).
     #[serde(default)]
     pub start: Flicks,
 }
 
-/// Une scène : un intervalle de la voix, ce qu'on y voit, et la transition qui suit.
+/// A scene: an interval of the voice, what is shown, and the transition after it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Block {
     pub id: BlockId,
     pub range: TimeRange,
     pub kind: BlockKind,
-    /// Description libre de ce qui doit se passer à l'écran.
+    /// Free description of what must happen on screen.
     pub description: String,
     pub transition_after: Transition,
-    /// Moments précis, triés par instant, tous dans `range`.
+    /// Precise moments, sorted by time, all within `range`.
     #[serde(default)]
     pub moments: Vec<Moment>,
-    /// Plan montré par un bloc « B-roll ».
+    /// Shot shown by a B-roll block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broll: Option<Broll>,
-    /// Bloc « Mixte » : la personne filmée est détourée, l'animation peut
-    /// passer derrière elle.
+    /// Mixed block: the filmed person is cut out, the animation can pass
+    /// behind them.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub cutout: bool,
 }

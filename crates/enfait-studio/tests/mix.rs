@@ -1,5 +1,5 @@
-//! Mixage réel par ffmpeg : la musique reprend au début, baisse sous la
-//! voix (ducking), le SFX tombe à son instant, l'image n'est pas touchée.
+//! Real mix by ffmpeg: the music loops, dips under the voice (ducking),
+//! the SFX falls at its time, the picture is untouched.
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 
@@ -19,7 +19,7 @@ fn ffmpeg(args: &[&str], out: &Path) {
     assert!(ok.success());
 }
 
-/// Niveau RMS (dB) du son de `file` entre `a` et `b` secondes.
+/// RMS level (dB) of the sound of `file` between `a` and `b` seconds.
 fn rms(file: &Path, a: f64, b: f64) -> f64 {
     let out = Command::new("ffmpeg")
         .args(["-nostdin", "-v", "info", "-ss", &a.to_string(), "-t"])
@@ -45,7 +45,7 @@ fn rms(file: &Path, a: f64, b: f64) -> f64 {
 async fn music_ducks_and_sfx_lands() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();
-    // Base : 6 s d'image et une « voix » muette.
+    // Base: 6 s of picture and a silent "voice".
     let base = d.join("base.mp4");
     ffmpeg(
         &[
@@ -67,13 +67,13 @@ async fn music_ducks_and_sfx_lands() {
         ],
         &base,
     );
-    // Musique : 1,5 s de la, reprise en boucle.
+    // Music: 1.5 s of A, looped.
     let music = d.join("music.wav");
     ffmpeg(
         &["-f", "lavfi", "-i", "sine=frequency=440:duration=1.5"],
         &music,
     );
-    // SFX : 0,3 s de bruit fort.
+    // SFX: 0.3 s of loud noise.
     let sfx = d.join("pop.wav");
     ffmpeg(&["-f", "lavfi", "-i", "anoisesrc=d=0.3:a=0.8"], &sfx);
 
@@ -104,7 +104,7 @@ async fn music_ducks_and_sfx_lands() {
             depth_db: -20.0,
             ..Ducking::default()
         },
-        // La voix « parle » de 1 à 2 s.
+        // The voice "speaks" from 1 to 2 s.
         duck_spans: vec![(1.0, 2.0)],
         voice_gain_db: 0.0,
     };
@@ -113,17 +113,14 @@ async fn music_ducks_and_sfx_lands() {
 
     let full = rms(&out, 3.0, 4.0);
     let ducked = rms(&out, 1.2, 1.8);
-    assert!(
-        full > -36.0,
-        "musique audible, reprise après 1,5 s : {full}"
-    );
+    assert!(full > -36.0, "audible music, looped after 1.5 s: {full}");
     assert!(
         (full - ducked - 20.0).abs() < 3.0,
-        "baisse de 20 dB sous la voix : {full} / {ducked}"
+        "20 dB dip under the voice: {full} / {ducked}"
     );
     let pop = rms(&out, 5.0, 5.3);
-    assert!(pop > full + 3.0, "le SFX tombe à 5 s : {pop} / {full}");
-    // L'image est copiée telle quelle, la durée est celle de la base.
+    assert!(pop > full + 3.0, "the SFX falls at 5 s: {pop} / {full}");
+    // The picture is copied as is, the duration is that of the base.
     let probe = Command::new("ffprobe")
         .args(["-v", "error", "-show_entries", "stream=codec_type,channels"])
         .args(["-of", "csv=p=0"])
@@ -136,7 +133,7 @@ async fn music_ducks_and_sfx_lands() {
         "{streams}"
     );
 
-    // Une voix mono garde son niveau une fois en stéréo.
+    // A mono voice keeps its level once in stereo.
     let voiced = d.join("voix.mp4");
     ffmpeg(
         &[
@@ -176,7 +173,7 @@ async fn music_ducks_and_sfx_lands() {
     let (before, after) = (rms(&voiced, 0.5, 2.0), rms(&mixed, 0.5, 2.0));
     assert!((before - after).abs() < 0.5, "voix : {before} → {after}");
 
-    // Rien à mixer : simple copie.
+    // Nothing to mix: plain copy.
     let copy = d.join("copie.mp4");
     apply(&base, &MixPlan::default(), &copy).await.unwrap();
     assert!(copy.is_file());

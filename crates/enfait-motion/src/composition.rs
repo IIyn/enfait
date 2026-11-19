@@ -1,17 +1,17 @@
-//! Le contrat d'une composition et sa préparation avant rendu.
+//! The contract of a composition and its preparation before rendering.
 //!
-//! Une composition est un document HTML autonome qui déclare
-//! `window.enfait = { duration, seek(t) }`. Le moteur l'ouvre, attend polices
-//! et images, puis appelle `seek(t)` pour chaque image avant de la capturer.
+//! A composition is a standalone HTML document declaring
+//! `window.enfait = { duration, seek(t) }`. The engine opens it, waits for
+//! fonts and images, then calls `seek(t)` for each frame before capturing it.
 
 use crate::library;
 
-/// Texte du contrat, à donner tel quel aux modèles.
+/// Text of the contract, to give as is to the models.
 pub const CONTRACT: &str = include_str!("contract.md");
 
-/// Extrait le document HTML d'une réponse de modèle : le dernier bloc
-/// ```` ```html ```` s'il y en a un, sinon le texte entre `<!doctype` (ou
-/// `<html`) et `</html>`.
+/// Extracts the HTML document from a model answer: the last
+/// ```` ```html ```` block if there is one, else the text between
+/// `<!doctype` (or `<html`) and `</html>`.
 pub fn extract_html(reply: &str) -> Option<String> {
     let fenced = last_fenced(reply, "html");
     let candidate = fenced.as_deref().unwrap_or(reply);
@@ -21,7 +21,7 @@ pub fn extract_html(reply: &str) -> Option<String> {
     candidate.get(start..end).map(str::to_owned)
 }
 
-/// Contenu du dernier bloc de code ```` ```lang ````.
+/// Content of the last ```` ```lang ```` code block.
 pub fn last_fenced(text: &str, lang: &str) -> Option<String> {
     let open = format!("```{lang}");
     let start = text.rfind(&open)?;
@@ -31,11 +31,11 @@ pub fn last_fenced(text: &str, lang: &str) -> Option<String> {
     body.get(..end).map(str::to_owned)
 }
 
-/// Ajoute la bibliothèque (polices, anime.js) en tête du document.
+/// Adds the library (fonts, anime.js) at the top of the document.
 pub fn prepare(html: &str) -> String {
     let tags = library::head_tags();
     let lower = html.to_ascii_lowercase();
-    // `<head>` ou `<head …>`, mais pas `<header>`.
+    // `<head>` or `<head …>`, but not `<header>`.
     let head = lower
         .match_indices("<head")
         .find(|(i, _)| {

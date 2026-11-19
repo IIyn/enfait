@@ -1,21 +1,21 @@
-//! Temps exact, sans flottants.
+//! Exact time, without floats.
 //!
-//! L'unité est le *flick* : 1/705 600 000 de seconde. Ce nombre se divise
-//! exactement par les cadences courantes (24, 25, 30, 48, 50, 60, 120 i/s et
-//! leurs variantes NTSC x/1001) et par les fréquences audio courantes
-//! (8, 16, 22,05, 24, 32, 44,1, 48, 88,2, 96, 192 kHz). Une durée d'image ou
-//! d'échantillon tombe donc sur un nombre entier de flicks : pas de dérive.
+//! The unit is the *flick*: 1/705,600,000 of a second. This number divides
+//! exactly by common frame rates (24, 25, 30, 48, 50, 60, 120 fps and
+//! their NTSC x/1001 variants) and by common audio rates (8, 16, 22.05,
+//! 24, 32, 44.1, 48, 88.2, 96, 192 kHz). A frame or sample duration is thus
+//! a whole number of flicks: no drift.
 
 use crate::error::TimeError;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Nombre de flicks dans une seconde.
+/// Number of flicks in a second.
 pub const FLICKS_PER_SECOND: i64 = 705_600_000;
 
 const FLICKS_PER_MILLI: i64 = 705_600;
 
-/// Un instant ou une durée, en flicks.
+/// A time or a duration, in flicks.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
 )]
@@ -46,9 +46,9 @@ impl Flicks {
             .ok_or(TimeError::Overflow)
     }
 
-    /// Valeur approchée en secondes, pour l'affichage uniquement.
+    /// Approximate value in seconds, for display only.
     pub fn as_secs_f64(self) -> f64 {
-        // Conversion volontairement approchée : jamais réutilisée pour calculer.
+        // Deliberately approximate: never reused for computing.
         self.0 as f64 / FLICKS_PER_SECOND as f64
     }
 
@@ -66,8 +66,8 @@ impl Flicks {
             .ok_or(TimeError::Overflow)
     }
 
-    /// Instant du `samples`-ième échantillon à `sample_rate` Hz (arrondi à l'inférieur
-    /// si la fréquence ne divise pas exactement la seconde en flicks).
+    /// Time of the `samples`-th sample at `sample_rate` Hz (rounded down if
+    /// the rate does not divide the second exactly in flicks).
     pub fn from_samples(samples: i64, sample_rate: u32) -> Result<Self, TimeError> {
         if sample_rate == 0 {
             return Err(TimeError::InvalidSampleRate);
@@ -79,7 +79,7 @@ impl Flicks {
         narrow(value).map(Self)
     }
 
-    /// Index de l'échantillon qui contient cet instant.
+    /// Index of the sample containing this time.
     pub fn to_sample_floor(self, sample_rate: u32) -> Result<i64, TimeError> {
         if sample_rate == 0 {
             return Err(TimeError::InvalidSampleRate);
@@ -96,7 +96,7 @@ fn narrow(value: i128) -> Result<i64, TimeError> {
     i64::try_from(value).map_err(|_| TimeError::Overflow)
 }
 
-/// Cadence d'images, sous forme de fraction `num / den` images par seconde.
+/// Frame rate, as a fraction `num / den` frames per second.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "RawFrameRate", into = "RawFrameRate")]
 pub struct FrameRate {
@@ -161,13 +161,13 @@ impl FrameRate {
         self.den
     }
 
-    /// Nombre d'images par seconde arrondi au supérieur (30 pour 29,97).
-    /// C'est la base des timecodes non-drop.
+    /// Frames per second rounded up (30 for 29.97).
+    /// This is the base of non-drop timecodes.
     pub fn nominal_fps(self) -> u32 {
         self.num.div_ceil(self.den)
     }
 
-    /// Début de l'image `frame`.
+    /// Start of frame `frame`.
     pub fn frame_to_flicks(self, frame: i64) -> Result<Flicks, TimeError> {
         let value = i128::from(frame)
             .checked_mul(i128::from(FLICKS_PER_SECOND))
@@ -177,7 +177,7 @@ impl FrameRate {
         narrow(value).map(Flicks)
     }
 
-    /// Index de l'image affichée à l'instant `t`.
+    /// Index of the frame displayed at time `t`.
     pub fn flicks_to_frame_floor(self, t: Flicks) -> Result<i64, TimeError> {
         let divisor = i128::from(FLICKS_PER_SECOND)
             .checked_mul(i128::from(self.den))
@@ -189,7 +189,7 @@ impl FrameRate {
         narrow(value)
     }
 
-    /// Première image qui commence à `t` ou après.
+    /// First frame starting at `t` or after.
     pub fn flicks_to_frame_ceil(self, t: Flicks) -> Result<i64, TimeError> {
         let floor = self.flicks_to_frame_floor(t)?;
         if self.frame_to_flicks(floor)? < t {
@@ -199,13 +199,13 @@ impl FrameRate {
         }
     }
 
-    /// Images dont le début tombe dans `range` : `[premier, dernier + 1)`.
+    /// Frames whose start falls in `range`: `[first, last + 1)`.
     pub fn frames_in(self, range: TimeRange) -> Result<std::ops::Range<i64>, TimeError> {
         Ok(self.flicks_to_frame_ceil(range.start())?..self.flicks_to_frame_ceil(range.end())?)
     }
 }
 
-/// Intervalle semi-ouvert `[start, end)`, non vide, qui commence à 0 ou après.
+/// Half-open interval `[start, end)`, non-empty, starting at 0 or after.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "RawRange", into = "RawRange")]
 pub struct TimeRange {
@@ -256,7 +256,7 @@ impl TimeRange {
     }
 
     pub fn duration(self) -> Flicks {
-        // start >= 0 et end > start : la soustraction ne peut pas déborder.
+        // start >= 0 and end > start: the subtraction cannot overflow.
         Flicks(self.end.0.saturating_sub(self.start.0))
     }
 
@@ -264,7 +264,7 @@ impl TimeRange {
         self.start <= t && t < self.end
     }
 
-    /// Coupe en `[start, at)` et `[at, end)`. `at` doit être strictement à l'intérieur.
+    /// Splits into `[start, at)` and `[at, end)`. `at` must be strictly inside.
     pub fn split_at(self, at: Flicks) -> Result<(Self, Self), TimeError> {
         if at <= self.start || at >= self.end {
             return Err(TimeError::EmptyRange);
@@ -282,7 +282,7 @@ impl TimeRange {
     }
 }
 
-/// Timecode non-drop `HH:MM:SS:FF`.
+/// Non-drop timecode `HH:MM:SS:FF`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timecode {
     hours: u32,

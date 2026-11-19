@@ -1,8 +1,8 @@
-//! `enfait-cli make` : voix off → vidéo.
+//! `enfait-cli make`: voice-over → video.
 //!
-//! Chaque étape écrit son résultat dans le dossier de travail et le réutilise
-//! au lancement suivant : on peut relancer après une erreur, ou refaire
-//! seulement certains blocs avec `--redo`.
+//! Each step writes its result into the working folder and reuses it on
+//! the next run: you can run again after an error, or redo only some
+//! blocks with `--redo`.
 
 use crate::encode;
 use crate::paths::{Dirs, default_work_dir, find_in_path};
@@ -25,11 +25,11 @@ pub(crate) use enfait_studio::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum ProviderChoice {
-    /// Clé API si `ANTHROPIC_API_KEY` existe, sinon Claude Code.
+    /// API if an Anthropic key is set, else Claude Code.
     Auto,
     Api,
     ClaudeCode,
-    /// Modèle local (`ENFAIT_LOCAL_MODEL`, `ENFAIT_LOCAL_URL`).
+    /// Local model (Settings → Models, or `ENFAIT_LOCAL_MODEL`, `ENFAIT_LOCAL_URL`).
     Local,
 }
 
@@ -45,20 +45,20 @@ pub enum Aspect {
 
 #[derive(Debug, clap::Args)]
 pub struct MakeArgs {
-    /// Voix off (tout format lisible par ffmpeg).
+    /// Voice-over (any format ffmpeg reads).
     pub voice: PathBuf,
-    /// Script d'origine (texte ou Markdown), pour le vocabulaire et le contexte.
+    /// Original script (text or Markdown), for vocabulary and context.
     #[arg(long)]
     pub script: Option<PathBuf>,
-    /// Règles de style de l'utilisateur (Markdown), prioritaires.
+    /// The user's style rules (Markdown), taking precedence.
     #[arg(long)]
     pub style: Option<PathBuf>,
-    /// Style prédéfini (voir `enfait-cli styles`).
+    /// Style preset (see `enfait-cli styles`).
     #[arg(long)]
     pub preset: Option<String>,
-    /// Look de l'interface (`look.json` de la session) : style, post-FX et
-    /// bibliothèque (dans `library/` à côté). `--preset` et `--style`
-    /// l'emportent sur son style.
+    /// Look of the app (`look.json` of the session): style, post-FX and
+    /// library (in `library/` next to it). `--preset` and `--style` win over
+    /// its style.
     #[arg(long)]
     pub look: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "polished")]
@@ -69,39 +69,39 @@ pub struct MakeArgs {
     pub fps: u32,
     #[arg(long, value_enum, default_value = "auto")]
     pub provider: ProviderChoice,
-    /// Fichier vidéo produit (par défaut `<dossier de travail>/video.mp4`).
+    /// Produced video file (by default `<working folder>/video.mp4`).
     #[arg(long, short)]
     pub out: Option<PathBuf>,
-    /// Dossier de travail (par défaut `<voix>.enfait/`).
+    /// Working folder (by default `<voice>.enfait/`).
     #[arg(long)]
     pub work: Option<PathBuf>,
-    /// Blocs traités en parallèle.
+    /// Blocks processed in parallel.
     #[arg(long, default_value_t = 3)]
     pub jobs: usize,
-    /// Langue de la voix (`fr`, `en`…), détectée sinon.
+    /// Language of the voice (`fr`, `en`…), detected otherwise.
     #[arg(long)]
     pub language: Option<String>,
-    /// Blocs à refaire (numéros à partir de 1), par exemple `--redo 2,5`.
+    /// Blocks to redo (numbers from 1), for example `--redo 2,5`.
     #[arg(long, value_delimiter = ',')]
     pub redo: Vec<usize>,
-    /// Nombre maximal de transitions travaillées.
+    /// Maximum number of crafted transitions.
     #[arg(long, default_value_t = 1)]
     pub transitions: usize,
-    /// Ne traiter que les N premiers blocs (essais rapides).
+    /// Only process the first N blocks (quick tests).
     #[arg(long)]
     pub limit: Option<usize>,
-    /// Accélération GPU du rendu Chromium.
+    /// GPU acceleration of the Chromium render.
     #[arg(long, value_enum, default_value = "auto")]
     pub gpu: GpuArg,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum GpuArg {
-    /// Carte NVIDIA si `nvidia-smi` est présent, sinon processeur.
+    /// NVIDIA card if `nvidia-smi` is present, else the processor.
     Auto,
-    /// Carte NVIDIA, par Vulkan.
+    /// NVIDIA card, through Vulkan.
     Nvidia,
-    /// Tout sur le processeur.
+    /// Everything on the processor.
     Cpu,
 }
 
@@ -140,7 +140,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
         None => default_work_dir(&voice),
     };
     tokio::fs::create_dir_all(&work).await?;
-    tracing::info!("dossier de travail : {}", work.display());
+    tracing::info!("working folder: {}", work.display());
     let script = read_optional(args.script.as_deref()).await?;
     let look = match &args.look {
         Some(path) => Some(Look::load(path).await?),
@@ -152,12 +152,12 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
         .or_else(|| look.as_ref().and_then(|l| l.look.style.preset.clone()));
     let preset = match &preset_slug {
         Some(slug) => Some(enfait_ai::styles::find(slug).with_context(|| {
-            format!("style « {slug} » inconnu : `enfait-cli styles` liste les styles")
+            format!("unknown style \"{slug}\": `enfait-cli styles` lists the styles")
         })?),
         None => None,
     };
     if let Some(p) = preset {
-        tracing::info!("style imposé : {}", p.name);
+        tracing::info!("imposed style: {}", p.name);
     }
     let user_rules = match read_optional(args.style.as_deref()).await? {
         Some(rules) => Some(rules),
@@ -171,7 +171,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
     // 1. Transcription.
     let transcript = transcribe(dirs, &voice, &work, &args, script.as_deref()).await?;
 
-    // 2. Blocs.
+    // 2. Blocks.
     let mut ranges =
         enfait_speech::segment(&transcript, &enfait_speech::SegmentParams::standard()?)?;
     if let Some(limit) = args.limit {
@@ -190,7 +190,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
         ..ProjectSettings::default()
     };
     let texts: Vec<String> = ranges.iter().map(|r| transcript.text_in(*r)).collect();
-    tracing::info!("{} blocs :", ranges.len());
+    tracing::info!("{} blocks:", ranges.len());
     for (i, (r, text)) in ranges.iter().zip(&texts).enumerate() {
         tracing::info!(
             "  {:>2}. {:>6.2} → {:>6.2}  {}",
@@ -206,7 +206,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
     let quality: Quality = args.quality.into();
     let qs = quality.settings();
     tracing::info!(
-        "modèles via {} ; soin {:?} ({}, effort {}, {} critique(s))",
+        "models through {}; quality {:?} ({}, effort {}, {} critique(s))",
         provider.name(),
         quality,
         qs.model,
@@ -252,7 +252,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
     // 4. Compositions.
     let chrome = enfait_motion::ensure_browser(&dirs.chromium()).await?;
     library::install(&work.join("comps"))
-        .context("bibliothèque des compositions (lancer `enfait-cli setup`)")?;
+        .context("library of the compositions (run `enfait-cli setup`)")?;
     if let Some(look) = &look {
         look.install(&work.join("comps"))?;
     }
@@ -267,9 +267,9 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
     tracing::info!(
         "rendu {}",
         if nvidia {
-            "sur la carte NVIDIA"
+            "on the NVIDIA card"
         } else {
-            "sur le processeur"
+            "on the processor"
         }
     );
     let renderers = RendererPool::launch(&chrome, &dirs.browser_profile(), gpu, args.jobs).await?;
@@ -335,11 +335,11 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
             .await?;
         }
 
-        // 5. Rendu.
+        // 5. Render.
         let timeline = Timeline::build(rate, &ranges, &transition_after, TRANSITION_LENGTH)?;
         render_all(&ctx, &timeline, args.jobs).await?;
 
-        // 6. Encodage.
+        // 6. Encoding.
         let out = match &args.out {
             Some(o) => std::path::absolute(o)?,
             None => work.join("video.mp4"),
@@ -349,7 +349,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
             .as_ref()
             .and_then(|l| enfait_media::fx::filter(&l.look.fx, height));
         if fx.is_some() {
-            tracing::info!("post-FX du look appliqués à l'encodage");
+            tracing::info!("post-FX of the look applied to the encoding");
         }
         encode::encode(
             &ctx.work,
@@ -361,7 +361,7 @@ pub async fn run(dirs: &Dirs, args: MakeArgs) -> Result<()> {
         )
         .await?;
         tracing::info!(
-            "terminé en {} s : {}",
+            "done in {} s: {}",
             started.elapsed().as_secs(),
             out.display()
         );
@@ -378,7 +378,7 @@ pub(crate) async fn read_optional(path: Option<&Path>) -> Result<Option<String>>
         Some(p) => Ok(Some(
             tokio::fs::read_to_string(p)
                 .await
-                .with_context(|| format!("lecture de {}", p.display()))?,
+                .with_context(|| format!("reading {}", p.display()))?,
         )),
         None => Ok(None),
     }
@@ -399,14 +399,14 @@ async fn transcribe(
     let model = dirs.whisper_model();
     if !model.is_file() {
         anyhow::bail!(
-            "modèle whisper absent ({}) : lancer `enfait-cli setup`",
+            "whisper model missing ({}): run `enfait-cli setup`",
             model.display()
         );
     }
     tracing::info!("transcription de {}…", voice.display());
     let voice = voice.to_path_buf();
     let language = args.language.clone();
-    // Le début du script oriente le vocabulaire de whisper.
+    // The start of the script steers whisper's vocabulary.
     let prompt: Option<String> = script.map(|s| s.chars().take(400).collect());
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
     let transcript = tokio::task::spawn_blocking(move || -> Result<Transcript> {
@@ -421,7 +421,7 @@ async fn transcribe(
     })
     .await??;
     tracing::info!(
-        "{} mots, langue {}",
+        "{} words, language {}",
         transcript.words.len(),
         transcript.language
     );
@@ -439,7 +439,7 @@ pub(crate) fn make_provider(choice: ProviderChoice, work: &Path) -> Result<Provi
     Ok(choice.make(&work.join("claude"))?)
 }
 
-/// Look de l'interface et dossier de sa bibliothèque.
+/// Look of the app and folder of its library.
 pub(crate) struct Look {
     look: enfait_core::Look,
     library: PathBuf,
@@ -449,7 +449,7 @@ impl Look {
     async fn load(path: &Path) -> Result<Self> {
         let data = tokio::fs::read(path)
             .await
-            .with_context(|| format!("lecture de {}", path.display()))?;
+            .with_context(|| format!("reading {}", path.display()))?;
         let look = serde_json::from_slice(&data).context("look illisible")?;
         let library = path
             .parent()
@@ -458,17 +458,17 @@ impl Look {
         Ok(Self { look, library })
     }
 
-    /// Polices de l'utilisateur, au format de [`fonts_list`].
+    /// The user's fonts, in the format of [`fonts_list`].
     fn font_lines(&self) -> String {
         enfait_studio::userlib::font_lines(&self.look)
     }
 
-    /// Fichiers (hors polices) pour le brief des animateurs.
+    /// Files (fonts aside) for the animators' brief.
     fn brief(&self) -> Option<String> {
         enfait_studio::userlib::brief(&self.look)
     }
 
-    /// Copie polices et fichiers dans le dossier des compositions.
+    /// Copies fonts and files into the compositions folder.
     fn install(&self, comps: &Path) -> Result<()> {
         enfait_studio::userlib::install(&self.look, &self.library, comps)
     }
@@ -532,7 +532,7 @@ pub(crate) async fn render_all(ctx: &Ctx<'_>, timeline: &Timeline, jobs: usize) 
         for f in t.frames.clone() {
             let (Some(a), Some(b)) = (timeline.block_frame(from, f), timeline.block_frame(to, f))
             else {
-                anyhow::bail!("{name} : image {f} absente des rendus voisins");
+                anyhow::bail!("{name}: frame {f} missing from the neighbouring renders");
             };
             scenes.push((from_dir.join(frame_name(a)), to_dir.join(frame_name(b))));
             times.push(timeline.local_time(f, t.frames.start)?);

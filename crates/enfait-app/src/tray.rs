@@ -54,12 +54,7 @@ fn build() -> anyhow::Result<Tray> {
     let settings = MenuItem::new(rust_i18n::t!("tray.settings"), true, None);
     let quit = MenuItem::new(rust_i18n::t!("tray.quit"), true, None);
     let menu = Menu::new();
-    menu.append_items(&[
-        &open,
-        &settings,
-        &PredefinedMenuItem::separator(),
-        &quit,
-    ])?;
+    menu.append_items(&[&open, &settings, &PredefinedMenuItem::separator(), &quit])?;
     let icon = TrayIconBuilder::new()
         .with_icon(icon)
         .with_tooltip("enfait")
@@ -122,7 +117,7 @@ fn poll(cx: &mut App) {
             if events.is_empty() {
                 continue;
             }
-            let _ = cx.update(|cx| {
+            cx.update(|cx| {
                 for event in events {
                     handle(event, cx);
                 }
@@ -138,14 +133,14 @@ fn handle(event: Event, cx: &mut App) {
     };
     match event {
         Event::Click => crate::show_main_window(cx),
-        Event::Menu(id) if &id == tray.open.id() => crate::show_main_window(cx),
-        Event::Menu(id) if &id == tray.settings.id() => {
+        Event::Menu(id) if id == *tray.open.id() => crate::show_main_window(cx),
+        Event::Menu(id) if id == *tray.settings.id() => {
             crate::show_main_window(cx);
             if let Some(shell) = crate::main_shell(cx) {
                 shell.update(cx, |shell, cx| shell.open_settings(cx));
             }
         }
-        Event::Menu(id) if &id == tray.quit.id() => cx.quit(),
+        Event::Menu(id) if id == *tray.quit.id() => cx.quit(),
         Event::Menu(_) => {}
     }
 }

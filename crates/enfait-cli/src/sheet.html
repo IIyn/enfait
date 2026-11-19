@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Planche d'évaluation</title>
+<title>Evaluation sheet</title>
 <link rel="stylesheet" href="lib/fonts.css">
 <style>
 :root {
@@ -70,25 +70,25 @@ textarea:focus, button:focus-visible { outline: 1px solid var(--signal); outline
 </head>
 <body>
 <header>
-  <h1>Planche d'évaluation</h1>
+  <h1>Evaluation sheet</h1>
   <span class="meta" id="run"></span>
   <span class="spacer"></span>
   <span class="meta" id="progress"></span>
-  <select id="filter" aria-label="Filtre">
-    <option value="all">Tous les cas</option>
-    <option value="todo">À noter</option>
-    <option value="low">Notés 1 ou 2</option>
+  <select id="filter" aria-label="Filter">
+    <option value="all">All cases</option>
+    <option value="todo">To rate</option>
+    <option value="low">Rated 1 or 2</option>
   </select>
-  <button class="primary" id="export">Exporter notes.json</button>
+  <button class="primary" id="export">Export notes.json</button>
 </header>
 <main id="cases"></main>
 <script>
 const DATA = /*DATA*/null;
-const SCALE = { 1: "raté", 2: "faible", 3: "correct", 4: "bon", 5: "wow" };
-const TAGS = ["illisible", "décalé sur la voix", "cliché", "vide", "surchargé",
-  "mouvement raide", "style non respecté", "texte coupé", "bug de rendu"];
+const SCALE = { 1: "failed", 2: "weak", 3: "fair", 4: "good", 5: "wow" };
+const TAGS = ["unreadable", "off the voice", "cliché", "empty", "cluttered",
+  "stiff motion", "style not followed", "text cut off", "render bug"];
 const run = DATA.run || {};
-const key = "enfait-eval:" + (run.fingerprint || "sans-empreinte") + ":" + (run.created || 0);
+const key = "enfait-eval:" + (run.fingerprint || "no-fingerprint") + ":" + (run.created || 0);
 
 function load() {
   let saved = null;
@@ -111,15 +111,15 @@ function el(tag, cls, text) {
 
 document.getElementById("run").textContent = run.fingerprint
   ? "prompts " + run.fingerprint + " · " + run.quality + " (" + run.model + ") · " + run.provider
-    + " · " + new Date(run.created * 1000).toLocaleString("fr-FR")
-  : "passe sans métadonnées";
+    + " · " + new Date(run.created * 1000).toLocaleString()
+  : "pass without metadata";
 
 function progress() {
   const scored = DATA.cases.map(c => notes[c.id] && notes[c.id].score).filter(Boolean);
   const mean = scored.length ? (scored.reduce((a, b) => a + b, 0) / scored.length).toFixed(2) : "–";
   const wow = scored.filter(s => s >= 5).length;
   document.getElementById("progress").textContent =
-    scored.length + "/" + DATA.cases.length + " notés · moyenne " + mean + " · " + wow + " wow";
+    scored.length + "/" + DATA.cases.length + " rated · mean " + mean + " · " + wow + " wow";
   document.querySelectorAll(".card").forEach(card => {
     const n = notes[card.dataset.id];
     card.classList.toggle("rated", !!(n && n.score));
@@ -158,7 +158,7 @@ function card(c, i) {
 
   const head = el("div", "head");
   head.append(el("span", "num", String(i + 1).padStart(2, "0")), el("span", "id", c.id),
-    el("span", "chip", c.style_name || "style libre"), el("span", "chip", c.aspect),
+    el("span", "chip", c.style_name || "free style"), el("span", "chip", c.aspect),
     el("span", "chip", c.language), el("span", "chip", c.duration.toFixed(1) + " s"),
     el("span", "theme", c.theme));
   root.append(head);
@@ -175,7 +175,7 @@ function card(c, i) {
   } else if (c.error) {
     stage.append(el("div", "error", c.error));
   } else {
-    stage.append(el("div", "missing", "pas encore produit"));
+    stage.append(el("div", "missing", "not produced yet"));
   }
   root.append(stage);
   root.append(video ? caption(c, video) : el("div", "caption", c.text));
@@ -183,9 +183,9 @@ function card(c, i) {
   if (c.concept || c.intent) {
     const d = el("details");
     d.append(el("summary", null, "Direction"));
-    if (c.concept) d.append(el("p", null, "Concept : " + c.concept));
-    if (c.intent) d.append(el("p", null, "Intention : " + c.intent));
-    d.append(el("p", null, "Contexte : " + c.context));
+    if (c.concept) d.append(el("p", null, "Concept: " + c.concept));
+    if (c.intent) d.append(el("p", null, "Intent: " + c.intent));
+    d.append(el("p", null, "Context: " + c.context));
     root.append(d);
   }
 
@@ -215,7 +215,7 @@ function card(c, i) {
     tags.append(b);
   });
   const comment = el("textarea");
-  comment.placeholder = "Ce qui marche, ce qui manque…";
+  comment.placeholder = "What works, what is missing…";
   comment.value = n.comment || "";
   comment.oninput = () => { n.comment = comment.value; save(); };
   rate.append(scores, tags, comment);

@@ -1,16 +1,16 @@
-//! Préparation d'un média et cache sur disque.
+//! Preparing a media and caching it on disk.
 //!
-//! Pour chaque fichier source (identifié par son chemin, sa taille et sa
-//! date de modification), un dossier du cache contient :
+//! For each source file (identified by its path, size and modification
+//! date), a cache folder contains:
 //!
-//! - `info.json` : l'analyse ffprobe ;
-//! - `proxy.mp4` : la vidéo réduite à 540 lignes, H.264 avec une image clé
-//!   toutes les demi-secondes, rapide à décoder et à parcourir ;
-//! - `audio.s16` : le son brut, 48 kHz, une ou deux voies ;
-//! - `peaks.bin` : la forme d'onde.
+//! - `info.json`: the ffprobe analysis;
+//! - `proxy.mp4`: the video reduced to 540 lines, H.264 with a keyframe
+//!   every half second, fast to decode and to scrub;
+//! - `audio.s16`: the raw sound, 48 kHz, one or two channels;
+//! - `peaks.bin`: the waveform.
 //!
-//! Chaque fichier est écrit sous un nom temporaire puis renommé : un fichier
-//! présent est toujours complet.
+//! Each file is written under a temporary name, then renamed: a file that
+//! exists is always complete.
 
 use crate::MediaError;
 use crate::audio::{self, AudioBuffer};
@@ -20,12 +20,12 @@ use crate::waveform::Peaks;
 use enfait_core::FrameRate;
 use std::path::{Path, PathBuf};
 
-/// Hauteur maximale des proxys.
+/// Maximum height of the proxies.
 pub const PROXY_HEIGHT: u32 = 540;
-/// Version du format du cache : la changer invalide les anciens dossiers.
+/// Version of the cache format: changing it invalidates old folders.
 const CACHE_VERSION: &str = "1";
 
-/// Étape en cours, pour l'affichage de la progression.
+/// Current stage, for progress display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
     Probe,
@@ -37,32 +37,32 @@ pub enum Stage {
 impl Stage {
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Probe => "analyse",
-            Self::Proxy => "proxy vidéo",
-            Self::Audio => "son",
-            Self::Waveform => "forme d'onde",
+            Self::Probe => "analysis",
+            Self::Proxy => "video proxy",
+            Self::Audio => "sound",
+            Self::Waveform => "waveform",
         }
     }
 }
 
-/// Fichier d'où lire les images, et taille des images produites.
+/// File to read the frames from, and size of the produced frames.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VideoSource {
     pub path: PathBuf,
     pub width: u32,
     pub height: u32,
-    /// `true` : le proxy ; `false` : le fichier d'origine, en attendant le
-    /// proxy (décodage plus lourd, sauts plus lents).
+    /// `true`: the proxy; `false`: the original file, until the proxy exists
+    /// (heavier decoding, slower seeks).
     pub is_proxy: bool,
 }
 
-/// Un média prêt à être lu.
+/// A media ready to play.
 #[derive(Debug, Clone)]
 pub struct Prepared {
     pub source: PathBuf,
     pub info: MediaInfo,
-    /// Images : le proxy s'il existe déjà, sinon le fichier d'origine
-    /// (voir [`MediaCache::build_proxy`]).
+    /// Frames: the proxy if it already exists, else the original file (see
+    /// [`MediaCache::build_proxy`]).
     pub video: Option<VideoSource>,
     pub audio: Option<AudioBuffer>,
     pub peaks: Option<Peaks>,
@@ -73,7 +73,7 @@ impl Prepared {
         self.info.video.map(|v| v.frame_rate)
     }
 
-    /// Nombre d'images du média (0 sans vidéo).
+    /// Number of frames of the media (0 without video).
     pub fn frame_count(&self) -> i64 {
         self.frame_rate().map_or(0, |r| {
             frame_at(self.info.duration - 1e-4, r).saturating_add(1)
@@ -90,7 +90,7 @@ impl MediaCache {
         Self { root: root.into() }
     }
 
-    /// Dossier du cache pour `source`.
+    /// Cache folder for `source`.
     pub fn dir_for(&self, source: &Path) -> Result<PathBuf, MediaError> {
         let meta = std::fs::metadata(source)?;
         let modified = meta
@@ -107,10 +107,10 @@ impl MediaCache {
         Ok(self.root.join(key))
     }
 
-    /// Prépare `source` pour une lecture immédiate : analyse, son et forme
-    /// d'onde (rapides). Le proxy n'est pas fabriqué ici : s'il manque, les
-    /// images viennent du fichier d'origine en attendant
-    /// [`MediaCache::build_proxy`]. Bloquant : hors du fil de l'interface.
+    /// Prepares `source` for immediate playback: analysis, sound and waveform
+    /// (fast). The proxy is not made here: if it is missing, the frames come
+    /// from the original file until [`MediaCache::build_proxy`]. Blocking:
+    /// off the interface thread.
     pub fn prepare(
         &self,
         source: &Path,
@@ -194,9 +194,9 @@ impl MediaCache {
 }
 
 impl MediaCache {
-    /// Fabrique le proxy de `prepared` s'il manque (environ 18 fois le temps
-    /// réel pour du 1080p) et renvoie la source d'images à utiliser ensuite.
-    /// Bloquant : hors du fil de l'interface.
+    /// Makes the proxy of `prepared` if missing (about 18× real time for
+    /// 1080p) and returns the frame source to use afterwards. Blocking: off
+    /// the interface thread.
     pub fn build_proxy(
         &self,
         prepared: &Prepared,
@@ -238,7 +238,7 @@ fn write_atomic(path: &Path, data: &[u8]) -> Result<(), MediaError> {
     Ok(())
 }
 
-/// Dimensions paires du proxy, sans agrandir la source.
+/// Even proxy size, without enlarging the source.
 pub fn proxy_size(width: u32, height: u32) -> (u32, u32) {
     let even = |x: u64| u32::try_from((x / 2).max(1) * 2).unwrap_or(2);
     if height <= PROXY_HEIGHT {
@@ -257,8 +257,8 @@ fn make_proxy(
     duration: f64,
     on_progress: &mut dyn FnMut(f32),
 ) -> Result<(), MediaError> {
-    // Image clé toutes les demi-secondes, sans image B : un saut ne décode
-    // jamais plus d'une demi-seconde.
+    // A keyframe every half second, no B-frames: a seek never decodes more
+    // than half a second.
     let gop = (rate.nominal_fps() / 2).max(1).to_string();
     let mut args: Vec<std::ffi::OsString> = vec!["-i".into(), source.into()];
     args.extend(

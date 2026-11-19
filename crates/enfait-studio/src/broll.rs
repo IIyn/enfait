@@ -1,15 +1,15 @@
-//! Plans de b-roll : une vidéo ou une image de la bibliothèque, montée sur
-//! la durée d'un bloc sans passer par un modèle. Une vidéo est lue à partir
-//! d'un instant (et reprise au début si elle est trop courte) ; une image
-//! fixe reçoit un lent zoom avant. Le cadre est rempli (recadrage au centre).
+//! B-roll shots: a video or an image of the library, edited over the
+//! duration of a block without a model. A video plays from a start time
+//! (and loops if it is too short); a still image gets a slow zoom in. The
+//! frame is filled (centred crop).
 
 use anyhow::{Context as _, Result};
 use enfait_core::AssetKind;
 use std::path::Path;
 
-/// Filtres ffmpeg du plan : remplir `w`×`h` à `fps`, et pour une image un
-/// zoom de 1 à 1,08 sur `frames` images (calculé sur une image deux fois
-/// plus grande, pour un mouvement sans à-coups).
+/// ffmpeg filters of the shot: fill `w`×`h` at `fps`, and for an image a
+/// zoom from 1 to 1.08 over `frames` frames (computed on an image twice as
+/// large, for a smooth movement).
 pub fn filter(kind: AssetKind, size: (u32, u32), fps: f64, frames: usize) -> String {
     let (w, h) = size;
     match kind {
@@ -29,8 +29,8 @@ pub fn filter(kind: AssetKind, size: (u32, u32), fps: f64, frames: usize) -> Str
     }
 }
 
-/// Rend le plan `source` en clip H.264 muet de `duration` secondes dans
-/// `out`. `start` : instant de départ dans une vidéo.
+/// Renders shot `source` into a silent H.264 clip of `duration` seconds in
+/// `out`. `start`: start time in a video.
 pub async fn render(
     source: &Path,
     kind: AssetKind,
@@ -42,9 +42,9 @@ pub async fn render(
 ) -> Result<()> {
     anyhow::ensure!(
         !matches!(kind, AssetKind::Font | AssetKind::Audio),
-        "une police ou un son ne peut pas servir de plan"
+        "a font or a sound cannot be a shot"
     );
-    // Nombre d'images du plan : positif et borné.
+    // Number of frames of the shot: positive and bounded.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let frames = (duration * fps).round().max(1.0) as usize;
     if let Some(dir) = out.parent() {
@@ -73,7 +73,7 @@ pub async fn render(
         .arg(&tmp)
         .output()
         .await
-        .context("lancement de ffmpeg")?;
+        .context("starting ffmpeg")?;
     anyhow::ensure!(
         output.status.success(),
         "plan de b-roll : {}",

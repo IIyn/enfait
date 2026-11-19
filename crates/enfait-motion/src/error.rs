@@ -2,25 +2,25 @@ use std::path::PathBuf;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MotionError {
-    #[error("entrée-sortie : {0}")]
+    #[error("input-output: {0}")]
     Io(#[from] std::io::Error),
-    #[error("navigateur : {0}")]
+    #[error("browser: {0}")]
     Browser(String),
-    #[error("installation de Chromium : {0}")]
+    #[error("Chromium install: {0}")]
     Fetch(String),
-    #[error("téléchargement : {0}")]
+    #[error("download: {0}")]
     Http(#[from] reqwest::Error),
-    #[error("archive : {0}")]
+    #[error("archive: {0}")]
     Zip(#[from] zip::result::ZipError),
-    #[error("chemin invalide : {0}")]
+    #[error("invalid path: {0}")]
     Path(PathBuf),
-    #[error("JSON : {0}")]
+    #[error("JSON: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("image : {0}")]
+    #[error("image: {0}")]
     Image(#[from] image::ImageError),
-    #[error("base64 : {0}")]
+    #[error("base64: {0}")]
     Base64(#[from] base64::DecodeError),
-    #[error("la composition ne respecte pas le contrat : {0}")]
+    #[error("the composition does not follow the contract: {0}")]
     Contract(String),
 }
 

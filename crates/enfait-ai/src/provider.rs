@@ -1,4 +1,4 @@
-//! Choix du fournisseur de modèles.
+//! Choosing the model provider.
 
 use crate::anthropic::AnthropicClient;
 use crate::claude_code::ClaudeCodeClient;
@@ -6,17 +6,17 @@ use crate::llm::{AiError, Reply, Request};
 use crate::local::LocalClient;
 
 pub enum Provider {
-    /// API Anthropic avec une clé.
+    /// Anthropic API with a key.
     Anthropic(AnthropicClient),
-    /// Claude Code installé localement, avec le compte de l'utilisateur.
+    /// Claude Code installed locally, with the user's account.
     ClaudeCode(ClaudeCodeClient),
-    /// Modèle local, servi par une API compatible OpenAI.
+    /// Local model, served by an OpenAI-compatible API.
     Local(LocalClient),
-    /// Réponses préparées à l'avance (essais sans modèle, tests).
+    /// Answers prepared in advance (runs without a model, tests).
     Canned(Canned),
 }
 
-/// Fonction qui répond à une requête sans appeler de modèle.
+/// Function answering a request without calling a model.
 pub type Canned = std::sync::Arc<dyn Fn(&Request) -> Result<String, AiError> + Send + Sync>;
 
 impl Provider {
@@ -28,7 +28,7 @@ impl Provider {
             Self::Local(client) => client.complete(request).await,
             Self::Canned(answer) => answer(request).map(|text| Reply {
                 text,
-                model: "préenregistré".into(),
+                model: "canned".into(),
                 usage: crate::Usage::default(),
             }),
         }?;
@@ -38,7 +38,7 @@ impl Provider {
             input = reply.usage.input_tokens,
             output = reply.usage.output_tokens,
             cache_read = reply.usage.cache_read_input_tokens,
-            "réponse reçue"
+            "reply received"
         );
         Ok(reply)
     }
@@ -47,24 +47,24 @@ impl Provider {
         match self {
             Self::Anthropic(_) => "API Anthropic",
             Self::ClaudeCode(_) => "Claude Code",
-            Self::Local(_) => "modèle local",
-            Self::Canned(_) => "réponses préenregistrées",
+            Self::Local(_) => "local model",
+            Self::Canned(_) => "canned answers",
         }
     }
 }
 
-/// Quel fournisseur utiliser (réglage de l'utilisateur).
+/// Which provider to use (user setting).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderChoice {
-    /// L'API si `ANTHROPIC_API_KEY` existe, sinon Claude Code.
+    /// The API if an Anthropic key is set, else Claude Code.
     #[default]
     Auto,
     Api,
     ClaudeCode,
-    /// Modèle local (voir [`crate::local`]).
+    /// Local model (see [`crate::local`]).
     Local,
 }
 
@@ -80,7 +80,7 @@ impl ProviderChoice {
         }
     }
 
-    /// Crée le fournisseur ; `work` : dossier de travail de Claude Code.
+    /// Creates the provider; `work`: working folder of Claude Code.
     pub fn make(self, work: &std::path::Path) -> Result<Provider, AiError> {
         let api = || AnthropicClient::from_config().map(Provider::Anthropic);
         let claude = || {
@@ -88,8 +88,8 @@ impl ProviderChoice {
                 .map(|program| Provider::ClaudeCode(ClaudeCodeClient::new(program, work)))
                 .ok_or_else(|| {
                     AiError::ClaudeCode(
-                        "commande `claude` introuvable : installe Claude Code, ou choisis \
-                         l'API ou un modèle local"
+                        "`claude` command not found: install Claude Code, or choose the API \
+                         or a local model"
                             .into(),
                     )
                 })

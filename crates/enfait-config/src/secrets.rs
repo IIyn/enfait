@@ -179,7 +179,11 @@ fn write_file(secret: Secret, value: Option<&str>) -> Result<()> {
     let path = secrets_file();
     let mut all = load_file();
     let changed = match value {
-        Some(v) => all.insert(secret.account().to_owned(), v.to_owned()).as_deref() != Some(v),
+        Some(v) => {
+            all.insert(secret.account().to_owned(), v.to_owned())
+                .as_deref()
+                != Some(v)
+        }
         None => all.remove(secret.account()).is_some(),
     };
     if !changed {

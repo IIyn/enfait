@@ -1,8 +1,8 @@
-//! Pont vers Claude Code (`claude -p`), qui utilise le compte de l'utilisateur.
+//! Bridge to Claude Code (`claude -p`), which uses the user's account.
 //!
-//! Chaque requête lance un `claude -p` sans session persistante, avec notre
-//! consigne système à la place de celle de Claude Code et le seul outil `Read`
-//! (pour ouvrir les images à critiquer).
+//! Each request runs a `claude -p` without a persistent session, with our
+//! system instruction instead of Claude Code's and the `Read` tool only
+//! (to open the images to critique).
 
 use crate::llm::{AiError, Part, Reply, Request, Usage};
 use serde::Deserialize;
@@ -12,7 +12,7 @@ use tokio::io::AsyncWriteExt as _;
 
 pub struct ClaudeCodeClient {
     program: PathBuf,
-    /// Dossier de travail des sous-processus (consignes, images).
+    /// Working folder of the subprocesses (instructions, images).
     work_dir: PathBuf,
 }
 
@@ -112,8 +112,8 @@ impl ClaudeCodeClient {
     }
 }
 
-/// Met le message à plat : les images deviennent des chemins à ouvrir avec
-/// l'outil `Read`. Renvoie aussi les dossiers à autoriser.
+/// Flattens the message: images become paths to open with the `Read`
+/// tool. Also returns the folders to allow.
 fn flatten(parts: &[Part]) -> (String, Vec<PathBuf>) {
     let mut prompt = String::new();
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -125,7 +125,7 @@ fn flatten(parts: &[Part]) -> (String, Vec<PathBuf>) {
             }
             Part::Image(path) => {
                 let path = std::path::absolute(path).unwrap_or_else(|_| path.clone());
-                prompt.push_str("[Image à ouvrir avec l'outil Read : ");
+                prompt.push_str("[Image to open with the Read tool: ");
                 prompt.push_str(&path.to_string_lossy());
                 prompt.push_str("]\n\n");
                 if let Some(dir) = path.parent().map(Path::to_path_buf)

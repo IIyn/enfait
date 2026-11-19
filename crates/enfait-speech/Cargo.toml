@@ -1,6 +1,6 @@
 [package]
 name = "enfait-speech"
-description = "Parole : décodage audio, transcription mot à mot (whisper), découpage en blocs."
+description = "Speech: audio decoding, word-by-word transcription (whisper), splitting into blocks."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -246,8 +246,11 @@ impl Shell {
                         shell.offer_broll(&file, hit.kind, cx);
                     }
                     Err(e) => {
-                        shell.library_notice =
-                            Some(tr!("assets.add_failed", title = hit.origin.title, error = e));
+                        shell.library_notice = Some(tr!(
+                            "assets.add_failed",
+                            title = hit.origin.title,
+                            error = e
+                        ));
                     }
                 }
                 shell.push_snapshot();
@@ -308,7 +311,7 @@ impl Shell {
         self.library_notice = None;
         cx.notify();
         let source = self.session.library_dir().join(&file);
-        let models = enfait_config::paths::models_dir().join("cutout");
+        let models = enfait_config::paths::cutout_models_dir();
         let out = cache_root()
             .join("search")
             .join(format!("cutout-{}.png", std::process::id()));
@@ -415,7 +418,10 @@ impl Shell {
         let status = if state.busy {
             Some((tr!("assets.searching"), tokens::FG2))
         } else if !state.hits.is_empty() {
-            Some((tr!("assets.results", count = state.hits.len()), tokens::MUTE))
+            Some((
+                tr!("assets.results", count = state.hits.len()),
+                tokens::MUTE,
+            ))
         } else {
             None
         };
@@ -515,16 +521,14 @@ impl Shell {
             .children(state.errors.iter().map(|e| small(e.clone(), tokens::ERROR)))
             .when(has_hits, |d| {
                 d.child(small(tr!("assets.click_to_add"), tokens::MUTE))
-                .child(div().flex().flex_wrap().gap(px(6.)).children(cards))
-                .child(
-                    chip("clear-search", tr!("assets.clear"), false).on_click(
+                    .child(div().flex().flex_wrap().gap(px(6.)).children(cards))
+                    .child(chip("clear-search", tr!("assets.clear"), false).on_click(
                         listeners.listener(|shell, _: &ClickEvent, _, cx| {
                             shell.search.hits.clear();
                             shell.search.errors.clear();
                             cx.notify();
                         }),
-                    ),
-                )
+                    ))
             })
             .when(!missing.is_empty() && !has_hits, |d| {
                 d.child(
@@ -535,9 +539,11 @@ impl Shell {
                     .id("missing-keys")
                     .cursor_pointer()
                     .hover(|d| d.underline())
-                    .on_click(listeners.listener(|shell, _: &ClickEvent, _, cx| {
-                        shell.open_settings(cx);
-                    })),
+                    .on_click(listeners.listener(
+                        |shell, _: &ClickEvent, _, cx| {
+                            shell.open_settings(cx);
+                        },
+                    )),
                 )
             })
     }
@@ -585,9 +591,10 @@ impl Shell {
                 }
                 let page = origin.page.clone();
                 if !page.is_empty() {
-                    details = details.child(chip("open-page", tr!("assets.file_page"), false).on_click(
-                        listeners.listener(move |_, _: &ClickEvent, _, cx| cx.open_url(&page)),
-                    ));
+                    details =
+                        details.child(chip("open-page", tr!("assets.file_page"), false).on_click(
+                            listeners.listener(move |_, _: &ClickEvent, _, cx| cx.open_url(&page)),
+                        ));
                 }
             }
             None => {
@@ -645,7 +652,11 @@ impl Shell {
                 .flex_col()
                 .gap(px(6.))
                 .child(small(
-                    tr!("assets.found_online", count = found.len(), credit = to_credit),
+                    tr!(
+                        "assets.found_online",
+                        count = found.len(),
+                        credit = to_credit
+                    ),
                     tokens::FG2,
                 ))
                 .when(warnings > 0, |d| {
@@ -691,7 +702,11 @@ impl Shell {
             let file = asset.file.clone();
             chip(
                 ("broll", i),
-                format!("{} · {}", asset.name, super::side::asset_kind_name(asset.kind)),
+                format!(
+                    "{} · {}",
+                    asset.name,
+                    super::side::asset_kind_name(asset.kind)
+                ),
                 on,
             )
             .when(!on, |d| {
@@ -756,7 +771,10 @@ impl Shell {
                         )
                         .child(chip("broll-back", "−1 s", false).on_click(shift(-1.0)))
                         .child(chip("broll-forward", "+1 s", false).on_click(shift(1.0)))
-                        .child(chip("broll-zero", tr!("assets.from_start"), false).on_click(shift(0.0))),
+                        .child(
+                            chip("broll-zero", tr!("assets.from_start"), false)
+                                .on_click(shift(0.0)),
+                        ),
                 )
             }
             _ => None,
@@ -783,12 +801,12 @@ impl Shell {
                     .map(|w| small(tr!("assets.warning", text = w), tokens::MIXED)),
             )
             .child(
-                chip("search-broll", tr!("assets.search_shot"), false).on_click(listeners.listener(
-                    move |shell, _: &ClickEvent, window, cx| {
+                chip("search-broll", tr!("assets.search_shot"), false).on_click(
+                    listeners.listener(move |shell, _: &ClickEvent, window, cx| {
                         shell.search_broll_for(&block_for_search, window, cx);
                         shell.run_search(cx);
-                    },
-                )),
+                    }),
+                ),
             )
             .child(small(tr!("assets.broll_note"), tokens::MUTE))
     }

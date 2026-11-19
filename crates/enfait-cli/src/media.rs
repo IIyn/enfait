@@ -1,4 +1,4 @@
-//! `enfait-cli media` : prépare un média comme le fera l'interface.
+//! `enfait-cli media`: prepares a media as the app will.
 
 use crate::paths::Dirs;
 use anyhow::Result;
@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, clap::Args)]
 pub struct MediaArgs {
-    /// Vidéo ou son.
+    /// Video or sound.
     pub file: PathBuf,
 }
 
@@ -21,7 +21,7 @@ pub async fn run(dirs: &Dirs, args: MediaArgs) -> Result<()> {
                 last = Some(stage);
             }
         })?;
-        tracing::info!("lisible après {:.1} s", started.elapsed().as_secs_f64());
+        tracing::info!("playable after {:.1} s", started.elapsed().as_secs_f64());
         if prepared.video.as_ref().is_some_and(|v| !v.is_proxy) {
             tracing::info!("{}…", enfait_media::Stage::Proxy.label());
         }
@@ -30,10 +30,10 @@ pub async fn run(dirs: &Dirs, args: MediaArgs) -> Result<()> {
     })
     .await??;
     let info = &prepared.info;
-    tracing::info!("durée : {:.2} s", info.duration);
+    tracing::info!("duration: {:.2} s", info.duration);
     if let Some(v) = info.video {
         tracing::info!(
-            "image : {}×{}, {}/{} i/s, {} images",
+            "picture: {}×{}, {}/{} fps, {} frames",
             v.width,
             v.height,
             v.frame_rate.num(),
@@ -46,12 +46,12 @@ pub async fn run(dirs: &Dirs, args: MediaArgs) -> Result<()> {
     }
     if let Some(a) = &prepared.audio {
         tracing::info!(
-            "son : {} Hz, {} voie(s), {:.2} s",
+            "sound: {} Hz, {} channel(s), {:.2} s",
             a.rate(),
             a.channels(),
             a.duration()
         );
     }
-    tracing::info!("prêt en {:.1} s", started.elapsed().as_secs_f64());
+    tracing::info!("ready in {:.1} s", started.elapsed().as_secs_f64());
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! Passe « réalisateur » : direction artistique et intention de chaque bloc.
+//! "Director" pass: art direction and intent of each block.
 
 use crate::llm::{AiError, Effort, Part, Request};
 use crate::text::{fill, last_fenced};
@@ -48,13 +48,13 @@ pub struct BlockIntent {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TransitionIntent {
-    /// Numéro (à partir de 1) du bloc après lequel la transition a lieu.
+    /// Number (from 1) of the block after which the transition happens.
     pub after: usize,
     pub description: String,
 }
 
 impl Direction {
-    /// Intention du bloc `index` (à partir de 1).
+    /// Intent of block `index` (from 1).
     pub fn intent(&self, index: usize) -> &str {
         self.blocks
             .iter()
@@ -62,7 +62,7 @@ impl Direction {
             .map_or("", |b| b.intent.as_str())
     }
 
-    /// Transition après le bloc `index`, s'il y en a une.
+    /// Transition after block `index`, if any.
     pub fn transition_after(&self, index: usize) -> Option<&str> {
         self.transitions
             .iter()
@@ -70,14 +70,14 @@ impl Direction {
             .map(|t| t.description.as_str())
     }
 
-    /// Direction commune, en texte, pour les animateurs.
+    /// Shared direction, as text, for the animators.
     pub fn art_direction(&self) -> String {
         let p = &self.palette;
         let t = &self.typography;
         format!(
-            "- Concept : {}\n- Palette : fond {}, encre {}, accent {}, secondaires {}\n\
-             - Typographie : affichage « {} », texte « {} ». {}\n- Mouvement : {}\n\
-             - Mise en page : {}\n- Motifs récurrents : {}",
+            "- Concept: {}\n- Palette: background {}, ink {}, accent {}, secondary {}\n\
+             - Typography: display “{}”, text “{}”. {}\n- Motion: {}\n\
+             - Layout: {}\n- Recurring motifs: {}",
             self.concept,
             p.background,
             p.ink,
@@ -93,7 +93,7 @@ impl Direction {
     }
 }
 
-/// Un bloc tel que le réalisateur le voit.
+/// A block as the director sees it.
 pub struct DirectorBlock {
     pub start: f64,
     pub end: f64,
@@ -120,7 +120,7 @@ pub fn director_request(input: &DirectorInput<'_>, model: &str, effort: Effort) 
         ],
     );
     let mut user = format!(
-        "Format : {}×{} px. {} blocs.{}\n\n## Blocs\n\n",
+        "Format: {}×{} px. {} blocks.{}\n\n## Blocks\n\n",
         input.width,
         input.height,
         input.blocks.len(),
@@ -138,12 +138,12 @@ pub fn director_request(input: &DirectorInput<'_>, model: &str, effort: Effort) 
         );
     }
     if let Some(script) = input.script {
-        let _ = write!(user, "\n## Script d'origine\n\n{script}\n");
+        let _ = write!(user, "\n## Original script\n\n{script}\n");
     }
     if let Some(style) = input.user_style {
         let _ = write!(
             user,
-            "\n## Style imposé (règles fixes, prioritaires)\n\n{style}\n"
+            "\n## Imposed style (fixed rules, take precedence)\n\n{style}\n"
         );
     }
     Request {
@@ -155,7 +155,7 @@ pub fn director_request(input: &DirectorInput<'_>, model: &str, effort: Effort) 
     }
 }
 
-/// Lit la direction dans la réponse du réalisateur.
+/// Reads the direction in the director's answer.
 pub fn parse_direction(reply: &str, block_count: usize) -> Result<Direction, AiError> {
     let json = last_fenced(reply, "json")
         .or_else(|| {
@@ -163,14 +163,14 @@ pub fn parse_direction(reply: &str, block_count: usize) -> Result<Direction, AiE
             let end = reply.rfind('}')?.checked_add(1)?;
             reply.get(start..end)
         })
-        .ok_or_else(|| AiError::Unexpected("pas de JSON dans la réponse du réalisateur".into()))?;
+        .ok_or_else(|| AiError::Unexpected("no JSON in the director's answer".into()))?;
     let direction: Direction = serde_json::from_str(json)?;
     let described = (1..=block_count)
         .filter(|i| !direction.intent(*i).trim().is_empty())
         .count();
     if described < block_count {
         tracing::warn!(
-            "le réalisateur a décrit {described} blocs sur {block_count}, les autres suivront la direction générale"
+            "the director described {described} blocks out of {block_count}, the others will follow the general direction"
         );
     }
     Ok(direction)

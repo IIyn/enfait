@@ -1,22 +1,22 @@
-//! Protocole MCP sur l'entrée et la sortie standard : JSON-RPC 2.0, un
-//! message par ligne. Seuls les outils sont proposés (`tools/list`,
-//! `tools/call`) ; les journaux vont sur la sortie d'erreur.
+//! MCP protocol over standard input and output: JSON-RPC 2.0, one message
+//! per line. Only tools are offered (`tools/list`, `tools/call`); logs go
+//! to standard error.
 
 use crate::tools::Tools;
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt as _, AsyncWrite, AsyncWriteExt as _};
 
-/// Versions du protocole comprises, de la plus récente à la plus ancienne.
+/// Understood protocol versions, from the most recent to the oldest.
 const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
-const INSTRUCTIONS: &str = "enfait est un logiciel local de montage vidéo avec motion design. \
-Ces outils travaillent sur la session ouverte : storyboard (blocs d'une voix off, ce qu'on y \
-voit, moments précis, transitions), bibliothèque (images, vidéos, sons, avec leur licence), \
-recherche libre de droits et finition sonore. Commence par `storyboard`. Les blocs se \
-désignent par leur numéro (1, 2…). La génération des animations se fait dans l'interface \
-d'enfait : `generer` lui dépose des demandes, elle doit être ouverte pour les traiter.";
+const INSTRUCTIONS: &str = "enfait is a local video editor with motion design. These tools \
+work on the open session: storyboard (blocks of a voice-over, what is seen, precise moments, \
+transitions), library (images, videos, sounds, with their licence), royalty-free search and \
+sound finish. Start with `storyboard`. Blocks are referred to by their number (1, 2…). \
+Animations are generated in the enfait app: `generate` drops requests for it, and it must be \
+open to process them.";
 
-/// Le serveur : l'état des outils et la boucle de messages.
+/// The server: the state of the tools and the message loop.
 pub struct Server {
     tools: Tools,
 }
@@ -26,7 +26,7 @@ impl Server {
         Self { tools }
     }
 
-    /// Lit les messages de `input` jusqu'à sa fin, répond sur `output`.
+    /// Reads the messages of `input` until its end, answers on `output`.
     pub async fn serve<R, W>(&mut self, input: R, mut output: W) -> std::io::Result<()>
     where
         R: AsyncBufRead + Unpin,
@@ -51,9 +51,9 @@ impl Server {
         Ok(())
     }
 
-    /// Répond à un message (`None` pour une notification).
+    /// Answers a message (`None` for a notification).
     pub async fn handle(&mut self, message: Value) -> Option<Value> {
-        // Un lot de messages (ancienne version du protocole).
+        // A batch of messages (former protocol version).
         if let Value::Array(batch) = message {
             let mut replies = Vec::new();
             for m in batch {
@@ -104,7 +104,7 @@ impl Server {
                     }),
                 )
             }
-            _ => error(id, -32601, &format!("méthode inconnue : {method}")),
+            _ => error(id, -32601, &format!("unknown method: {method}")),
         })
     }
 }

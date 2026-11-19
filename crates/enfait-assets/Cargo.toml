@@ -1,6 +1,6 @@
 [package]
 name = "enfait-assets"
-description = "Outils d'assets d'enfait : recherche libre de droits, téléchargement avec licence, détourage."
+description = "enfait's asset tools: royalty-free search, download with licence, cutout."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

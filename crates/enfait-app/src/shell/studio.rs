@@ -129,7 +129,9 @@ pub(super) fn provider_hint(
 ) -> Option<SharedString> {
     use enfait_config::{Secret, secrets};
     match choice {
-        ProviderChoice::Api if !secrets::is_set(Secret::Anthropic) => Some(tr!("studio.missing.api")),
+        ProviderChoice::Api if !secrets::is_set(Secret::Anthropic) => {
+            Some(tr!("studio.missing.api"))
+        }
         ProviderChoice::ClaudeCode if enfait_config::process::which("claude").is_none() => {
             Some(tr!("studio.missing.claude"))
         }
@@ -155,6 +157,7 @@ impl Shell {
                     .timer(Duration::from_millis(400))
                     .await;
                 let alive = this.update(cx, |shell, cx| {
+                    shell.poll_events(cx);
                     shell.poll_bridge(cx);
                     if shell.worker.take_changed() {
                         shell.poll_written(cx);
@@ -169,6 +172,70 @@ impl Shell {
             }
         })
         .detach();
+    }
+
+    /// Notifies the work the engine finished, when the window is in the
+    /// background or closed; a clicked notification brings it back.
+    fn poll_events(&mut self, cx: &mut Context<Self>) {
+        if crate::notify::take_open_request() {
+            cx.defer(crate::show_main_window);
+        }
+        let events = self.worker.take_events();
+        if events.is_empty()
+            || !crate::prefs::settings(cx).notifications
+            || cx.active_window().is_some()
+        {
+            return;
+        }
+        let title = self.title();
+        let jobs: Vec<&crate::worker::Event> = events
+            .iter()
+            .filter(|e| matches!(e, crate::worker::Event::Job { .. }))
+            .collect();
+        // Many blocks at once ("Generate all"): one summary.
+        if jobs.len() > 3 {
+            let failed = jobs
+                .iter()
+                .filter(|e| matches!(e, crate::worker::Event::Job { error: Some(_), .. }))
+                .count();
+            let body = if failed > 0 {
+                tr!(
+                    "notify.many_failed",
+                    done = jobs.len() - failed,
+                    failed = failed
+                )
+            } else {
+                tr!("notify.many", count = jobs.len())
+            };
+            crate::notify::send(title.clone(), body.to_string());
+        }
+        for event in &events {
+            let body = match event {
+                crate::worker::Event::Job { .. } if jobs.len() > 3 => continue,
+                crate::worker::Event::Job {
+                    number,
+                    transition,
+                    error,
+                } => match (transition, error) {
+                    (false, None) => tr!("notify.block_done", n = number),
+                    (true, None) => tr!("notify.transition_done", n = number),
+                    (false, Some(e)) => tr!("notify.block_failed", n = number, error = e),
+                    (true, Some(e)) => tr!("notify.transition_failed", n = number, error = e),
+                },
+                crate::worker::Event::Export(crate::worker::ExportState::Done {
+                    message, ..
+                }) => SharedString::from(message.clone()),
+                crate::worker::Event::Export(crate::worker::ExportState::Failed(e)) => {
+                    tr!("finish.export_failed", error = e)
+                }
+                crate::worker::Event::Export(_) => continue,
+                crate::worker::Event::Written { error: None } => tr!("notify.written"),
+                crate::worker::Event::Written { error: Some(e) } => {
+                    tr!("magic.board_failed", error = e)
+                }
+            };
+            crate::notify::send(title.clone(), body.to_string());
+        }
     }
 
     /// Copies the state of the project for the engine.
@@ -520,11 +587,14 @@ impl Shell {
             })
             .child({
                 let writing = writing.is_some();
-                chip("write-board", tr!("studio.write_board"), false, !writing).when(!writing, |d| {
-                    d.on_click(
-                        cx.listener(|shell, _: &ClickEvent, _, cx| shell.write_storyboard(cx)),
-                    )
-                })
+                chip("write-board", tr!("studio.write_board"), false, !writing).when(
+                    !writing,
+                    |d| {
+                        d.on_click(
+                            cx.listener(|shell, _: &ClickEvent, _, cx| shell.write_storyboard(cx)),
+                        )
+                    },
+                )
             })
             .child(
                 chip("generate-all", tr!("studio.generate_all"), false, true)
@@ -532,14 +602,14 @@ impl Shell {
             )
             .when(queued > 0, |d| {
                 d.child(
-                    chip("cancel-all", tr!("studio.cancel_queue"), false, true).on_click(cx.listener(
-                        |shell, _: &ClickEvent, _, cx| {
+                    chip("cancel-all", tr!("studio.cancel_queue"), false, true).on_click(
+                        cx.listener(|shell, _: &ClickEvent, _, cx| {
                             if let Ok(mut q) = shell.queue.lock() {
                                 q.cancel_queued(None);
                             }
                             cx.notify();
-                        },
-                    )),
+                        }),
+                    ),
                 )
             })
             .when_some(activity, |d, a| {
@@ -579,8 +649,14 @@ impl Shell {
             .items_center()
             .gap(px(4.))
             .ml(px(4.))
-            .child(chip("framing-fill", tr!("studio.framing.fill"), fill, true).on_click(set(Framing::Fill, pan)))
-            .child(chip("framing-fit", tr!("studio.framing.fit"), !fill, true).on_click(set(Framing::Fit, 0)))
+            .child(
+                chip("framing-fill", tr!("studio.framing.fill"), fill, true)
+                    .on_click(set(Framing::Fill, pan)),
+            )
+            .child(
+                chip("framing-fit", tr!("studio.framing.fit"), !fill, true)
+                    .on_click(set(Framing::Fit, 0)),
+            )
             .when(fill, |d| {
                 d.child(
                     chip("pan-left", "◀", false, pan > -PAN_LIMIT)
@@ -733,16 +809,14 @@ impl Shell {
                     }))
                 })
             });
-            section = section
-                .child(label(tr!("studio.label.versions")))
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap(px(4.))
-                        .children(chips)
-                        .child(chip("current", tr!("studio.current_version"), true, false)),
-                );
+            section = section.child(label(tr!("studio.label.versions"))).child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(4.))
+                    .children(chips)
+                    .child(chip("current", tr!("studio.current_version"), true, false)),
+            );
         }
         let start = block.range.start().as_secs_f64();
         let notes = self.retouches.iter().enumerate().map(|(i, (t, note))| {

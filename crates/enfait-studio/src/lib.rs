@@ -1,15 +1,15 @@
-//! Atelier d'animation : la chaîne commune au CLI et à l'interface.
+//! Animation studio: the pipeline shared by the CLI and the interface.
 //!
-//! - [`direct`] : passe « réalisateur » (direction artistique, intention de
-//!   chaque bloc), mise en cache ;
-//! - [`animate`] : une composition par bloc (création, corrections
-//!   techniques, critiques sur images rendues) ;
-//! - [`revise`] : retouches de l'utilisateur ancrées dans le temps ;
-//! - [`render_clip`] : rendu d'une composition en clip vidéo.
+//! - [`direct`]: "director" pass (art direction, intent of each block),
+//!   cached;
+//! - [`animate`]: one composition per block (creation, technical fixes,
+//!   critiques on rendered frames);
+//! - [`revise`]: the user's retouches anchored in time;
+//! - [`render_clip`]: rendering a composition into a video clip.
 //!
-//! Tout est écrit dans le dossier de travail d'un [`Studio`] : `comps/`
-//! (compositions prêtes au rendu), `sources/` (compositions brutes),
-//! `checks/` (images de vérification), `logs/`, `frames/`.
+//! Everything is written in the working folder of a [`Studio`]: `comps/`
+//! (compositions ready to render), `sources/` (raw compositions),
+//! `checks/` (check frames), `logs/`, `frames/`.
 
 pub mod broll;
 pub mod export;
@@ -35,15 +35,15 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-/// Durée d'une transition travaillée, en secondes.
+/// Duration of a crafted transition, in seconds.
 pub const TRANSITION_LENGTH: f64 = 1.0;
 
-/// Dimensions des images d'un média, s'il en a (ffprobe).
+/// Frame size of a media, if it has pictures (ffprobe).
 pub fn probe_video(path: &Path) -> Option<(u32, u32)> {
     let video = enfait_media::probe::probe(path).ok()?.video?;
     Some((video.width, video.height))
 }
-/// Corrections techniques tentées avant d'abandonner une version.
+/// Technical fixes tried before giving up on a version.
 const MAX_FIXES: usize = 2;
 
 pub struct Studio<'a> {
@@ -55,21 +55,21 @@ pub struct Studio<'a> {
     pub width: u32,
     pub height: u32,
     pub fps: f64,
-    /// Jetons consommés, partagés entre tous les blocs (et tous les cas d'une évaluation).
+    /// Tokens used, shared by all the blocks (and all the cases of an evaluation).
     pub usage: &'a Mutex<Usage>,
-    /// Images de la prise pour une scène mixte ou à effet : dossier
-    /// (`000000.jpg`, …, une par image à `fps`) et nombre d'images.
+    /// Frames of the take for a mixed or effect scene: folder (`000000.jpg`,
+    /// …, one per frame at `fps`) and number of frames.
     pub scene_frames: Option<(PathBuf, usize)>,
-    /// La personne détourée sur ces mêmes images (`000000.png`, …) : passée
-    /// en second plan (`to`) d'une scène mixte avec détourage.
+    /// The cut-out person on those same frames (`000000.png`, …): passed as the
+    /// second layer (`to`) of a mixed scene with cutout.
     pub scene_cutouts: Option<PathBuf>,
 }
 
 impl Studio<'_> {
-    /// Image de la prise à l'instant `t` de la scène (la dernière au-delà).
+    /// Frame of the take at time `t` of the scene (the last one beyond).
     fn scene_at(&self, t: f64) -> Option<(PathBuf, PathBuf)> {
         let (dir, count) = self.scene_frames.as_ref()?;
-        // Instant positif et borné par la scène.
+        // Positive time bounded by the scene.
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let index = ((t.max(0.0) * self.fps).floor() as usize).min(count.saturating_sub(1));
         let path = dir.join(enfait_motion::frame_name(index));
@@ -80,7 +80,7 @@ impl Studio<'_> {
         Some((path, second))
     }
 
-    /// Images de la prise pour une suite d'instants.
+    /// Frames of the take for a sequence of times.
     fn scenes_for(&self, times: &[f64]) -> Option<Vec<(PathBuf, PathBuf)>> {
         self.scene_frames.as_ref()?;
         times.iter().map(|t| self.scene_at(*t)).collect()
@@ -99,30 +99,30 @@ impl Studio<'_> {
     }
 }
 
-/// Nom de l'image détourée `index` d'une prise.
+/// Name of the cut-out frame `index` of a take.
 pub fn cutout_name(index: usize) -> String {
     format!("{index:06}.png")
 }
 
-/// Bilan des jetons consommés.
+/// Summary of the tokens used.
 pub fn log_usage(usage: &Mutex<Usage>) {
     let usage = usage.lock().map(|u| *u).unwrap_or_default();
     tracing::info!(
-        "jetons : {} en entrée (dont {} lus en cache), {} en sortie{}",
+        "tokens: {} in ({} read from cache), {} out{}",
         usage
             .input_tokens
             .saturating_add(usage.cache_read_input_tokens),
         usage.cache_read_input_tokens,
         usage.output_tokens,
         if usage.cost_usd > 0.0 {
-            format!(", coût annoncé {:.2} $", usage.cost_usd)
+            format!(", reported cost ${:.2}", usage.cost_usd)
         } else {
             String::new()
         }
     );
 }
 
-/// Polices disponibles, une ligne par famille.
+/// Available fonts, one line per family.
 pub fn fonts_list() -> String {
     let mut out = String::new();
     for family in library::font_families() {
@@ -181,8 +181,8 @@ pub async fn direct(
         max_transitions,
     };
     let request = director_request(&input, "claude-opus-5-5", Effort::High);
-    // La consigne système entre dans la signature : modifier le prompt du
-    // réalisateur invalide la direction en cache.
+    // The system instruction is part of the signature: changing the
+    // director's prompt invalidates the cached direction.
     let signature = std::iter::once(format!(
         "<!-- consigne {} -->\n",
         blake3::hash(request.system.as_bytes()).to_hex()
@@ -202,11 +202,11 @@ pub async fn direct(
         tracing::info!("direction reprise de {}", cached.display());
         return Ok(serde_json::from_slice(&data)?);
     }
-    tracing::info!("passe réalisateur…");
+    tracing::info!("director pass…");
     let mut last_error = None;
     for _ in 0..2 {
         let reply = provider.complete(&request).await?;
-        // Les concepts écartés et les références, utiles pour comprendre le choix.
+        // The discarded concepts and the references, useful to understand the choice.
         tokio::fs::write(work.join("direction.notes.md"), &reply.text).await?;
         match parse_direction(&reply.text, blocks.len()) {
             Ok(direction) => {
@@ -216,15 +216,15 @@ pub async fn direct(
                 return Ok(direction);
             }
             Err(e) => {
-                tracing::warn!("réponse du réalisateur illisible : {e}");
+                tracing::warn!("unreadable director answer: {e}");
                 last_error = Some(e);
             }
         }
     }
-    Err(last_error.map_or_else(|| anyhow::anyhow!("direction impossible"), Into::into))
+    Err(last_error.map_or_else(|| anyhow::anyhow!("no direction"), Into::into))
 }
 
-/// Instants d'échantillonnage pour la vérification et la critique.
+/// Sampling times for the check and the critique.
 pub fn sample_times(duration: f64, fps: f64) -> Vec<f64> {
     let last = (duration - 1.0 / fps).max(0.0);
     let mut times = vec![0.1_f64.min(last)];
@@ -241,7 +241,7 @@ struct Checked {
 }
 
 impl Studio<'_> {
-    /// Écrit `html` (préparé) dans `comps/<name>.html` et la vérifie.
+    /// Writes `html` (prepared) to `comps/<name>.html` and checks it.
     async fn check(&self, name: &str, round: &str, html: &str, duration: f64) -> Result<Report> {
         let path = self.comps().join(format!("{name}.html"));
         tokio::fs::write(&path, composition::prepare(html)).await?;
@@ -258,8 +258,8 @@ impl Studio<'_> {
         Ok(job.run(&*self.renderers.acquire().await?).await?)
     }
 
-    /// Demande des corrections tant que la vérification bloque. `strict` :
-    /// juger aussi l'image (durée, image vide), pas seulement la technique.
+    /// Asks for fixes as long as the check blocks. `strict`: also judge the
+    /// picture (duration, empty frame), not only the technique.
     #[allow(clippy::too_many_arguments)]
     async fn fix_until_clean(
         &self,
@@ -291,7 +291,7 @@ impl Studio<'_> {
                 .ask(&self.animator.fix(brief, &html, &problems))
                 .await?;
             let Some(fixed) = composition::extract_html(&reply) else {
-                let _ = writeln!(log, "(réponse sans HTML)");
+                let _ = writeln!(log, "(answer without HTML)");
                 continue;
             };
             html = fixed;
@@ -303,13 +303,13 @@ impl Studio<'_> {
     }
 }
 
-/// Anime le bloc `brief.index` (fichiers `b01`, `b02`…).
+/// Animates block `brief.index` (files `b01`, `b02`…).
 pub async fn animate_block(ctx: &Studio<'_>, brief: &SceneBrief, redo: bool) -> Result<()> {
     animate(ctx, &format!("b{:02}", brief.index), brief, redo).await
 }
 
-/// Crée la composition `name` (création, corrections techniques, critiques
-/// sur images rendues), ou reprend `sources/<name>.html` sauf si `redo`.
+/// Creates composition `name` (creation, technical fixes, critiques on
+/// rendered frames), or takes `sources/<name>.html` again unless `redo`.
 pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: bool) -> Result<()> {
     let name = name.to_owned();
     let sources = ctx.work.join("sources");
@@ -326,10 +326,10 @@ pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: boo
     }
     let text = brief.render();
     let mut log = format!("# {name}\n\n{text}\n");
-    tracing::info!("{name} : création…");
+    tracing::info!("{name}: creating…");
     let reply = ctx.ask(&ctx.animator.create(&text)).await?;
     let html = composition::extract_html(&reply)
-        .with_context(|| format!("{name} : la réponse ne contient pas de HTML"))?;
+        .with_context(|| format!("{name}: the answer contains no HTML"))?;
     let report = ctx.check(&name, "r0", &html, brief.duration).await?;
     let mut best = ctx
         .fix_until_clean(
@@ -355,8 +355,8 @@ pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: boo
             .iter()
             .map(|s| (s.t, s.path.clone()))
             .collect();
-        // Une critique qui échoue (quota atteint, réseau) n'annule pas la
-        // version déjà valide : on la garde.
+        // A failing critique (quota reached, network) does not cancel the
+        // already valid version: it is kept.
         let reply = match ctx
             .ask(
                 &ctx.animator
@@ -366,10 +366,8 @@ pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: boo
         {
             Ok(reply) => reply,
             Err(e) => {
-                tracing::warn!(
-                    "{name} : critique {round} impossible ({e:#}), version actuelle gardée"
-                );
-                let _ = writeln!(log, "\n(critique {round} impossible : {e:#})");
+                tracing::warn!("{name}: critique {round} failed ({e:#}), current version kept");
+                let _ = writeln!(log, "\n(critique {round} failed: {e:#})");
                 break;
             }
         };
@@ -381,7 +379,7 @@ pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: boo
             .to_owned();
         let _ = writeln!(log, "\n## Critique {round}\n\n{notes}");
         if parse_verdict(&reply) == Verdict::Keep {
-            tracing::info!("{name} : gardée à la critique {round}");
+            tracing::info!("{name}: kept at critique {round}");
             break;
         }
         let Some(candidate) = composition::extract_html(&reply) else {
@@ -406,21 +404,21 @@ pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: boo
         {
             Ok(checked) => checked,
             Err(e) => {
-                tracing::warn!("{name} : correction impossible ({e:#}), version précédente gardée");
+                tracing::warn!("{name}: fix failed ({e:#}), previous version kept");
                 break;
             }
         };
         if checked.report.blocking().is_empty() {
             best = checked;
         } else {
-            let _ = writeln!(log, "\n(nouvelle version abandonnée : erreurs techniques)");
+            let _ = writeln!(log, "\n(new version dropped: technical errors)");
             break;
         }
     }
 
     let remaining = best.report.blocking();
     if !remaining.is_empty() {
-        tracing::warn!("{name} : problèmes restants : {}", remaining.join(" ; "));
+        tracing::warn!("{name}: remaining problems: {}", remaining.join("; "));
     }
     tokio::fs::write(
         ctx.comps().join(format!("{name}.html")),
@@ -431,7 +429,7 @@ pub async fn animate(ctx: &Studio<'_>, name: &str, brief: &SceneBrief, redo: boo
     let logs = ctx.work.join("logs");
     tokio::fs::create_dir_all(&logs).await?;
     tokio::fs::write(logs.join(format!("{name}.md")), log).await?;
-    tracing::info!("{name} : prête");
+    tracing::info!("{name}: ready");
     Ok(())
 }
 
@@ -469,9 +467,9 @@ pub async fn animate_transition(
     tracing::info!("{name} : transition…");
     let reply = ctx.ask(&ctx.animator.transition(&brief)).await?;
     let html = composition::extract_html(&reply)
-        .with_context(|| format!("{name} : la réponse ne contient pas de HTML"))?;
-    // La durée réelle dépend de l'arrondi aux images : on vérifie le contrat
-    // et les erreurs, pas la durée exacte.
+        .with_context(|| format!("{name}: the answer contains no HTML"))?;
+    // The real duration depends on rounding to frames: check the contract
+    // and the errors, not the exact duration.
     let report = ctx.check(&name, "r0", &html, TRANSITION_LENGTH).await?;
     let mut log = String::new();
     let checked = ctx
@@ -492,13 +490,13 @@ pub async fn animate_transition(
     )
     .await?;
     tokio::fs::write(&source, &checked.html).await?;
-    tracing::info!("{name} : prête");
+    tracing::info!("{name}: ready");
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-/// Brief d'un animateur pour le bloc `i` : texte, mots datés, direction,
-/// voisins et transitions.
+/// Brief of an animator for block `i`: text, dated words, direction,
+/// neighbours and transitions.
 pub fn brief(
     i: usize,
     ranges: &[TimeRange],
@@ -516,7 +514,7 @@ pub fn brief(
     let neighbour = |j: usize| -> Option<String> {
         let text = texts.get(j)?;
         Some(format!(
-            "Voix : « {text} »\nIntention : {}",
+            "Voice: “{text}”\nIntent: {}",
             direction.intent(j.saturating_add(1))
         ))
     };
@@ -528,13 +526,13 @@ pub fn brief(
     ) {
         let _ = write!(
             p,
-            "\nTransition vers ta scène : {t} (gérée à part, commence ta scène normalement)."
+            "\nTransition into your scene: {t} (handled separately, start your scene normally)."
         );
     }
     if let (Some(n), Some(t)) = (next.as_mut(), direction.transition_after(index)) {
         let _ = write!(
             n,
-            "\nTransition depuis ta scène : {t} (gérée à part, termine ta scène posée)."
+            "\nTransition out of your scene: {t} (handled separately, end your scene settled)."
         );
     }
     SceneBrief {
@@ -566,9 +564,9 @@ pub fn brief(
     }
 }
 
-/// Retouche la composition `name` selon les remarques de l'utilisateur
-/// (instant en s depuis le début de la scène, remarque), puis la vérifie et
-/// corrige si besoin. La version précédente reste dans `sources/` sous
+/// Retouches composition `name` following the user's remarks (time in s
+/// from the start of the scene, remark), then checks and fixes it if
+/// needed. The previous version stays in `sources/` as
 /// `<name>.<n>.html`.
 pub async fn revise(
     ctx: &Studio<'_>,
@@ -580,15 +578,15 @@ pub async fn revise(
     let source = sources.join(format!("{name}.html"));
     let html = tokio::fs::read_to_string(&source)
         .await
-        .with_context(|| format!("{name} : pas de composition à retoucher"))?;
-    // Garder la version précédente.
+        .with_context(|| format!("{name}: no composition to retouch"))?;
+    // Keep the previous version.
     let n = archive(&ctx.work, name).await?;
 
     let text = brief.render();
     tracing::info!("{name} : retouche…");
     let reply = ctx.ask(&ctx.animator.revise(&text, &html, notes)).await?;
     let revised = composition::extract_html(&reply)
-        .with_context(|| format!("{name} : la retouche ne contient pas de HTML"))?;
+        .with_context(|| format!("{name}: the retouch contains no HTML"))?;
     let round = format!("v{n}");
     let report = ctx.check(name, &round, &revised, brief.duration).await?;
     let mut log = String::new();
@@ -606,7 +604,7 @@ pub async fn revise(
         .await?;
     let remaining = checked.report.blocking();
     if !remaining.is_empty() {
-        tracing::warn!("{name} : problèmes restants : {}", remaining.join(" ; "));
+        tracing::warn!("{name}: remaining problems: {}", remaining.join("; "));
     }
     tokio::fs::write(
         ctx.comps().join(format!("{name}.html")),
@@ -616,22 +614,22 @@ pub async fn revise(
     tokio::fs::write(&source, &checked.html).await?;
     let logs = ctx.work.join("logs");
     tokio::fs::create_dir_all(&logs).await?;
-    let mut entry = format!("\n## Retouche {n}\n\n");
+    let mut entry = format!("\n## Retouch {n}\n\n");
     for (t, note) in notes {
-        let _ = writeln!(entry, "- à {t:.2} s : {note}");
+        let _ = writeln!(entry, "- at {t:.2} s: {note}");
     }
     entry.push_str(&log);
     let path = logs.join(format!("{name}.md"));
     let old = tokio::fs::read_to_string(&path).await.unwrap_or_default();
     tokio::fs::write(&path, old + &entry).await?;
-    tracing::info!("{name} : retouche prête");
+    tracing::info!("{name}: retouch ready");
     Ok(())
 }
 
-/// Rend `comps/<name>.html` sur `duration` secondes en un clip H.264 muet
-/// (`out`), à la cadence et aux dimensions du studio.
+/// Renders `comps/<name>.html` over `duration` seconds into a silent H.264
+/// clip (`out`), at the frame rate and size of the studio.
 pub async fn render_clip(ctx: &Studio<'_>, name: &str, duration: f64, out: &Path) -> Result<()> {
-    // Nombre d'images de la scène : positif et borné.
+    // Number of frames of the scene: positive and bounded.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let count = (duration * ctx.fps).round().max(1.0) as usize;
     #[allow(clippy::cast_precision_loss)]
@@ -643,7 +641,7 @@ pub async fn render_clip(ctx: &Studio<'_>, name: &str, duration: f64, out: &Path
         height: ctx.height,
         scenes: ctx.scenes_for(&times),
         times,
-        // Les images de la prise font partie du rendu.
+        // The frames of the take are part of the render.
         extra_key: ctx
             .scene_frames
             .as_ref()
@@ -665,9 +663,9 @@ pub async fn render_clip(ctx: &Studio<'_>, name: &str, duration: f64, out: &Path
     encode_frames(&frames, ctx.fps, count, out).await
 }
 
-/// Extrait les images de la prise pour une scène : `pieces` (début, fin en
-/// secondes dans la prise) bout à bout, à `fps`, cadrées en `size` (image
-/// entière), dans `out` (`000000.jpg`…). Renvoie le nombre d'images.
+/// Extracts the frames of the take for a scene: `pieces` (start, end in
+/// seconds in the take) end to end, at `fps`, framed in `size` (whole
+/// picture), into `out` (`000000.jpg`…). Returns the number of frames.
 pub async fn extract_frames(
     rush: &Path,
     pieces: &[(f64, f64)],
@@ -679,7 +677,7 @@ pub async fn extract_frames(
     extract_frames_framed(rush, pieces, fps, &fit, out).await
 }
 
-/// Comme [`extract_frames`], avec la mise au cadre `framing` (voir
+/// Like [`extract_frames`], with the framing `framing` (see
 /// [`enfait_media::fx::framing`]).
 pub async fn extract_frames_framed(
     rush: &Path,
@@ -717,10 +715,10 @@ pub async fn extract_frames_framed(
             .arg(tmp.join("%06d.jpg"))
             .output()
             .await
-            .context("lancement de ffmpeg")?;
+            .context("starting ffmpeg")?;
         anyhow::ensure!(
             output.status.success(),
-            "images de la prise : {}",
+            "frames of the take: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
         let mut k = 0_usize;
@@ -735,12 +733,12 @@ pub async fn extract_frames_framed(
         }
         let _ = tokio::fs::remove_dir_all(&tmp).await;
     }
-    anyhow::ensure!(count > 0, "aucune image extraite de la prise");
+    anyhow::ensure!(count > 0, "no frame extracted from the take");
     Ok(count)
 }
 
-/// Versions précédentes de `name` gardées par [`revise`] et [`restore`]
-/// (`sources/<name>.<n>.html`), dans l'ordre.
+/// Previous versions of `name` kept by [`revise`] and [`restore`]
+/// (`sources/<name>.<n>.html`), in order.
 pub fn versions(work: &Path, name: &str) -> Vec<u32> {
     let sources = work.join("sources");
     let mut found: Vec<u32> = std::fs::read_dir(&sources)
@@ -759,7 +757,7 @@ pub fn versions(work: &Path, name: &str) -> Vec<u32> {
     found
 }
 
-/// Garde la composition actuelle comme nouvelle version ; renvoie son numéro.
+/// Keeps the current composition as a new version; returns its number.
 async fn archive(work: &Path, name: &str) -> Result<u32> {
     let sources = work.join("sources");
     let n = versions(work, name)
@@ -773,13 +771,13 @@ async fn archive(work: &Path, name: &str) -> Result<u32> {
     Ok(n)
 }
 
-/// Revient à la version `version` de `name` (la version actuelle est gardée
-/// à son tour). Pas d'appel aux modèles.
+/// Goes back to version `version` of `name` (the current version is kept
+/// in turn). No model call.
 pub async fn restore(ctx: &Studio<'_>, name: &str, version: u32) -> Result<()> {
     let sources = ctx.work.join("sources");
     let html = tokio::fs::read_to_string(sources.join(format!("{name}.{version}.html")))
         .await
-        .with_context(|| format!("{name} : version {version} introuvable"))?;
+        .with_context(|| format!("{name}: version {version} not found"))?;
     archive(&ctx.work, name).await?;
     tokio::fs::write(sources.join(format!("{name}.html")), &html).await?;
     tokio::fs::write(
@@ -790,8 +788,8 @@ pub async fn restore(ctx: &Studio<'_>, name: &str, version: u32) -> Result<()> {
     Ok(())
 }
 
-/// Crée (ou reprend sauf `redo`) la transition `name` et la rend en clip :
-/// `scenes` donne, pour chaque image, les deux plans reliés.
+/// Creates (or takes again unless `redo`) transition `name` and renders it
+/// into a clip: `scenes` gives, for each frame, the two connected shots.
 pub async fn transition_clip(
     ctx: &Studio<'_>,
     name: &str,
@@ -808,12 +806,12 @@ pub async fn transition_clip(
         _ => {
             let reply = ctx.ask(&ctx.animator.transition(brief)).await?;
             let html = composition::extract_html(&reply)
-                .with_context(|| format!("{name} : la réponse ne contient pas de HTML"))?;
+                .with_context(|| format!("{name}: the answer contains no HTML"))?;
             let path = ctx.comps().join(format!("{name}.html"));
             tokio::fs::write(&path, composition::prepare(&html)).await?;
             let times = sample_times(brief.duration, ctx.fps);
             let pick = |t: f64| {
-                // Instant positif et borné par la transition.
+                // Positive time bounded by the transition.
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let i = ((t * ctx.fps).floor() as usize).min(scenes.len().saturating_sub(1));
                 scenes.get(i).cloned()
@@ -871,7 +869,7 @@ pub async fn transition_clip(
     encode_frames(&frames, ctx.fps, scenes.len(), out).await
 }
 
-/// Encode `count` images JPEG de `frames` en clip H.264 muet.
+/// Encodes `count` JPEG frames of `frames` into a silent H.264 clip.
 async fn encode_frames(frames: &Path, fps: f64, count: usize, out: &Path) -> Result<()> {
     if let Some(dir) = out.parent() {
         tokio::fs::create_dir_all(dir).await?;
@@ -887,7 +885,7 @@ async fn encode_frames(frames: &Path, fps: f64, count: usize, out: &Path) -> Res
         .arg(out)
         .output()
         .await
-        .context("lancement de ffmpeg")?;
+        .context("starting ffmpeg")?;
     anyhow::ensure!(
         output.status.success(),
         "ffmpeg : {}",

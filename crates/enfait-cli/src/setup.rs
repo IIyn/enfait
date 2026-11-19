@@ -1,4 +1,4 @@
-//! `enfait-cli setup` : installe ce qui n'est pas dans le binaire.
+//! `enfait-cli setup`: installs what is not in the binary.
 
 use crate::paths::{Dirs, WHISPER_URL, find_in_path};
 use anyhow::{Context as _, Result};
@@ -9,7 +9,7 @@ use tokio::io::AsyncWriteExt as _;
 pub async fn run(dirs: &Dirs) -> Result<()> {
     if find_in_path("ffmpeg").is_none() {
         anyhow::bail!(
-            "ffmpeg est introuvable dans le PATH : installe-le avec ton gestionnaire de paquets"
+            "ffmpeg not found in the PATH: install it with your package manager (brew, winget, apt…)"
         );
     }
     tracing::info!("ffmpeg : ok");
@@ -19,7 +19,7 @@ pub async fn run(dirs: &Dirs) -> Result<()> {
 
     let model = dirs.whisper_model();
     if model.is_file() {
-        tracing::info!("modèle whisper : {}", model.display());
+        tracing::info!("whisper model: {}", model.display());
     } else {
         download(WHISPER_URL, &model).await?;
     }
@@ -27,21 +27,21 @@ pub async fn run(dirs: &Dirs) -> Result<()> {
     match find_in_path("claude") {
         Some(path) => tracing::info!("Claude Code : {}", path.display()),
         None if enfait_config::secrets::is_set(enfait_config::Secret::Anthropic) => {
-            tracing::info!("API Anthropic : clé trouvée");
+            tracing::info!("Anthropic API: key found");
         }
         None => tracing::warn!(
-            "ni Claude Code ni ANTHROPIC_API_KEY : `make` ne pourra pas appeler de modèle"
+            "neither Claude Code nor an Anthropic key: `make` will not be able to call a model"
         ),
     }
     Ok(())
 }
 
-/// Téléchargement en flux vers un fichier `.part`, renommé à la fin.
+/// Streamed download into a `.part` file, renamed at the end.
 pub async fn download(url: &str, dest: &Path) -> Result<()> {
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
-    tracing::info!("téléchargement de {url}");
+    tracing::info!("downloading {url}");
     let response = reqwest::Client::builder()
         .user_agent(concat!("enfait/", env!("CARGO_PKG_VERSION")))
         .build()?

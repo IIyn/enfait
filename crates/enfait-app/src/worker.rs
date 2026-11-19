@@ -9,7 +9,6 @@
 
 use crate::jobs::{Job, JobKind, JobQueue, JobStatus};
 use anyhow::{Context as _, Result};
-use rust_i18n::t;
 use enfait_ai::animate::{AnimatorConfig, SceneLayer, TransitionBrief, animator_system};
 use enfait_ai::direction::{BlockIntent, Direction};
 use enfait_ai::{Provider, ProviderChoice, Usage};
@@ -20,6 +19,7 @@ use enfait_core::{
 use enfait_motion::{Gpu, RendererPool, composition, frame_name, library};
 use enfait_studio::Studio;
 use enfait_studio::preview::{Output, assemble, pieces, preview_size};
+use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -71,6 +71,30 @@ struct Shared {
     /// Storyboard to write (editor pass), not started yet.
     write_request: Mutex<Option<WriteRequest>>,
     write_state: Mutex<WriteState>,
+    /// Finished work, for notifications.
+    events: Mutex<Vec<Event>>,
+}
+
+/// Something the engine finished, worth a notification.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    /// A block's animation (or the transition after it) is done or failed.
+    Job {
+        /// Number of the block, from 1 (0 if it no longer exists).
+        number: usize,
+        transition: bool,
+        error: Option<String>,
+    },
+    Export(ExportState),
+    Written {
+        error: Option<String>,
+    },
+}
+
+fn push_event(shared: &Shared, event: Event) {
+    if let Ok(mut events) = shared.events.lock() {
+        events.push(event);
+    }
 }
 
 /// "Write the storyboard": the editor pass, then the search for the shots
@@ -200,6 +224,7 @@ impl Worker {
             export_state: Mutex::new(ExportState::Idle),
             write_request: Mutex::new(None),
             write_state: Mutex::new(WriteState::Idle),
+            events: Mutex::new(Vec::new()),
         });
         let thread = {
             let shared = Arc::clone(&shared);
@@ -311,6 +336,15 @@ impl Worker {
         }
     }
 
+    /// Work finished since the last call.
+    pub fn take_events(&self) -> Vec<Event> {
+        self.shared
+            .events
+            .lock()
+            .map(|mut e| std::mem::take(&mut *e))
+            .unwrap_or_default()
+    }
+
     pub fn activity(&self) -> Option<String> {
         let activity = self.shared.activity.lock().ok()?;
         (!activity.is_empty()).then(|| activity.values().cloned().collect::<Vec<_>>().join(" · "))
@@ -335,12 +369,15 @@ fn wake(shared: &Shared) {
     condvar.notify_one();
 }
 
+/// A provider choice and the configuration generation it was built with.
+type ProviderKey = (ProviderChoice, u64);
+
 /// Resources shared by the jobs, created when first needed.
 struct Engine {
     dir: PathBuf,
     /// Model provider and the choice that created it.
     /// The choice and the configuration generation it was built with.
-    provider: tokio::sync::Mutex<Option<((ProviderChoice, u64), Arc<Provider>)>>,
+    provider: tokio::sync::Mutex<Option<(ProviderKey, Arc<Provider>)>>,
     renderers: tokio::sync::OnceCell<RendererPool>,
     usage: Mutex<Usage>,
     /// A single "director" pass at a time.
@@ -393,14 +430,32 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                 Arc::clone(&running),
             );
             runtime.spawn(async move {
+                let number = snapshot.as_ref().map_or(0, |s| {
+                    s.project
+                        .blocks()
+                        .iter()
+                        .position(|b| b.id == job.block)
+                        .map_or(0, |i| i.saturating_add(1))
+                });
                 let result = match snapshot {
                     Some(snapshot) => run_job(&engine, &shared, &job, &snapshot).await,
-                    None => Err(anyhow::anyhow!("storyboard indisponible")),
+                    None => Err(anyhow::anyhow!("storyboard unavailable")),
                 };
+                // Going back to a version is instant: nothing to announce.
+                if !matches!(job.kind, JobKind::Restore { .. }) {
+                    push_event(
+                        &shared,
+                        Event::Job {
+                            number,
+                            transition: job.kind == JobKind::Transition,
+                            error: result.as_ref().err().map(|e| format!("{e:#}")),
+                        },
+                    );
+                }
                 let status = match result {
                     Ok(()) => JobStatus::Done,
                     Err(e) => {
-                        tracing::warn!("job {} : {e:#}", job.id);
+                        tracing::warn!("job {}: {e:#}", job.id);
                         JobStatus::Failed(format!("{e:#}"))
                     }
                 };
@@ -422,8 +477,9 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
             runtime.spawn(async move {
                 let state = match snapshot {
                     Some(snapshot) => run_export(&dir, &shared, &snapshot, &request).await,
-                    None => ExportState::Failed("storyboard indisponible".into()),
+                    None => ExportState::Failed("storyboard unavailable".into()),
                 };
+                push_event(&shared, Event::Export(state.clone()));
                 if let Ok(mut s) = shared.export_state.lock() {
                     *s = state;
                 }
@@ -444,13 +500,22 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                                 gathered,
                             })),
                             Err(e) => {
-                                tracing::warn!("storyboard : {e:#}");
+                                tracing::warn!("storyboard: {e:#}");
                                 WriteState::Failed(format!("{e:#}"))
                             }
                         }
                     }
-                    None => WriteState::Failed("storyboard indisponible".into()),
+                    None => WriteState::Failed("storyboard unavailable".into()),
                 };
+                push_event(
+                    &shared,
+                    Event::Written {
+                        error: match &state {
+                            WriteState::Failed(e) => Some(e.clone()),
+                            _ => None,
+                        },
+                    },
+                );
                 if let Ok(mut s) = shared.write_state.lock() {
                     *s = state;
                 }
@@ -873,7 +938,9 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
         .iter()
         .position(|b| b.id == job.block)
         .with_context(|| t!("worker.block_gone").into_owned())?;
-    let block = blocks.get(index).with_context(|| t!("worker.block_missing").into_owned())?;
+    let block = blocks
+        .get(index)
+        .with_context(|| t!("worker.block_missing").into_owned())?;
     let number = index.saturating_add(1);
     let what = if job.kind == JobKind::Transition {
         t!(
@@ -1015,10 +1082,7 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
     };
     let name = block_name(block.id, snap.project.settings());
     if brief.layer.is_some() {
-        anyhow::ensure!(
-            snap.rush_has_video,
-            t!("worker.needs_video").into_owned()
-        );
+        anyhow::ensure!(snap.rush_has_video, t!("worker.needs_video").into_owned());
         say(&t!("worker.rush_frames"));
         let pieces = source_pieces(&snap.parts, start, block.range.end().as_secs_f64());
         let dir = engine.dir.join("rush-frames").join(&name);
@@ -1071,10 +1135,7 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
             if let Err(e) =
                 render_transition(engine, snap, &studio, &direction, before, false).await
             {
-                tracing::warn!(
-                    "transition after block {}: {e:#}",
-                    before.saturating_add(1)
-                );
+                tracing::warn!("transition after block {}: {e:#}", before.saturating_add(1));
             }
         }
     }
@@ -1091,7 +1152,7 @@ async fn cut_person(
 ) -> Result<()> {
     use enfait_assets::cutout::{Cutter, Model, cut_frames, ensure_model};
     say(&t!("worker.cutout_model"));
-    let models = cache_dir().join("models").join("detourage");
+    let models = enfait_config::paths::cutout_models_dir();
     tokio::fs::create_dir_all(&models).await?;
     let model = ensure_model(&models, Model::Fast).await?;
     if tokio::fs::try_exists(out).await.unwrap_or(false) {
@@ -1130,7 +1191,9 @@ async fn render_transition(
     redo: bool,
 ) -> Result<()> {
     let blocks = snap.project.blocks();
-    let block = blocks.get(index).with_context(|| t!("worker.block_missing").into_owned())?;
+    let block = blocks
+        .get(index)
+        .with_context(|| t!("worker.block_missing").into_owned())?;
     let next = blocks
         .get(index.saturating_add(1))
         .with_context(|| t!("worker.no_next").into_owned())?;

@@ -1,5 +1,5 @@
-//! Plans de b-roll rendus par le vrai ffmpeg : vidéo trop courte reprise au
-//! début, image fixe avec zoom, au format du projet.
+//! B-roll shots rendered by the real ffmpeg: video too short looped, still
+//! image with a zoom, in the project format.
 
 #![allow(clippy::unwrap_used)]
 
@@ -31,7 +31,7 @@ async fn video_and_still() {
         .unwrap();
     assert!(ok.success());
     let out = dir.path().join("plan.mp4");
-    // 3 s à partir de 1,5 s d'une vidéo de 2 s : reprise au début.
+    // 3 s from 1.5 s of a 2 s video: loops to the start.
     render(&video, AssetKind::Video, 1.5, 3.0, (1920, 1080), 30.0, &out)
         .await
         .unwrap();

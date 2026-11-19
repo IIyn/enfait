@@ -1,5 +1,5 @@
-//! `enfait-cli export` : la vidéo finale (MP4) ou le montage pour Premiere
-//! Pro (XML FCP7) à partir de la session de l'interface.
+//! `enfait-cli export`: the final video (MP4) or the edit for Premiere Pro
+//! (FCP7 XML) from the app's session.
 
 use anyhow::Result;
 use enfait_studio::export::{ExportOptions, TARGET_LUFS};
@@ -9,23 +9,22 @@ use std::path::PathBuf;
 
 #[derive(Debug, clap::Args)]
 pub struct ExportArgs {
-    /// Vidéo à écrire (MP4).
+    /// Video to write (MP4).
     #[arg(short, long)]
     pub output: Option<PathBuf>,
-    /// Montage Premiere à écrire (XML FCP7) ; les médias sont copiés à côté.
+    /// Premiere edit to write (FCP7 XML); the media are copied next to it.
     #[arg(long)]
     pub premiere: Option<PathBuf>,
-    /// Sans les effets sonores.
+    /// Without the sound effects.
     #[arg(long)]
-    pub sans_sfx: bool,
-    /// Loudness visée, en LUFS.
+    pub no_sfx: bool,
+    /// Target loudness, in LUFS.
     #[arg(long, default_value_t = TARGET_LUFS, allow_negative_numbers = true)]
     pub lufs: f64,
-    /// Son laissé tel qu'il est mixé (pas de normalisation).
+    /// Sound left as mixed (no normalisation).
     #[arg(long)]
-    pub sans_normalisation: bool,
-    /// Dossier de la session (par défaut celle de l'interface,
-    /// `ENFAIT_SESSION` sinon).
+    pub no_normalize: bool,
+    /// Session folder (by default the app's, or `ENFAIT_SESSION`).
     #[arg(long)]
     pub session: Option<PathBuf>,
 }
@@ -34,7 +33,7 @@ fn missing_note(missing: &[usize]) {
     if !missing.is_empty() {
         let list: Vec<String> = missing.iter().map(ToString::to_string).collect();
         tracing::warn!(
-            "blocs sans animation ni plan (la prise les couvre) : {}",
+            "blocks with neither animation nor shot (the take covers them): {}",
             list.join(", ")
         );
     }
@@ -43,7 +42,7 @@ fn missing_note(missing: &[usize]) {
 pub async fn run(args: ExportArgs) -> Result<()> {
     anyhow::ensure!(
         args.output.is_some() || args.premiere.is_some(),
-        "rien à exporter : --output <vidéo.mp4> et/ou --premiere <montage.xml>"
+        "nothing to export: --output <video.mp4> and/or --premiere <edit.xml>"
     );
     let dir = args
         .session
@@ -53,7 +52,7 @@ pub async fn run(args: ExportArgs) -> Result<()> {
     let sources = session.sources();
     let settings = session.project.settings();
     tracing::info!(
-        "{} : {}×{}, {:.1} s, {} blocs",
+        "{}: {}×{}, {:.1} s, {} blocks",
         settings.aspect.label(),
         settings.resolution.width,
         settings.resolution.height,
@@ -61,15 +60,10 @@ pub async fn run(args: ExportArgs) -> Result<()> {
         session.project.blocks().len()
     );
     if let Some(xml) = &args.premiere {
-        let report = enfait_studio::premiere::export(
-            &sources,
-            PremiereOptions {
-                sfx: !args.sans_sfx,
-            },
-            xml,
-        )?;
+        let report =
+            enfait_studio::premiere::export(&sources, PremiereOptions { sfx: !args.no_sfx }, xml)?;
         tracing::info!(
-            "montage Premiere : {} (médias : {})",
+            "Premiere edit: {} (media: {})",
             report.xml.display(),
             report.media.display()
         );
@@ -78,7 +72,7 @@ pub async fn run(args: ExportArgs) -> Result<()> {
     if let Some(out) = &args.output {
         let last = std::sync::atomic::AtomicU64::new(u64::MAX);
         let progress = |p: f64| {
-            // Toutes les dizaines de pour cent.
+            // Every ten percent.
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let step = (p * 10.0).floor() as u64;
             if last.swap(step, std::sync::atomic::Ordering::Relaxed) != step {
@@ -88,20 +82,20 @@ pub async fn run(args: ExportArgs) -> Result<()> {
         let report = enfait_studio::export::video(
             &sources,
             ExportOptions {
-                sfx: !args.sans_sfx,
-                loudness: (!args.sans_normalisation).then_some(args.lufs),
+                sfx: !args.no_sfx,
+                loudness: (!args.no_normalize).then_some(args.lufs),
             },
             out,
             &progress,
         )
         .await?;
         tracing::info!(
-            "vidéo : {} ({:.1} s{})",
+            "video: {} ({:.1} s{})",
             report.path.display(),
             report.duration,
             report
                 .measured_lufs
-                .map(|l| format!(", son mesuré à {l:.1} LUFS avant normalisation"))
+                .map(|l| format!(", sound measured at {l:.1} LUFS before normalisation"))
                 .unwrap_or_default()
         );
         missing_note(&report.missing);

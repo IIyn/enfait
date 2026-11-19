@@ -1,49 +1,49 @@
-//! Erreurs du modèle.
+//! Model errors.
 
 use crate::id::BlockId;
 
-/// Erreur d'un calcul de temps.
+/// Error of a time computation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum TimeError {
-    #[error("dépassement de capacité dans un calcul de temps")]
+    #[error("overflow in a time computation")]
     Overflow,
     #[error("cadence invalide : {num}/{den}")]
     InvalidFrameRate { num: u32, den: u32 },
-    #[error("fréquence d'échantillonnage nulle")]
+    #[error("zero sample rate")]
     InvalidSampleRate,
-    #[error("intervalle vide ou inversé")]
+    #[error("empty or reversed interval")]
     EmptyRange,
-    #[error("temps négatif")]
+    #[error("negative time")]
     Negative,
 }
 
-/// Erreur d'une édition du projet. Une édition qui échoue ne modifie rien.
+/// Error of a project edit. A failing edit changes nothing.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum EditError {
-    #[error("bloc introuvable : {0}")]
+    #[error("block not found: {0}")]
     BlockNotFound(BlockId),
-    #[error("identifiant de bloc déjà utilisé : {0}")]
+    #[error("block id already used: {0}")]
     DuplicateBlock(BlockId),
-    #[error("le point de coupe doit être strictement à l'intérieur du bloc")]
+    #[error("the cut point must be strictly inside the block")]
     SplitOutsideBlock,
-    #[error("aucun bloc suivant à fusionner")]
+    #[error("no next block to merge")]
     NoNextBlock,
-    #[error("les blocs ne se suivent pas sans trou")]
+    #[error("the blocks do not follow each other without a gap")]
     NotContiguous,
-    #[error("le moment doit tomber dans le bloc")]
+    #[error("the moment must fall inside the block")]
     MomentOutsideBlock,
-    #[error("un moment existe déjà à cet instant")]
+    #[error("a moment already exists at this time")]
     DuplicateMoment,
-    #[error("moment introuvable")]
+    #[error("moment not found")]
     MomentNotFound,
     #[error(transparent)]
     Time(#[from] TimeError),
 }
 
-/// Erreur de chargement ou de validation d'un projet.
+/// Error loading or validating a project.
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
-    #[error("version de format {found} non prise en charge (attendue : {expected})")]
+    #[error("unsupported format version {found} (expected: {expected})")]
     UnsupportedSchema { found: u32, expected: u32 },
     #[error("projet invalide : {0}")]
     Invalid(#[from] EditError),

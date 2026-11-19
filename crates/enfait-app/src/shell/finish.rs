@@ -528,11 +528,16 @@ impl Shell {
             .flex_col()
             .border_b_1()
             .border_color(color(tokens::LINE))
-            .child(lane(tr!("finish.lane.blocks")).child(track().children(blocks).child(playhead())))
             .child(
-                lane(tr!("finish.lane.music")).child(track().children(music_bars).child(playhead())),
+                lane(tr!("finish.lane.blocks")).child(track().children(blocks).child(playhead())),
             )
-            .child(lane(tr!("finish.lane.sfx")).child(track().children(sfx_marks).child(playhead())));
+            .child(
+                lane(tr!("finish.lane.music"))
+                    .child(track().children(music_bars).child(playhead())),
+            )
+            .child(
+                lane(tr!("finish.lane.sfx")).child(track().children(sfx_marks).child(playhead())),
+            );
 
         let rows = self.cue_rows(&placed, cx);
         let detail = tr!(
@@ -579,18 +584,24 @@ impl Shell {
                             .text_color(color(tokens::MUTE)),
                     )
                     .child(
-                        chip("finish-undo", tr!("common.undo"), false, can_undo).when(can_undo, |d| {
-                            d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
-                                shell.finish_undo(window, cx);
-                            }))
-                        }),
+                        chip("finish-undo", tr!("common.undo"), false, can_undo).when(
+                            can_undo,
+                            |d| {
+                                d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
+                                    shell.finish_undo(window, cx);
+                                }))
+                            },
+                        ),
                     )
                     .child(
-                        chip("finish-redo", tr!("common.redo"), false, can_redo).when(can_redo, |d| {
-                            d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
-                                shell.finish_redo(window, cx);
-                            }))
-                        }),
+                        chip("finish-redo", tr!("common.redo"), false, can_redo).when(
+                            can_redo,
+                            |d| {
+                                d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
+                                    shell.finish_redo(window, cx);
+                                }))
+                            },
+                        ),
                     ),
             )
             .child(lanes)
@@ -880,12 +891,14 @@ impl Shell {
                                     }),
                                 ),
                             )
-                            .child(chip("export-clear", tr!("finish.ok"), false, true).on_click(
-                                listeners.listener(|shell, _: &ClickEvent, _, cx| {
-                                    shell.worker.clear_export();
-                                    cx.notify();
-                                }),
-                            )),
+                            .child(
+                                chip("export-clear", tr!("finish.ok"), false, true).on_click(
+                                    listeners.listener(|shell, _: &ClickEvent, _, cx| {
+                                        shell.worker.clear_export();
+                                        cx.notify();
+                                    }),
+                                ),
+                            ),
                     ),
             ),
             ExportState::Failed(e) => {
@@ -939,12 +952,12 @@ impl Shell {
             )
         };
         let listeners: &Context<Self> = cx;
-        let remove = chip("remove-cue", tr!("finish.remove"), false, true).on_click(listeners.listener(
-            move |shell, _: &ClickEvent, window, cx| {
+        let remove = chip("remove-cue", tr!("finish.remove"), false, true).on_click(
+            listeners.listener(move |shell, _: &ClickEvent, window, cx| {
                 shell.edit_finish(|f| f.remove(id), cx);
                 shell.select_cue(None, window, cx);
-            },
-        ));
+            }),
+        );
         if let Some(m) = finish.music.iter().find(|m| m.id == id) {
             let file = m.file.clone();
             let listen = self.listen_chip("listen-cue", &file, listeners);
@@ -1095,8 +1108,14 @@ impl Shell {
                         .flex()
                         .flex_wrap()
                         .gap(px(4.))
-                        .child(chip("sfx-back", tr!("finish.nudge_back"), false, true).on_click(nudge(-0.1)))
-                        .child(chip("sfx-fwd", tr!("finish.nudge_fwd"), false, true).on_click(nudge(0.1)))
+                        .child(
+                            chip("sfx-back", tr!("finish.nudge_back"), false, true)
+                                .on_click(nudge(-0.1)),
+                        )
+                        .child(
+                            chip("sfx-fwd", tr!("finish.nudge_fwd"), false, true)
+                                .on_click(nudge(0.1)),
+                        )
                         .child(
                             chip("sfx-here", tr!("finish.to_playhead"), false, true)
                                 .on_click(to_playhead),
@@ -1163,21 +1182,34 @@ impl Shell {
                             .flex_wrap()
                             .gap(px(4.))
                             .child(listen)
-                            .child(chip(("as-music", i), tr!("finish.as_music"), false, true).on_click(
-                                cx.listener(move |shell, _: &ClickEvent, window, cx| {
-                                    shell.add_music(m.clone(), window, cx);
-                                }),
-                            ))
-                            .child(chip(("sfx-here", i), tr!("finish.sfx_here"), false, true).on_click(
-                                cx.listener(move |shell, _: &ClickEvent, window, cx| {
-                                    shell.add_sfx_here(h.clone(), window, cx);
-                                }),
-                            ))
                             .child(
-                                chip(("sfx-transitions", i), tr!("finish.on_transitions"), false, true)
-                                    .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                                chip(("as-music", i), tr!("finish.as_music"), false, true)
+                                    .on_click(cx.listener(
+                                        move |shell, _: &ClickEvent, window, cx| {
+                                            shell.add_music(m.clone(), window, cx);
+                                        },
+                                    )),
+                            )
+                            .child(
+                                chip(("sfx-here", i), tr!("finish.sfx_here"), false, true)
+                                    .on_click(cx.listener(
+                                        move |shell, _: &ClickEvent, window, cx| {
+                                            shell.add_sfx_here(h.clone(), window, cx);
+                                        },
+                                    )),
+                            )
+                            .child(
+                                chip(
+                                    ("sfx-transitions", i),
+                                    tr!("finish.on_transitions"),
+                                    false,
+                                    true,
+                                )
+                                .on_click(cx.listener(
+                                    move |shell, _: &ClickEvent, _, cx| {
                                         shell.sfx_on_transitions(t.clone(), cx);
-                                    })),
+                                    },
+                                )),
                             ),
                     ),
             );
@@ -1209,11 +1241,11 @@ impl Shell {
             .gap(px(8.))
             .child(label(tr!("finish.label.ducking")))
             .child(
-                chip("ducking", tr!("finish.ducking"), enabled, true).on_click(
-                    cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                chip("ducking", tr!("finish.ducking"), enabled, true).on_click(cx.listener(
+                    move |shell, _: &ClickEvent, _, cx| {
                         shell.edit_finish(|f| f.ducking.enabled = !enabled, cx);
-                    }),
-                ),
+                    },
+                )),
             )
             .when(enabled, |d| d.children(self.knob(Knob::Depth)))
             .children(self.knob(Knob::Voice))
