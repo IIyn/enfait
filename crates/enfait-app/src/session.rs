@@ -1,21 +1,57 @@
-//! Working session: the script, the imported take and the take choices,
-//! saved as you go.
+//! Working session of a project: the script, the imported take and the
+//! take choices, saved as you go.
 //!
-//! Until several projects are supported, the app works on a single
-//! session, in the user's data folder (`~/.local/share/enfait/session/` on
-//! Linux, see `enfait_config::paths`): `script.md` (readable and editable
-//! by hand), `session.json`, `look.json` (style, post-FX, library),
-//! `finish.json` (music, SFX, ducking) and the library files in
-//! `library/`.
+//! Each project is a folder (see `enfait_config::projects`): `script.md`
+//! (readable and editable by hand), `session.json` (how the project
+//! started, take, choices), `look.json` (style, post-FX, library),
+//! `finish.json` (music, SFX, ducking), the library files in `library/`
+//! and the voice recordings in `recordings/`.
 
-use enfait_core::{AssetKind, Finish, Look, Origin};
+use enfait_core::{AspectRatio, AssetKind, Finish, Look, Origin};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// How the project is made.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectMode {
+    /// The user writes the storyboard and sends blocks to the edit.
+    #[default]
+    Custom,
+    /// Everything is automatic from the voice or the take.
+    Magic,
+}
+
+/// What the project starts from.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Start {
+    /// The script is written in enfait, then the voice is recorded here.
+    Script,
+    /// A voice or a video recorded elsewhere.
+    #[default]
+    Import,
+    /// No voice: an animation of a chosen duration.
+    Silent,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SessionData {
+    /// Title given at creation (empty: taken from the script or the take).
+    pub title: String,
+    pub mode: ProjectMode,
+    pub start: Start,
+    /// Automatic cut of the take (last takes, false starts removed);
+    /// without it the whole take is used.
+    pub derush: bool,
+    /// Format chosen at creation (else taken from the take's frames).
+    pub aspect: Option<AspectRatio>,
+    /// Silent project: duration in seconds.
+    pub duration: f64,
+    /// Silent project: what the animation is about, text to show.
+    pub brief: String,
     /// Imported take (the rush).
     pub rush: Option<PathBuf>,
     /// Take kept for a sentence, by hand: sentence text → rank of the take
@@ -26,6 +62,35 @@ pub struct SessionData {
     pub quality: enfait_ai::Quality,
     /// Model provider (API, Claude Code, local model).
     pub provider: enfait_ai::ProviderChoice,
+}
+
+impl Default for SessionData {
+    fn default() -> Self {
+        Self {
+            title: String::new(),
+            mode: ProjectMode::Custom,
+            start: Start::Import,
+            derush: true,
+            aspect: None,
+            duration: 0.0,
+            brief: String::new(),
+            rush: None,
+            choices: BTreeMap::new(),
+            quality: enfait_ai::Quality::default(),
+            provider: enfait_ai::ProviderChoice::default(),
+        }
+    }
+}
+
+/// Sample rate of the silent track of a project without voice.
+const SILENCE_RATE: u32 = 16_000;
+
+/// Writes `seconds` of silence as a WAV file: the time base of a project
+/// without voice.
+pub fn write_silence(path: &Path, seconds: f64) -> std::io::Result<()> {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let samples = (seconds.max(0.5) * f64::from(SILENCE_RATE)).round() as usize;
+    enfait_media::record::write_wav(path, &vec![0.0; samples], SILENCE_RATE)
 }
 
 pub struct Session {
@@ -43,6 +108,15 @@ impl Session {
     pub fn default_dir() -> PathBuf {
         // Same rule as the MCP server: they work on the same session.
         enfait_mcp::bridge::session_dir()
+    }
+
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// Voice recordings made in enfait.
+    pub fn recordings_dir(&self) -> PathBuf {
+        self.dir.join("recordings")
     }
 
     /// Reads the session (empty if it does not exist yet).
@@ -92,13 +166,14 @@ impl Session {
         self.dir.join("library")
     }
 
-    /// Copies `source` into the library and adds it to the look.
-    pub fn import_asset(&mut self, source: &Path) -> Result<(), String> {
+    /// Copies `source` into the library and adds it to the look. Returns
+    /// the file name in the library.
+    pub fn import_asset(&mut self, source: &Path) -> Result<String, String> {
         let stem = source
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        self.add_file(source, &stem, None, None).map(|_| ())
+        self.add_file(source, &stem, None, None)
     }
 
     /// Adds to the library a file from a bank (or derived from a library

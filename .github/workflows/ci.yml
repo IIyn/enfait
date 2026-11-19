@@ -14,12 +14,24 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Debug info makes the test binaries several GB: the runner's disk fills
+  # up and the linker dies with SIGBUS (it mmaps its output).
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
 
 jobs:
   check:
     name: fmt, clippy, tests (Linux)
     runs-on: ubuntu-24.04
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force || true
+          df -h /
+
       - uses: actions/checkout@v4
 
       # Headers needed by gpui (windowing, fonts), whisper.cpp (cmake,
@@ -48,7 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-2022]
+        os: [macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

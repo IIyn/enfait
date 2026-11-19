@@ -3,7 +3,7 @@
 //! merge), with undo / redo.
 
 use super::{Shell, kind_color, kind_label, label, mono, short_time};
-use crate::session::Session;
+use crate::session::Start;
 use crate::storyboard::{self, Storyboard};
 use crate::theme::{ROW_HEIGHT, color, tokens};
 use crate::tr;
@@ -19,13 +19,18 @@ use gpui_kit::{
     relative,
 };
 
-const KINDS: [BlockKind; 5] = [
-    BlockKind::Animation,
-    BlockKind::Mixed,
+/// Block kinds offered when the take is filmed: video only, video with an
+/// animation, animation only, then effect and b-roll.
+const VIDEO_KINDS: [BlockKind; 5] = [
     BlockKind::Rush,
+    BlockKind::Mixed,
+    BlockKind::Animation,
     BlockKind::Effect,
     BlockKind::Broll,
 ];
+
+/// Without a filmed take there is only animation or a b-roll shot.
+const VOICE_KINDS: [BlockKind; 2] = [BlockKind::Animation, BlockKind::Broll];
 
 /// Small toggle button; `on`: chosen; `enabled`: clickable.
 fn chip(
@@ -73,8 +78,13 @@ fn seconds(t: Flicks) -> String {
 }
 
 impl Shell {
-    /// Title of the project: first heading of the script, else the take name.
+    /// Title of the project: the one given at creation, else the first
+    /// heading of the script, else the take name.
     pub(super) fn title(&self) -> String {
+        let given = self.session.data.title.trim();
+        if !given.is_empty() {
+            return given.to_owned();
+        }
         let heading = self
             .session
             .script
@@ -100,30 +110,39 @@ impl Shell {
         if let Some(board) = &self.board {
             return *board.project.settings();
         }
-        ProjectSettings::default()
+        ProjectSettings::default().with_aspect(self.session.data.aspect.unwrap_or_default())
     }
 
+    /// First settings of the project: the format chosen at creation (else
+    /// that of the take's frames), the frame rate of the take.
     fn settings_from_media(&self, cx: &Context<Self>) -> ProjectSettings {
+        let chosen = self.session.data.aspect;
         let Some(video) = self.player.read(cx).media_info().and_then(|i| i.video) else {
-            return ProjectSettings::default();
+            return ProjectSettings::default().with_aspect(chosen.unwrap_or_default());
         };
         let frame_rate = if (20..=60).contains(&video.frame_rate.nominal_fps()) {
             video.frame_rate
         } else {
             FrameRate::FPS_30
         };
-        ProjectSettings {
+        let rush = AspectRatio::nearest(video.width, video.height);
+        let aspect = chosen.unwrap_or(rush);
+        let mut settings = ProjectSettings {
             frame_rate,
             ..ProjectSettings::default()
         }
-        .with_aspect(AspectRatio::nearest(video.width, video.height))
+        .with_aspect(aspect);
+        if aspect != rush {
+            settings.framing = enfait_core::Framing::Fill;
+        }
+        settings
     }
 
     /// Builds (or rebuilds) the storyboard if the edit changed.
     pub(super) fn refresh_board(&mut self, cx: &mut Context<Self>) {
         use crate::cut::CutStatus;
-        let (Some(transcript), true) = (self.cut.transcript.clone(), self.cut.analysis.is_some())
-        else {
+        let analysed = self.cut.analysis.is_some() || !self.uses_cut();
+        let (Some(transcript), true) = (self.cut.transcript.clone(), analysed) else {
             self.board_notice = Some(match &self.cut.status {
                 CutStatus::Transcribing => tr!("board.transcribing"),
                 CutStatus::Failed(e) => e.clone(),
@@ -131,7 +150,7 @@ impl Shell {
             });
             return;
         };
-        let ranges = self.cut.ranges();
+        let ranges = self.edit_ranges();
         if ranges.is_empty() {
             self.board_notice = Some(tr!("board.nothing_found"));
             return;
@@ -167,8 +186,21 @@ impl Shell {
         match built {
             Ok(mut board) => {
                 let first = board.project.blocks().first().map(|b| b.id);
+                // Silent project: its subject goes to the first block.
+                let brief = self.session.data.brief.trim().to_owned();
+                if self.board.is_none()
+                    && self.session.data.start == Start::Silent
+                    && !brief.is_empty()
+                    && let Some(id) = first
+                {
+                    let _ = board.apply(Edit::SetDescription {
+                        block: id,
+                        text: brief,
+                    });
+                    board.history = enfait_core::History::new();
+                }
                 board.select(first);
-                board.save(&Session::default_dir());
+                board.save(self.session.dir());
                 self.board = Some(board);
                 self.needs_sync = true;
                 // New edit: the preview must be rebuilt.
@@ -184,7 +216,7 @@ impl Shell {
 
     pub(super) fn save_board(&self) {
         if let Some(board) = &self.board {
-            board.save(&Session::default_dir());
+            board.save(self.session.dir());
         }
         self.push_snapshot();
     }
@@ -289,10 +321,34 @@ impl Shell {
     }
 
     /// Saves what is being typed before switching context.
-    fn commit_inputs(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn commit_inputs(&mut self, cx: &mut Context<Self>) {
         self.commit_description(cx);
         self.commit_transition_text(cx);
         self.commit_moment_note(cx);
+    }
+
+    /// Click on a block (list or timeline): select it; Shift extends the
+    /// choice to a range, Ctrl/Cmd adds or removes it.
+    pub(super) fn click_block(
+        &mut self,
+        id: BlockId,
+        modifiers: gpui_kit::Modifiers,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if modifiers.shift || modifiers.secondary(cx) {
+            self.commit_inputs(cx);
+            let Some(board) = &mut self.board else { return };
+            if modifiers.shift {
+                board.select_range(id);
+            } else {
+                board.toggle_marked(id);
+            }
+            self.sync_inputs(window, cx);
+            cx.notify();
+            return;
+        }
+        self.select_block(Some(id), true, window, cx);
     }
 
     pub(super) fn select_block(
@@ -358,6 +414,37 @@ impl Shell {
         board.moment = Some(at);
         self.sync_inputs(window, cx);
         self.command(Command::Seek((at.as_secs_f64() - 0.05).max(0.0)), cx);
+        cx.notify();
+    }
+
+    /// Cuts the selected block (or the one under the playhead) at the
+    /// playhead.
+    fn split_at_playhead(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(t) = self.player.read(cx).position() else {
+            return;
+        };
+        self.commit_inputs(cx);
+        let Some(board) = &mut self.board else { return };
+        if let Err(e) = board.split_at_time(t) {
+            tracing::warn!("edit refused: {e}");
+        }
+        self.save_board();
+        self.sync_inputs(window, cx);
+        cx.notify();
+    }
+
+    /// A moment at the playhead in the selected block.
+    fn moment_at_playhead(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(t) = self.player.read(cx).position() else {
+            return;
+        };
+        self.commit_inputs(cx);
+        let Some(board) = &mut self.board else { return };
+        if let Err(e) = board.add_moment_at(t) {
+            tracing::warn!("edit refused: {e}");
+        }
+        self.save_board();
+        self.sync_inputs(window, cx);
         cx.notify();
     }
 
@@ -436,21 +523,31 @@ impl Shell {
             .iter()
             .enumerate()
             .map(|(i, block)| {
+                let id = block.id;
                 block_row(
                     i,
                     block,
                     board,
                     board.selected == Some(block.id),
+                    board.marked.len() > 1 && board.marked.contains(&block.id),
                     playing == Some(block.id),
                     rate,
                     states.get(i),
                 )
-                .on_click(listeners.listener({
-                    let id = block.id;
-                    move |shell, _: &ClickEvent, window, cx| {
-                        shell.select_block(Some(id), true, window, cx);
-                    }
-                }))
+                .on_click(
+                    listeners.listener(move |shell, event: &ClickEvent, window, cx| {
+                        shell.click_block(id, event.modifiers(), window, cx);
+                    }),
+                )
+                .drag_over::<gpui_kit::ExternalPaths>(|style, _, _, _| {
+                    style.bg(color(tokens::HOVER))
+                })
+                .on_drop(listeners.listener(
+                    move |shell, paths: &gpui_kit::ExternalPaths, window, cx| {
+                        cx.stop_propagation();
+                        shell.drop_on_block(id, paths.paths(), window, cx);
+                    },
+                ))
             })
             .map(|row| div().child(row))
             .collect();
@@ -577,9 +674,21 @@ impl Shell {
         });
         let transition_controls = self.transition_controls(cx);
         let studio = self.studio_inspector(cx);
+        let suggestions = self.mention_suggestions(super::mention::Field::Description, cx);
+        let mentioned = self.mentioned_files(&block.description);
+        let has_words = !words.is_empty();
+        let kinds: &[BlockKind] = if self.take_has_video()
+            || matches!(
+                block.kind,
+                BlockKind::Rush | BlockKind::Mixed | BlockKind::Effect
+            ) {
+            &VIDEO_KINDS
+        } else {
+            &VOICE_KINDS
+        };
         let listeners: &Context<Self> = cx;
 
-        let kinds = KINDS.iter().map(|&kind| {
+        let kinds = kinds.iter().map(|&kind| {
             let id = block.id;
             chip(
                 ("kind", kind as usize),
@@ -648,11 +757,13 @@ impl Shell {
                                 .flex()
                                 .gap(px(6.))
                                 .text_size(px(12.))
-                                .child(
-                                    div()
-                                        .text_color(color(tokens::MIXED))
-                                        .child(tr!("common.quoted", text = m.word)),
-                                )
+                                .child(div().text_color(color(tokens::MIXED)).child(
+                                    if m.word.is_empty() {
+                                        SharedString::from("◆")
+                                    } else {
+                                        tr!("common.quoted", text = m.word)
+                                    },
+                                ))
                                 .child(
                                     mono(seconds(at))
                                         .text_size(px(11.))
@@ -774,7 +885,32 @@ impl Shell {
                         .h(px(110.))
                         .child(Textarea::new(&self.description).h_full()),
                 )
-                .child(heading(tr!("board.label.words")))
+                .when_some(suggestions, |d, s| d.child(s))
+                .when(!mentioned.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .gap(px(4.))
+                            .text_size(px(11.))
+                            .text_color(color(tokens::FG2))
+                            .child(tr!("board.mentioned"))
+                            .children(mentioned.into_iter().map(|name| {
+                                mono(format!("@{name}"))
+                                    .px(px(4.))
+                                    .rounded(px(2.))
+                                    .bg(color(tokens::RAISED))
+                                    .text_color(color(tokens::SIGNAL))
+                            })),
+                    )
+                })
+                .child(
+                    div()
+                        .text_size(px(11.))
+                        .text_color(color(tokens::MUTE))
+                        .child(tr!("board.mention_hint")),
+                )
+                .when(has_words, |d| d.child(heading(tr!("board.label.words"))))
                 .child(
                     div()
                         .flex()
@@ -788,36 +924,62 @@ impl Shell {
                         .flex()
                         .flex_wrap()
                         .gap(px(4.))
-                        .child(
-                            chip(
-                                "split",
-                                tr!("board.split_before", word = word_label.clone()),
-                                false,
-                                can_split,
+                        .when(!has_words, |d| {
+                            d.child(
+                                chip("split-playhead", tr!("board.split_playhead"), false, true)
+                                    .on_click(listeners.listener(
+                                        |shell, _: &ClickEvent, window, cx| {
+                                            shell.split_at_playhead(window, cx);
+                                        },
+                                    )),
                             )
-                            .when(can_split, |d| {
-                                d.on_click(listeners.listener(
-                                    |shell, _: &ClickEvent, window, cx| {
-                                        shell.board_action(Storyboard::split_at_word, window, cx);
-                                    },
-                                ))
-                            }),
-                        )
-                        .child(
-                            chip(
-                                "moment",
-                                tr!("board.moment_on", word = word_label),
-                                false,
-                                can_moment,
+                            .child(
+                                chip("moment-playhead", tr!("board.moment_playhead"), false, true)
+                                    .on_click(listeners.listener(
+                                        |shell, _: &ClickEvent, window, cx| {
+                                            shell.moment_at_playhead(window, cx);
+                                        },
+                                    )),
                             )
-                            .when(can_moment, |d| {
-                                d.on_click(listeners.listener(
-                                    |shell, _: &ClickEvent, window, cx| {
-                                        shell.board_action(Storyboard::add_moment, window, cx);
-                                    },
-                                ))
-                            }),
-                        ),
+                        })
+                        .when(has_words, |d| {
+                            d.child(
+                                chip(
+                                    "split",
+                                    tr!("board.split_before", word = word_label.clone()),
+                                    false,
+                                    can_split,
+                                )
+                                .when(can_split, |d| {
+                                    d.on_click(listeners.listener(
+                                        |shell, _: &ClickEvent, window, cx| {
+                                            shell.board_action(
+                                                Storyboard::split_at_word,
+                                                window,
+                                                cx,
+                                            );
+                                        },
+                                    ))
+                                }),
+                            )
+                        })
+                        .when(has_words, |d| {
+                            d.child(
+                                chip(
+                                    "moment",
+                                    tr!("board.moment_on", word = word_label),
+                                    false,
+                                    can_moment,
+                                )
+                                .when(can_moment, |d| {
+                                    d.on_click(listeners.listener(
+                                        |shell, _: &ClickEvent, window, cx| {
+                                            shell.board_action(Storyboard::add_moment, window, cx);
+                                        },
+                                    ))
+                                }),
+                            )
+                        }),
                 )
                 .when(!block.moments.is_empty(), |d| {
                     d.child(heading(tr!("board.label.moments")))
@@ -848,11 +1010,13 @@ impl Shell {
 }
 
 /// One row of the storyboard.
+#[allow(clippy::too_many_arguments)]
 fn block_row(
     index: usize,
     block: &Block,
     board: &Storyboard,
     selected: bool,
+    marked: bool,
     playing: bool,
     rate: FrameRate,
     state: Option<&super::studio::BlockState>,
@@ -877,10 +1041,15 @@ fn block_row(
         .moments
         .iter()
         .map(|m| {
-            SharedString::from(if m.note.is_empty() {
-                format!("◆ {}", m.word)
+            let word = if m.word.is_empty() {
+                seconds(m.at)
             } else {
-                tr!("board.moment_line", word = m.word, note = m.note).to_string()
+                m.word.clone()
+            };
+            SharedString::from(if m.note.is_empty() {
+                format!("◆ {word}")
+            } else {
+                tr!("board.moment_line", word = word, note = m.note).to_string()
             })
         })
         .collect();
@@ -889,14 +1058,23 @@ fn block_row(
         .cursor_pointer()
         .border_b_1()
         .border_color(color(tokens::LINE))
-        .when(selected, |d| d.bg(color(tokens::RAISED)))
-        .when(!selected, |d| d.hover(|d| d.bg(color(tokens::PANEL))))
+        .when(selected || marked, |d| d.bg(color(tokens::RAISED)))
+        .when(!selected && !marked, |d| {
+            d.hover(|d| d.bg(color(tokens::PANEL)))
+        })
         .child(
             div()
                 .flex()
+                .child(div().flex_none().w(px(3.)).when(marked || selected, |d| {
+                    d.bg(color(if marked {
+                        tokens::SIGNAL
+                    } else {
+                        tokens::LINE_STRONG
+                    }))
+                }))
                 .child(
                     div()
-                        .w(px(132.))
+                        .w(px(129.))
                         .flex_none()
                         .px(px(20.))
                         .py(px(10.))
@@ -957,7 +1135,14 @@ fn block_row(
                                         .min_w(px(0.))
                                         .overflow_hidden()
                                         .text_color(color(tokens::MUTE))
-                                        .child(tr!("common.quoted", text = board.text_of(block))),
+                                        .child({
+                                            let said = board.text_of(block);
+                                            if said.is_empty() {
+                                                SharedString::default()
+                                            } else {
+                                                tr!("common.quoted", text = said)
+                                            }
+                                        }),
                                 ),
                         )
                         .child(

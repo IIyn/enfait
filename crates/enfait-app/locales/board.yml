@@ -89,3 +89,18 @@ _version: 2
 "board.transition_text":
   en: "Transition · %{text}"
   fr: "Transition · %{text}"
+"board.imported":
+  en: "%{count} file(s) added to the library."
+  fr: "%{count} fichier(s) ajouté(s) à la bibliothèque."
+"board.mention_hint":
+  en: "Type @ to name a library file, or drop files on the block."
+  fr: "Tape @ pour citer un fichier de la bibliothèque, ou dépose des fichiers sur le bloc."
+"board.mentioned":
+  en: "Files named:"
+  fr: "Fichiers cités :"
+"board.moment_playhead":
+  en: "Moment at the playhead"
+  fr: "Moment à la tête de lecture"
+"board.split_playhead":
+  en: "Split at the playhead"
+  fr: "Couper à la tête de lecture"

@@ -1,0 +1,26 @@
+# Built by .github/workflows/release.yml from the Linux release tarball.
+pkgname=enfait-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Voice-over to motion design video"
+arch=('x86_64')
+url="https://github.com/IIyn/enfait"
+license=('custom')
+depends=('ffmpeg' 'alsa-lib' 'fontconfig' 'freetype2' 'libxkbcommon' 'libxkbcommon-x11'
+         'wayland' 'libx11' 'libxcb' 'vulkan-icd-loader' 'dbus')
+provides=('enfait')
+conflicts=('enfait')
+options=('!strip' '!debug')
+source=("enfait-${pkgver}-x86_64-linux.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    cd "enfait-${pkgver}-x86_64-linux"
+    install -Dm755 enfait "$pkgdir/usr/bin/enfait"
+    install -Dm755 enfait-cli "$pkgdir/usr/bin/enfait-cli"
+    install -Dm644 enfait.desktop "$pkgdir/usr/share/applications/enfait.desktop"
+    for size in 16 22 32 48 64 128 256 512; do
+        install -Dm644 "icons/enfait-${size}.png" \
+            "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/enfait.png"
+    done
+}

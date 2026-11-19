@@ -122,3 +122,6 @@ _version: 2
 "side.your_rules":
   en: "Your rules (take precedence):"
   fr: "Tes règles (prioritaires) :"
+"side.style_drop_hint":
+  en: "Drop a file here to add it and name it in the style (logo, font…)."
+  fr: "Dépose un fichier ici pour l'ajouter et le citer dans le style (logo, police…)."

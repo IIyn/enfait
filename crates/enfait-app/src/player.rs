@@ -105,6 +105,17 @@ impl Player {
         }
     }
 
+    /// Empties the player (another project without media).
+    pub fn close(&mut self, cx: &mut Context<Self>) {
+        self.generation = self.generation.wrapping_add(1);
+        self.release();
+        self.loading = None;
+        self.pending_cut = None;
+        self.pending_seek = None;
+        self.state = State::Empty;
+        cx.notify();
+    }
+
     /// Prepares `path` in the background, then makes it playable.
     pub fn open(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.generation = self.generation.wrapping_add(1);

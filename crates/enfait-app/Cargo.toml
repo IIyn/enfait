@@ -40,3 +40,49 @@ workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# Linux packages, built by .github/workflows/release.yml after
+# `cargo build --release -p enfait-app -p enfait-cli`.
+[package.metadata.deb]
+name = "enfait"
+maintainer = "enfait <https://github.com/IIyn/enfait>"
+copyright = "enfait contributors"
+extended-description = "Turns a voice-over into a motion design video."
+section = "video"
+priority = "optional"
+depends = "$auto, ffmpeg"
+assets = [
+    ["target/release/enfait", "usr/bin/", "755"],
+    ["target/release/enfait-cli", "usr/bin/", "755"],
+    ["../../packaging/linux/enfait.desktop", "usr/share/applications/", "644"],
+    ["../../assets/icon/enfait-16.png", "usr/share/icons/hicolor/16x16/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-22.png", "usr/share/icons/hicolor/22x22/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-32.png", "usr/share/icons/hicolor/32x32/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-48.png", "usr/share/icons/hicolor/48x48/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-64.png", "usr/share/icons/hicolor/64x64/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-128.png", "usr/share/icons/hicolor/128x128/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-256.png", "usr/share/icons/hicolor/256x256/apps/enfait.png", "644"],
+    ["../../assets/icon/enfait-512.png", "usr/share/icons/hicolor/512x512/apps/enfait.png", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "enfait"
+# TODO: set once the project licence is chosen.
+license = "TBD"
+summary = "Voice-over to motion design video"
+assets = [
+    { source = "target/release/enfait", dest = "/usr/bin/enfait", mode = "755" },
+    { source = "target/release/enfait-cli", dest = "/usr/bin/enfait-cli", mode = "755" },
+    { source = "../../packaging/linux/enfait.desktop", dest = "/usr/share/applications/enfait.desktop", mode = "644" },
+    { source = "../../assets/icon/enfait-16.png", dest = "/usr/share/icons/hicolor/16x16/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-22.png", dest = "/usr/share/icons/hicolor/22x22/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-32.png", dest = "/usr/share/icons/hicolor/32x32/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-48.png", dest = "/usr/share/icons/hicolor/48x48/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-64.png", dest = "/usr/share/icons/hicolor/64x64/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-128.png", dest = "/usr/share/icons/hicolor/128x128/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-256.png", dest = "/usr/share/icons/hicolor/256x256/apps/enfait.png", mode = "644" },
+    { source = "../../assets/icon/enfait-512.png", dest = "/usr/share/icons/hicolor/512x512/apps/enfait.png", mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+"/usr/bin/ffmpeg" = "*"

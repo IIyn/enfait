@@ -1,7 +1,7 @@
 //! Generating animations from the interface: job queue, engine, retouches
 //! anchored in time, remembered rules, preview.
 
-use super::{STEP_FINISH, STEP_STORYBOARD, Shell, label, mono};
+use super::{STEP_MONTAGE, Shell, label, mono};
 use crate::jobs::{JobKind, JobStatus};
 use crate::theme::{color, tokens};
 use crate::tr;
@@ -60,10 +60,16 @@ impl BlockState {
     }
 }
 
-pub(super) const QUALITIES: [Quality; 3] = [Quality::Fast, Quality::Polished, Quality::Ultra];
+pub(super) const QUALITIES: [Quality; 4] = [
+    Quality::Light,
+    Quality::Fast,
+    Quality::Polished,
+    Quality::Ultra,
+];
 
 pub(super) fn quality_name(quality: Quality) -> SharedString {
     match quality {
+        Quality::Light => tr!("studio.quality.light"),
         Quality::Fast => tr!("studio.quality.fast"),
         Quality::Polished => tr!("studio.quality.polished"),
         Quality::Ultra => tr!("studio.quality.ultra"),
@@ -181,10 +187,28 @@ impl Shell {
             cx.defer(crate::show_main_window);
         }
         let events = self.worker.take_events();
-        if events.is_empty()
-            || !crate::prefs::settings(cx).notifications
-            || cx.active_window().is_some()
-        {
+        if events.is_empty() {
+            return;
+        }
+        // In the window: a badge on the Montage step and a toast.
+        for event in &events {
+            if let crate::worker::Event::Job {
+                number,
+                transition: false,
+                error,
+            } = event
+            {
+                if self.step != STEP_MONTAGE && error.is_none() {
+                    self.montage_badge = self.montage_badge.saturating_add(1);
+                }
+                self.toast(match error {
+                    None => tr!("notify.block_done", n = number),
+                    Some(_) => tr!("montage.block_failed_toast", n = number),
+                });
+            }
+        }
+        cx.notify();
+        if !crate::prefs::settings(cx).notifications || cx.active_window().is_some() {
             return;
         }
         let title = self.title();
@@ -277,7 +301,7 @@ impl Shell {
             rush: rush.clone(),
             rush_has_video: rush_video.is_some(),
             rush_size: rush_video.map(|v| (v.width, v.height)),
-            parts: self.cut.ranges(),
+            parts: self.edit_ranges(),
             finish: self.session.finish.clone(),
             provider: self.session.data.provider,
         });
@@ -357,10 +381,6 @@ impl Shell {
         }
         self.worker.wake();
         cx.notify();
-    }
-
-    pub(super) fn generate(&mut self, block: BlockId, cx: &mut Context<Self>) {
-        self.enqueue(block, JobKind::Create, cx);
     }
 
     /// Queues every block to generate, then their transitions (they come
@@ -482,7 +502,7 @@ impl Shell {
 
     /// Storyboard: the preview (if any) replaces the edited take.
     pub(super) fn refresh_preview(&mut self, cx: &mut Context<Self>) {
-        if self.step != STEP_STORYBOARD && self.step != STEP_FINISH {
+        if !super::board_step(self.step) {
             return;
         }
         let path = preview_path(&self.session.studio_dir());
@@ -511,15 +531,14 @@ impl Shell {
         }
     }
 
-    /// Storyboard bar: quality, "Generate all", engine activity.
+    /// Storyboard bar: format, "Write the storyboard", chosen blocks and
+    /// "Send to the edit", engine activity.
     pub(super) fn studio_toolbar(&self, cx: &mut Context<Self>) -> Div {
-        let quality = self.session.data.quality;
         let (running, queued) = self.queue.lock().map(|q| q.counts()).unwrap_or((0, 0));
         let writing = self.worker.writing();
         let activity = writing
             .clone()
             .map(|w| tr!("studio.writing", what = w).to_string())
-            .or_else(|| self.worker.activity())
             .or_else(|| {
                 (running + queued > 0)
                     .then(|| tr!("studio.counts", running = running, queued = queued).to_string())
@@ -530,20 +549,6 @@ impl Shell {
             self.write_notice.clone()
         };
         let listeners: &Context<Self> = cx;
-        let provider = self.session.data.provider;
-        let providers = ProviderChoice::ALL.iter().enumerate().map(|(i, p)| {
-            let p = *p;
-            chip(("provider", i), provider_name(p), provider == p, true).on_click(
-                listeners.listener(move |shell, _: &ClickEvent, _, cx| shell.set_provider(p, cx)),
-            )
-        });
-        let missing = provider_hint(provider, crate::prefs::settings(cx));
-        let qualities = QUALITIES.iter().enumerate().map(|(i, q)| {
-            let q = *q;
-            chip(("quality", i), quality_name(q), quality == q, true).on_click(
-                listeners.listener(move |shell, _: &ClickEvent, _, cx| shell.set_quality(q, cx)),
-            )
-        });
         let settings = self.settings();
         let formats = AspectRatio::ALL.iter().enumerate().map(|(i, a)| {
             let a = *a;
@@ -555,6 +560,11 @@ impl Shell {
             .rush_aspect(cx)
             .is_some_and(|rush| rush != settings.aspect);
         let framing = reframed.then(|| self.framing_chips(settings, listeners));
+        let chosen = self
+            .board
+            .as_ref()
+            .map_or(0, |b| b.marked.len().max(usize::from(b.selected.is_some())));
+        let all = self.board.as_ref().map_or(0, |b| b.project.blocks().len());
         div()
             .flex()
             .flex_wrap()
@@ -567,59 +577,58 @@ impl Shell {
             .child(label(tr!("studio.label.format")))
             .children(formats)
             .when_some(framing, |d, f| d.child(f))
-            .child(label(tr!("studio.label.animations")).ml(px(8.)))
-            .children(qualities)
-            .child(label(tr!("studio.label.models")).ml(px(8.)))
-            .children(providers)
-            .when_some(missing, |d, m| {
-                d.child(
-                    div()
-                        .id("provider-missing")
-                        .cursor_pointer()
-                        .text_size(px(11.))
-                        .text_color(color(tokens::MIXED))
-                        .hover(|d| d.underline())
-                        .child(m)
-                        .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
-                            shell.open_settings(cx);
-                        })),
-                )
-            })
             .child({
                 let writing = writing.is_some();
-                chip("write-board", tr!("studio.write_board"), false, !writing).when(
-                    !writing,
-                    |d| {
+                chip("write-board", tr!("studio.write_board"), false, !writing)
+                    .ml(px(8.))
+                    .when(!writing, |d| {
                         d.on_click(
                             cx.listener(|shell, _: &ClickEvent, _, cx| shell.write_storyboard(cx)),
                         )
-                    },
-                )
+                    })
             })
-            .child(
-                chip("generate-all", tr!("studio.generate_all"), false, true)
-                    .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| shell.generate_all(cx))),
-            )
-            .when(queued > 0, |d| {
-                d.child(
-                    chip("cancel-all", tr!("studio.cancel_queue"), false, true).on_click(
-                        cx.listener(|shell, _: &ClickEvent, _, cx| {
-                            if let Ok(mut q) = shell.queue.lock() {
-                                q.cancel_queued(None);
-                            }
-                            cx.notify();
-                        }),
-                    ),
-                )
-            })
+            .child(div().flex_1())
             .when_some(activity, |d, a| {
                 d.child(
                     div()
+                        .id("activity")
+                        .cursor_pointer()
                         .text_size(px(12.))
                         .text_color(color(tokens::FG2))
-                        .child(SharedString::from(a)),
+                        .hover(|d| d.underline())
+                        .child(SharedString::from(a))
+                        .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                            shell.go_to(STEP_MONTAGE, cx);
+                        })),
                 )
             })
+            .child(
+                div()
+                    .text_size(px(12.))
+                    .text_color(color(tokens::MUTE))
+                    .child(tr!("studio.chosen", count = chosen)),
+            )
+            .child(
+                chip("mark-all", tr!("studio.choose_all"), false, chosen < all).when(
+                    chosen < all,
+                    |d| {
+                        d.on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                            if let Some(board) = &mut shell.board {
+                                board.mark_all();
+                            }
+                            cx.notify();
+                        }))
+                    },
+                ),
+            )
+            .child(
+                super::screens::button(
+                    "send-montage",
+                    tr!("studio.send_to_montage", count = chosen),
+                    true,
+                )
+                .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| shell.open_care(cx))),
+            )
             .when_some(notice, |d, n| {
                 d.child(
                     div()
@@ -775,19 +784,31 @@ impl Shell {
                     chip(
                         "generate",
                         if ready {
-                            tr!("studio.regenerate")
+                            tr!("studio.send_again")
                         } else {
-                            tr!("studio.generate")
+                            tr!("studio.send_block")
                         },
                         false,
                         !busy,
                     )
                     .when(!busy, |d| {
                         d.on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
-                            shell.generate(id, cx);
+                            if let Some(board) = &mut shell.board {
+                                board.select(Some(id));
+                            }
+                            shell.open_care(cx);
                         }))
                     }),
-                ),
+                )
+                .when(ready, |d| {
+                    d.child(
+                        chip("to-retouch", tr!("studio.check"), false, true).on_click(
+                            listeners.listener(|shell, _: &ClickEvent, _, cx| {
+                                shell.go_to(super::STEP_RETOUCH, cx);
+                            }),
+                        ),
+                    )
+                }),
         );
         if let BlockState::Failed(e) = &state {
             section = section.child(
@@ -797,8 +818,19 @@ impl Shell {
                     .child(SharedString::from(e.clone())),
             );
         }
-        if !ready {
-            return Some(section);
+        Some(section)
+    }
+
+    /// Versions and retouches of the selected block (Retouch step).
+    pub(super) fn retouch_controls(&self, cx: &mut Context<Self>) -> Option<Div> {
+        let block = self.board.as_ref()?.block()?;
+        let id = block.id;
+        let state = self.block_state(block);
+        let busy = matches!(state, BlockState::Queued | BlockState::Running);
+        let listeners: &Context<Self> = cx;
+        let mut section = div().flex().flex_col().gap(px(8.));
+        if state != BlockState::Ready {
+            return None;
         }
         let versions = versions(&self.session.studio_dir(), id, &self.settings());
         if !versions.is_empty() {

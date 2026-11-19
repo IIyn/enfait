@@ -54,6 +54,8 @@ pub struct Prompter {
     running: bool,
     last_frame: Option<Instant>,
     focus: FocusHandle,
+    /// Voice being recorded while reading.
+    recording: Option<enfait_media::record::Meter>,
 }
 
 impl EventEmitter<Closed> for Prompter {}
@@ -70,7 +72,22 @@ impl Prompter {
             running: false,
             last_frame: None,
             focus,
+            recording: None,
         }
+    }
+
+    /// The prompter while the voice is recorded: the scrolling starts at
+    /// once, a meter shows the level and Escape ends the recording.
+    pub fn recording(
+        paragraphs: Vec<String>,
+        meter: enfait_media::record::Meter,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut prompter = Self::new(paragraphs, window, cx);
+        prompter.recording = Some(meter);
+        prompter.running = true;
+        prompter
     }
 
     fn toggle(&mut self, cx: &mut Context<Self>) {
@@ -106,6 +123,10 @@ impl Render for Prompter {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.running {
             self.advance();
+            window.request_animation_frame();
+        }
+        let meter = self.recording.as_ref().map(|m| (m.seconds(), m.level()));
+        if meter.is_some() {
             window.request_animation_frame();
         }
         let line = self.size * 1.45;
@@ -193,5 +214,40 @@ impl Render for Prompter {
                     .text_color(rgb(DIM))
                     .child(status),
             )
+            .when_some(meter, |d, (seconds, level)| {
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let secs = seconds as u64;
+                d.child(
+                    div()
+                        .absolute()
+                        .top(px(16.))
+                        .left(px(16.))
+                        .flex()
+                        .items_center()
+                        .gap(px(10.))
+                        .font_family(fonts::MONO)
+                        .text_size(px(13.))
+                        .text_color(rgb(TEXT))
+                        .child(div().size(px(10.)).rounded(px(5.)).bg(color(tokens::ERROR)))
+                        .child(format!("REC {:02}:{:02}", secs / 60, secs % 60))
+                        .child(
+                            div().w(px(120.)).h(px(4.)).bg(rgb(0x2B3230)).child(
+                                div()
+                                    .h_full()
+                                    .w(relative(level.sqrt().clamp(0.0, 1.0)))
+                                    .bg(color(if level > 0.9 {
+                                        tokens::ERROR
+                                    } else {
+                                        tokens::SIGNAL
+                                    })),
+                            ),
+                        )
+                        .child(
+                            div()
+                                .text_color(rgb(DIM))
+                                .child(tr!("prompter.stop_recording")),
+                        ),
+                )
+            })
     }
 }

@@ -14,3 +14,9 @@ _version: 2
 "steps.voice":
   en: "Voice"
   fr: "Voix"
+"steps.montage":
+  en: "Montage"
+  fr: "Montage"
+"steps.script":
+  en: "Script"
+  fr: "Script"

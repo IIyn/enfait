@@ -38,7 +38,7 @@ const MAX_CANDIDATES: usize = 4;
 /// Model and effort of the editor depending on the quality level.
 pub fn editor_model(quality: Quality) -> (&'static str, Effort) {
     match quality {
-        Quality::Fast => ("claude-sonnet-5-5", Effort::Medium),
+        Quality::Light | Quality::Fast => ("claude-sonnet-5-5", Effort::Medium),
         Quality::Polished | Quality::Ultra => ("claude-opus-5-5", Effort::High),
     }
 }

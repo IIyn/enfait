@@ -1,0 +1,40 @@
+_version: 2
+"retouch.broll":
+  en: "A b-roll shot: it is edited without a model; change it in the storyboard."
+  fr: "Un plan de b-roll : monté sans modèle ; change-le au storyboard."
+"retouch.edit_again":
+  en: "Edit again with another care level…"
+  fr: "Remonter avec un autre soin…"
+"retouch.failed":
+  en: "The montage failed: %{error}"
+  fr: "Le montage a échoué : %{error}"
+"retouch.in_edit":
+  en: "Being edited."
+  fr: "En cours de montage."
+"retouch.no_description":
+  en: "No description: enfait chose."
+  fr: "Pas de description : enfait a choisi."
+"retouch.not_edited":
+  en: "Video only: nothing to retouch."
+  fr: "Vidéo seule : rien à retoucher."
+"retouch.not_sent":
+  en: "Not sent to montage yet."
+  fr: "Pas encore envoyé au montage."
+"retouch.ready":
+  en: "%{count} ready"
+  fr: "%{count} prêts"
+"retouch.remarks_help":
+  en: "Pause where something is wrong, write it, Enter. Then send."
+  fr: "Mets en pause là où ça ne va pas, écris, Entrée. Puis envoie."
+"retouch.replay":
+  en: "Play the block"
+  fr: "Lire le bloc"
+"retouch.title":
+  en: "Retouch"
+  fr: "Retouches"
+"retouch.to_finish":
+  en: "Finish"
+  fr: "Finition"
+"retouch.tracks_hint":
+  en: "Music and sound effects: Finish step →"
+  fr: "Musique et effets sonores : étape Finition →"

@@ -150,7 +150,10 @@ mod tests {
             Part::Image("/tmp/a/x.jpg".into()),
             Part::Image("/tmp/a/y.jpg".into()),
         ]);
-        assert!(prompt.contains("/tmp/a/x.jpg"));
-        assert_eq!(dirs, vec![PathBuf::from("/tmp/a")]);
+        // `absolute` adds the drive letter and backslashes on Windows.
+        let image = std::path::absolute("/tmp/a/x.jpg").unwrap_or_default();
+        let dir = std::path::absolute("/tmp/a").unwrap_or_default();
+        assert!(prompt.contains(&*image.to_string_lossy()));
+        assert_eq!(dirs, vec![dir]);
     }
 }

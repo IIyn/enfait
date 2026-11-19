@@ -11,3 +11,9 @@ _version: 2
 "common.untitled":
   en: "Untitled"
   fr: "Sans titre"
+"common.back":
+  en: "Back"
+  fr: "Retour"
+"common.cancel":
+  en: "Cancel"
+  fr: "Annuler"

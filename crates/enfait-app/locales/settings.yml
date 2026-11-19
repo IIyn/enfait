@@ -171,11 +171,11 @@ _version: 2
   en: "Tools"
   fr: "Outils"
 "settings.session":
-  en: "Session folder"
-  fr: "Dossier de la session"
+  en: "Folder of the open project"
+  fr: "Dossier du projet ouvert"
 "settings.session_help":
-  en: "Script, storyboard, library and animations. ENFAIT_SESSION chooses another folder."
-  fr: "Script, storyboard, bibliothèque et animations. ENFAIT_SESSION permet d'en choisir un autre."
+  en: "Script, storyboard, library and animations. New projects go in the projects folder of enfait's data; ENFAIT_SESSION opens another folder."
+  fr: "Script, storyboard, bibliothèque et animations. Les nouveaux projets vont dans le dossier projects des données d'enfait ; ENFAIT_SESSION ouvre un autre dossier."
 "settings.show_folder":
   en: "Show the folder"
   fr: "Afficher le dossier"

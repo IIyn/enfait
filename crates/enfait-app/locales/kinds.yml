@@ -1,7 +1,7 @@
 _version: 2
 "kinds.animation":
-  en: "Animation"
-  fr: "Animation"
+  en: "Animation only"
+  fr: "Animation seule"
 "kinds.broll":
   en: "B-roll"
   fr: "B-roll"
@@ -9,8 +9,8 @@ _version: 2
   en: "Effect"
   fr: "Effet"
 "kinds.mixed":
-  en: "Mixed"
-  fr: "Mixte"
+  en: "Video + animation"
+  fr: "Vidéo + animation"
 "kinds.rush":
-  en: "Rush"
-  fr: "Rush"
+  en: "Video only"
+  fr: "Vidéo seule"

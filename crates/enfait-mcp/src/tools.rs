@@ -25,6 +25,8 @@ const DONE: &str = "done";
 /// (`add_media` refers to them by number).
 pub struct Tools {
     dir: PathBuf,
+    /// Follow the project open in the app (re-read at every call).
+    follow: bool,
     found: Vec<Hit>,
 }
 
@@ -104,9 +106,21 @@ fn text_arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
 }
 
 impl Tools {
+    /// Tools pinned to the session `dir`.
     pub fn new(dir: PathBuf) -> Self {
         Self {
             dir,
+            follow: false,
+            found: Vec::new(),
+        }
+    }
+
+    /// Tools working on the project open in the app: when the user opens
+    /// another project, the next call works on it.
+    pub fn following() -> Self {
+        Self {
+            dir: bridge::session_dir(),
+            follow: true,
             found: Vec::new(),
         }
     }
@@ -481,6 +495,14 @@ impl Tools {
     }
 
     pub async fn call(&mut self, name: &str, args: &Value) -> Outcome {
+        if self.follow {
+            let dir = bridge::session_dir();
+            if dir != self.dir {
+                // Search results belong to the previous project's session.
+                self.found.clear();
+                self.dir = dir;
+            }
+        }
         match current_name(name) {
             "storyboard" => self.storyboard(),
             "edit_block" => self.set_block(args),

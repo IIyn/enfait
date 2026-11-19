@@ -1,7 +1,7 @@
 _version: 2
 "notify.block_done":
-  en: "Block %{n} animated."
-  fr: "Bloc %{n} animé."
+  en: "Block %{n} ready."
+  fr: "Bloc %{n} monté."
 "notify.block_failed":
   en: "Block %{n} failed: %{error}"
   fr: "Échec du bloc %{n} : %{error}"

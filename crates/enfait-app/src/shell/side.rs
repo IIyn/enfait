@@ -53,7 +53,7 @@ impl FxField {
         }
     }
 
-    fn get(self, fx: &PostFx) -> f32 {
+    pub(super) fn get(self, fx: &PostFx) -> f32 {
         match self {
             Self::Grain => fx.grain,
             Self::Vignette => fx.vignette,
@@ -292,6 +292,7 @@ impl Shell {
     /// The left column.
     pub(super) fn sidebar(&mut self, cx: &mut Context<Self>) -> Div {
         let search = self.search_section(cx);
+        let style_suggestions = self.mention_suggestions(super::mention::Field::Style, cx);
         let details = self.asset_details(cx);
         let credits = self.credits_section(cx);
         let look = &self.session.look;
@@ -482,6 +483,16 @@ impl Shell {
                     .overflow_y_scroll()
                     .child(
                         section(tr!("side.label.style"))
+                            .id("style-section")
+                            .drag_over::<gpui_kit::ExternalPaths>(|style, _, _, _| {
+                                style.bg(color(tokens::HOVER))
+                            })
+                            .on_drop(cx.listener(
+                                |shell, paths: &gpui_kit::ExternalPaths, _, cx| {
+                                    cx.stop_propagation();
+                                    shell.drop_on_style(paths.paths(), cx);
+                                },
+                            ))
                             .child(div().flex().flex_wrap().gap(px(4.)).children(styles))
                             .child(
                                 div()
@@ -499,6 +510,13 @@ impl Shell {
                                 div()
                                     .h(px(90.))
                                     .child(Textarea::new(&self.style_rules).h_full()),
+                            )
+                            .when_some(style_suggestions, |d, s| d.child(s))
+                            .child(
+                                div()
+                                    .text_size(px(11.))
+                                    .text_color(color(tokens::MUTE))
+                                    .child(tr!("side.style_drop_hint")),
                             ),
                     )
                     .child(

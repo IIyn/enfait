@@ -1,0 +1,216 @@
+name: Release
+
+# Push a `v*` tag (or publish a release from the GitHub UI, which creates the
+# tag): every platform is built, packaged and attached to the release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  linux:
+    name: Linux (deb, rpm, tar.gz)
+    runs-on: ubuntu-24.04
+    # Built on Ubuntu 22.04 (glibc 2.35): runs on Debian 12+, Ubuntu 22.04+,
+    # Fedora, Arch…
+    container: ubuntu:22.04
+    steps:
+      - name: System dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential file dpkg-dev \
+            pkg-config cmake clang libclang-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev \
+            libfontconfig1-dev libfreetype-dev libvulkan-dev \
+            libasound2-dev libdbus-1-dev
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Toolchain
+        run: |
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none --profile minimal
+          "$HOME/.cargo/bin/rustup" toolchain install
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: Version
+        run: |
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          mkdir -p dist
+
+      - name: Build
+        run: cargo build --release --locked -p enfait-app -p enfait-cli
+
+      - name: Packaging tools
+        run: cargo install --locked cargo-deb cargo-generate-rpm
+
+      - name: deb
+        run: |
+          cargo deb -p enfait-app --no-build --deb-version "$VERSION" \
+            -o "dist/enfait_${VERSION}_amd64.deb"
+
+      - name: rpm
+        run: |
+          cargo generate-rpm -p crates/enfait-app \
+            -s "version = \"$VERSION\"" \
+            -o "dist/enfait-${VERSION}-1.x86_64.rpm"
+
+      - name: tar.gz
+        run: |
+          dir="enfait-${VERSION}-x86_64-linux"
+          mkdir -p "$dir/icons"
+          cp target/release/enfait target/release/enfait-cli packaging/linux/enfait.desktop "$dir/"
+          cp assets/icon/enfait-*.png "$dir/icons/"
+          tar czf "dist/$dir.tar.gz" "$dir"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  arch:
+    name: Arch Linux (pkg.tar.zst)
+    needs: linux
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: linux
+
+      # makepkg refuses to run as root.
+      - name: makepkg
+        run: |
+          pacman -Syu --noconfirm --needed base-devel
+          useradd -m builder
+          VERSION="${TAG#v}"
+          # pkgver cannot contain '-' (e.g. 0.2.0-rc1 → 0.2.0_rc1).
+          PKGVER="${VERSION//-/_}"
+          mkdir -p /build
+          sed "s/@VERSION@/$PKGVER/" packaging/arch/PKGBUILD > /build/PKGBUILD
+          sed -i "s/enfait-\${pkgver}-x86_64-linux/enfait-${VERSION}-x86_64-linux/g" /build/PKGBUILD
+          cp "linux/enfait-${VERSION}-x86_64-linux.tar.gz" /build/
+          chown -R builder /build
+          su builder -c "cd /build && makepkg --nodeps --noconfirm"
+          mkdir -p dist
+          cp /build/*.pkg.tar.zst dist/
+          cp /build/PKGBUILD dist/PKGBUILD
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch
+          path: dist/*
+
+  windows:
+    name: Windows (setup.exe, zip)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: Build
+        run: cargo build --release --locked -p enfait-app -p enfait-cli
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target\release\enfait.exe, target\release\enfait-cli.exe dist\
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DVersion=$version" "/DSourceDir=$PWD\dist" "/O$PWD\out" `
+            packaging\windows\enfait.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Compress-Archive -Path dist\enfait.exe, dist\enfait-cli.exe `
+            -DestinationPath "out\enfait-$version-x86_64-windows.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/*
+
+  macos:
+    name: macOS (dmg)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: Build
+        run: cargo build --release --locked -p enfait-app -p enfait-cli
+
+      - name: Package
+        run: packaging/macos/bundle.sh "${TAG#v}" out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/*.dmg
+
+  publish:
+    name: Attach to the release
+    needs: [linux, arch, windows, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --generate-notes \
+                 $([[ "$TAG" == *-* ]] && echo --prerelease)
+          gh release upload "$TAG" dist/* --clobber

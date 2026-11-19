@@ -18,17 +18,10 @@ use std::time::{Duration, SystemTime};
 /// The app is considered open if it gave a sign of life within…
 const ALIVE: Duration = Duration::from_secs(15);
 
-/// Session folder (`ENFAIT_SESSION` to use another one).
+/// Session folder: `ENFAIT_SESSION`, else the project open in the app
+/// (or last opened), else the legacy session folder.
 pub fn session_dir() -> PathBuf {
-    if let Some(dir) = std::env::var_os("ENFAIT_SESSION") {
-        return dir.into();
-    }
-    directories::ProjectDirs::from("", "", "enfait")
-        .map_or_else(
-            || std::env::temp_dir().join("enfait"),
-            |d| d.data_dir().to_path_buf(),
-        )
-        .join("session")
+    enfait_config::projects::current_session()
 }
 
 fn requests_dir(session: &Path) -> PathBuf {

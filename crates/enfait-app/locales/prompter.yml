@@ -11,3 +11,6 @@ _version: 2
 "prompter.stopped":
   en: "stopped"
   fr: "arrêté"
+"prompter.stop_recording":
+  en: "Esc: stop recording"
+  fr: "Échap : arrêter l'enregistrement"

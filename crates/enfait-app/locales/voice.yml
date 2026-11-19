@@ -26,3 +26,54 @@ _version: 2
 "voice.title":
   en: "Script"
   fr: "Script"
+"voice.current_take":
+  en: "current take"
+  fr: "prise utilisée"
+"voice.cut_label":
+  en: "Cut"
+  fr: "Découpe"
+"voice.drop_help":
+  en: "Audio or video file: voice-over, or a take filmed with its microphone."
+  fr: "Fichier audio ou vidéo : voix off, ou rush filmé avec son micro."
+"voice.drop_here":
+  en: "Drop your voice or your video here"
+  fr: "Dépose ta voix ou ta vidéo ici"
+"voice.go_record":
+  en: "Record the voice"
+  fr: "Enregistrer la voix"
+"voice.record":
+  en: "Record with the prompter"
+  fr: "Enregistrer avec le prompteur"
+"voice.record_failed":
+  en: "Recording failed: %{error}"
+  fr: "Enregistrement impossible : %{error}"
+"voice.record_help":
+  en: "The prompter scrolls while you read; Space pauses it, Esc ends the take. Retakes are fine: the cut keeps the last ones."
+  fr: "Le prompteur défile pendant la lecture ; Espace le met en pause, Échap termine la prise. Tu peux reprendre une phrase : la découpe garde les dernières prises."
+"voice.record_too_short":
+  en: "Recording too short: nothing kept."
+  fr: "Enregistrement trop court : rien n'est gardé."
+"voice.recorded":
+  en: "Take recorded."
+  fr: "Prise enregistrée."
+"voice.script_empty":
+  en: "The script is empty: write it first (Script step)."
+  fr: "Le script est vide : écris-le d'abord (étape Script)."
+"voice.takes":
+  en: "Takes recorded here"
+  fr: "Prises enregistrées ici"
+"voice.title_import":
+  en: "Voice and video"
+  fr: "Voix et vidéo"
+"voice.title_record":
+  en: "Voice recording"
+  fr: "Enregistrement de la voix"
+"voice.to_storyboard":
+  en: "Go to the storyboard"
+  fr: "Aller au storyboard"
+"voice.use_take":
+  en: "Use"
+  fr: "Utiliser"
+"voice.no_takes":
+  en: "No take yet."
+  fr: "Aucune prise pour l'instant."

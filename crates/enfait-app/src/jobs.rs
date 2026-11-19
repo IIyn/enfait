@@ -47,6 +47,25 @@ pub struct Job {
     pub kind: JobKind,
     pub quality: Quality,
     pub status: JobStatus,
+    /// When it was queued, started and finished (seconds since the Unix
+    /// epoch): progress and estimates of the Montage screen.
+    #[serde(default)]
+    pub queued_at: u64,
+    #[serde(default)]
+    pub started_at: Option<u64>,
+    #[serde(default)]
+    pub finished_at: Option<u64>,
+}
+
+impl Job {
+    /// Seconds it took (finished jobs).
+    pub fn took(&self) -> Option<u64> {
+        Some(self.finished_at?.saturating_sub(self.started_at?))
+    }
+}
+
+fn now() -> u64 {
+    enfait_config::projects::now()
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -81,6 +100,7 @@ impl JobQueue {
         for job in &mut queue.jobs {
             if job.status == JobStatus::Running {
                 job.status = JobStatus::Queued;
+                job.started_at = None;
             }
         }
         queue
@@ -106,7 +126,6 @@ impl JobQueue {
         }
     }
 
-    #[cfg(test)]
     pub fn jobs(&self) -> &[Job] {
         &self.jobs
     }
@@ -136,6 +155,9 @@ impl JobQueue {
             kind,
             quality,
             status: JobStatus::Queued,
+            queued_at: now(),
+            started_at: None,
+            finished_at: None,
         });
         self.trim();
         self.save();
@@ -155,6 +177,7 @@ impl JobQueue {
             j.status == JobStatus::Queued && !busy.contains(&(j.block, j.kind.family()))
         })?;
         job.status = JobStatus::Running;
+        job.started_at = Some(now());
         let job = job.clone();
         self.save();
         Some(job)
@@ -163,6 +186,7 @@ impl JobQueue {
     pub fn finish(&mut self, id: u64, status: JobStatus) {
         if let Some(job) = self.jobs.iter_mut().find(|j| j.id == id) {
             job.status = status;
+            job.finished_at = Some(now());
         }
         self.save();
     }

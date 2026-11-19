@@ -6,7 +6,6 @@
 
 use super::Shell;
 use crate::jobs::JobKind;
-use crate::session::Session;
 use crate::storyboard::Storyboard;
 use enfait_core::{Finish, History, Look};
 use enfait_mcp::bridge::{self, RequestKind};
@@ -49,7 +48,7 @@ fn read<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
 impl Shell {
     /// Called at every engine poll (every 400 ms).
     pub(super) fn poll_bridge(&mut self, cx: &mut Context<Self>) {
-        let dir = Session::default_dir();
+        let dir = self.session.dir().to_path_buf();
         if self.watch.ticks.is_multiple_of(HEARTBEAT) {
             bridge::touch_heartbeat(&dir);
         }

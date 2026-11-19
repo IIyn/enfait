@@ -19,6 +19,7 @@ mod ffmpeg;
 pub mod fx;
 pub mod output;
 pub mod probe;
+pub mod record;
 pub mod transport;
 pub mod video;
 pub mod waveform;

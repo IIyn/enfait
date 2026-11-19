@@ -1,0 +1,145 @@
+_version: 2
+"home.ago.days":
+  en: "%{n} d ago"
+  fr: "il y a %{n} j"
+"home.ago.hours":
+  en: "%{n} h ago"
+  fr: "il y a %{n} h"
+"home.ago.minutes":
+  en: "%{n} min ago"
+  fr: "il y a %{n} min"
+"home.ago.now":
+  en: "just now"
+  fr: "à l'instant"
+"home.blocks":
+  en: "%{count} blocks"
+  fr: "%{count} blocs"
+"home.brief":
+  en: "Subject, text to show (optional)"
+  fr: "Sujet, texte à afficher (facultatif)"
+"home.brief_placeholder":
+  en: "What the animation shows, the words that must appear…"
+  fr: "Ce que montre l'animation, les mots qui doivent apparaître…"
+"home.choose_file":
+  en: "Choose a file…"
+  fr: "Choisir un fichier…"
+"home.create":
+  en: "Create the project"
+  fr: "Créer le projet"
+"home.create_magic":
+  en: "Start magic mode"
+  fr: "Lancer le mode magique"
+"home.custom":
+  en: "Custom"
+  fr: "Sur mesure"
+"home.custom_text":
+  en: "You describe each block of the storyboard and send the blocks to the montage when you want."
+  fr: "Tu décris chaque bloc du storyboard et tu envoies les blocs au montage quand tu veux."
+"home.delete":
+  en: "Delete the project"
+  fr: "Supprimer le projet"
+"home.delete_confirm":
+  en: "Delete"
+  fr: "Supprimer"
+"home.derush_off":
+  en: "Whole take"
+  fr: "Prise entière"
+"home.derush_off_text":
+  en: "The file is used as it is, from start to end."
+  fr: "Le fichier est utilisé tel quel, du début à la fin."
+"home.derush_on":
+  en: "Automatic cut"
+  fr: "Dérush automatique"
+"home.derush_on_text":
+  en: "enfait keeps the last take of each sentence and removes false starts; you can fix it in the Cut step."
+  fr: "enfait garde la dernière prise de chaque phrase et retire les faux départs ; tu corriges à l'étape Découpe."
+"home.drop_import":
+  en: "Drop the voice or the video here, or add it later."
+  fr: "Dépose la voix ou la vidéo ici, ou ajoute-la plus tard."
+"home.drop_magic":
+  en: "Drop your voice-over or your take here."
+  fr: "Dépose ta voix off ou ton rush ici."
+"home.duration":
+  en: "Duration"
+  fr: "Durée"
+"home.editing":
+  en: "montage: %{count} job(s)"
+  fr: "montage : %{count} tâche(s)"
+"home.error.create":
+  en: "Cannot create the project: %{error}"
+  fr: "Impossible de créer le projet : %{error}"
+"home.error.delete":
+  en: "Cannot delete the project: %{error}"
+  fr: "Impossible de supprimer le projet : %{error}"
+"home.error.duration":
+  en: "Choose a duration between 1 and %{max} seconds."
+  fr: "Choisis une durée entre 1 et %{max} secondes."
+"home.error.file_missing":
+  en: "The file cannot be found."
+  fr: "Le fichier est introuvable."
+"home.error.need_file":
+  en: "Magic mode needs a voice or a take."
+  fr: "Le mode magique a besoin d'une voix ou d'un rush."
+"home.file_chosen":
+  en: "File: %{name}"
+  fr: "Fichier : %{name}"
+"home.format":
+  en: "Format"
+  fr: "Format"
+"home.kind.import":
+  en: "Voice or video"
+  fr: "Voix ou vidéo"
+"home.kind.magic":
+  en: "Magic"
+  fr: "Magique"
+"home.kind.script":
+  en: "Script and recording"
+  fr: "Script et enregistrement"
+"home.kind.silent":
+  en: "No voice"
+  fr: "Sans voix"
+"home.magic":
+  en: "Magic"
+  fr: "Magique"
+"home.magic_text":
+  en: "Give your voice-over or your take: cleanup, storyboard, montage, sound and export are automatic. You can come back to the storyboard afterwards."
+  fr: "Donne ta voix off ou ton rush : nettoyage, storyboard, montage, son et export sont automatiques. Tu peux revenir au storyboard ensuite."
+"home.new":
+  en: "New project"
+  fr: "Nouveau projet"
+"home.new_title":
+  en: "New project"
+  fr: "Nouveau projet"
+"home.projects":
+  en: "Projects"
+  fr: "Projets"
+"home.seconds":
+  en: "seconds"
+  fr: "secondes"
+"home.start.import":
+  en: "Voice or video already recorded"
+  fr: "Voix ou vidéo déjà enregistrée"
+"home.start.import_text":
+  en: "Import a voice-over, or a take filmed with its microphone."
+  fr: "Importe une voix off, ou un rush filmé avec son micro."
+"home.start.script":
+  en: "Write the script and record it here"
+  fr: "Écrire le script et l'enregistrer ici"
+"home.start.script_text":
+  en: "Script editor, then recording with the prompter."
+  fr: "Éditeur de script, puis enregistrement avec le prompteur."
+"home.start.silent":
+  en: "No voice"
+  fr: "Sans voix"
+"home.start.silent_text":
+  en: "An animation of a chosen duration; timing is set with precise moments."
+  fr: "Une animation d'une durée choisie ; le timing se règle avec les moments précis."
+"home.start_label":
+  en: "Start from"
+  fr: "Pour démarrer"
+"home.title_label":
+  en: "Title (optional)"
+  fr: "Titre (facultatif)"
+"home.title_placeholder":
+  en: "Untitled"
+  fr: "Sans titre"

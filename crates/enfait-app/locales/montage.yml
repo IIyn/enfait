@@ -1,0 +1,139 @@
+_version: 2
+"montage.about_minutes":
+  en: "~%{n} min"
+  fr: "~%{n} min"
+"montage.about_seconds":
+  en: "~%{n} s"
+  fr: "~%{n} s"
+"montage.block":
+  en: "Block %{n}"
+  fr: "Bloc %{n}"
+"montage.block_failed_toast":
+  en: "Block %{n}: the montage failed."
+  fr: "Bloc %{n} : le montage a échoué."
+"montage.block_left":
+  en: "Montage: %{left} left"
+  fr: "Montage : encore %{left}"
+"montage.block_title":
+  en: "Montage of block %{n}"
+  fr: "Montage du bloc %{n}"
+"montage.care.fast":
+  en: "One pass, no review of the rendered frames. Often needs a retouch."
+  fr: "Une passe, sans relecture des images rendues. Demande souvent une retouche."
+"montage.care.light":
+  en: "Smallest model, one pass. For drafts and simple blocks."
+  fr: "Plus petit modèle, une passe. Pour les brouillons et les blocs simples."
+"montage.care.polished":
+  en: "Two reviews of the rendered frames. The usual choice."
+  fr: "Deux relectures des images rendues. Le choix habituel."
+"montage.care.ultra":
+  en: "Four reviews, highest effort. Long, and uses more of your quota."
+  fr: "Quatre relectures, effort maximal. Long, et consomme plus de quota."
+"montage.care_label":
+  en: "Care level"
+  fr: "Niveau de soin"
+"montage.check":
+  en: "Check →"
+  fr: "Vérifier →"
+"montage.done_of":
+  en: "%{done} of %{total} blocks edited"
+  fr: "%{done} blocs montés sur %{total}"
+"montage.estimate_note":
+  en: "Estimate updated after each finished block. You can leave this screen: the montage goes on."
+  fr: "Estimation recalée à chaque bloc fini. Tu peux quitter cet écran : le montage continue."
+"montage.idle":
+  en: "Choose blocks in the storyboard (Shift or Ctrl+click), then Send to montage."
+  fr: "Choisis des blocs au storyboard (Maj ou Ctrl+clic), puis Envoyer au montage."
+"montage.idle_tag":
+  en: "idle"
+  fr: "à l'arrêt"
+"montage.idle_title":
+  en: "Nothing being edited"
+  fr: "Aucun montage en cours"
+"montage.legend.failed":
+  en: "%{n} failed"
+  fr: "%{n} en échec"
+"montage.legend.queued":
+  en: "%{n} waiting"
+  fr: "%{n} à venir"
+"montage.legend.ready":
+  en: "%{n} ready"
+  fr: "%{n} prêts"
+"montage.legend.running":
+  en: "%{n} running"
+  fr: "%{n} en cours"
+"montage.legend.unsent":
+  en: "%{n} not sent"
+  fr: "%{n} non envoyés"
+"montage.no_board":
+  en: "No storyboard yet."
+  fr: "Pas encore de storyboard."
+"montage.no_edit":
+  en: "no montage"
+  fr: "sans montage"
+"montage.nothing_to_send":
+  en: "None of the chosen blocks needs a montage (video only or b-roll)."
+  fr: "Aucun des blocs choisis n'a besoin de montage (vidéo seule ou b-roll)."
+"montage.phase.editing":
+  en: "Montage"
+  fr: "Montage"
+"montage.phase.finishing":
+  en: "Finalisation"
+  fr: "Finalisation"
+"montage.phase.preparing":
+  en: "Preparation"
+  fr: "Préparation"
+"montage.progress":
+  en: "Progress"
+  fr: "Avancement"
+"montage.queue_left":
+  en: "Queue: %{left} left"
+  fr: "File : encore %{left}"
+"montage.retouch_link":
+  en: "Retouch · %{count} ready"
+  fr: "Retouches · %{count} prêts"
+"montage.retry":
+  en: "Retry…"
+  fr: "Relancer…"
+"montage.running_tag":
+  en: "running"
+  fr: "en cours"
+"montage.send_blocks":
+  en: "%{count} block(s): %{list}. They are edited in the background; you can go on with the storyboard."
+  fr: "%{count} bloc(s) : %{list}. Ils sont montés en tâche de fond ; tu peux continuer le storyboard."
+"montage.send_one":
+  en: "Send…"
+  fr: "Envoyer…"
+"montage.send_title":
+  en: "Send to montage"
+  fr: "Envoyer au montage"
+"montage.sent":
+  en: "%{count} block(s) sent to montage."
+  fr: "%{count} bloc(s) envoyé(s) au montage."
+"montage.skipped":
+  en: "%{count} chosen block(s) need no montage (video only or b-roll)."
+  fr: "%{count} bloc(s) choisi(s) sans montage (vidéo seule ou b-roll)."
+"montage.start":
+  en: "Start the montage"
+  fr: "Lancer le montage"
+"montage.started":
+  en: "started %{ago} ago"
+  fr: "commencé il y a %{ago}"
+"montage.stop":
+  en: "Stop"
+  fr: "Arrêter"
+"montage.title":
+  en: "Montage"
+  fr: "Montage"
+"montage.to_storyboard":
+  en: "Storyboard"
+  fr: "Storyboard"
+"montage.transition":
+  en: "Transition %{from} → %{to}"
+  fr: "Transition %{from} → %{to}"
+"montage.with_transitions":
+  en: "With the transitions"
+  fr: "Avec les transitions"
+"montage.your_blocks":
+  en: "Your blocks"
+  fr: "Tes blocs"

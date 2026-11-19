@@ -20,7 +20,13 @@ pub async fn run(args: McpArgs) -> Result<()> {
         return install(&dir);
     }
     tracing::info!("MCP server on session {}", dir.display());
-    let mut server = Server::new(Tools::new(dir));
+    // Without ENFAIT_SESSION the server follows the project open in the app.
+    let tools = if std::env::var_os("ENFAIT_SESSION").is_some() {
+        Tools::new(dir)
+    } else {
+        Tools::following()
+    };
+    let mut server = Server::new(tools);
     server
         .serve(
             tokio::io::BufReader::new(tokio::io::stdin()),

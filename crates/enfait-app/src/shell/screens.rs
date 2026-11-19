@@ -2,6 +2,7 @@
 
 use super::{Shell, mono};
 use crate::cut::{CutStatus, clock};
+use crate::session::Start;
 use crate::theme::{ROW_HEIGHT, color, tokens};
 use crate::tr;
 use enfait_speech::script::sentences;
@@ -16,7 +17,11 @@ use gpui_kit::{
 const WORDS_PER_MINUTE: f64 = 150.0;
 
 /// Plain button; `primary`: in the signal colour.
-fn button(id: impl Into<ElementId>, text: impl Into<SharedString>, primary: bool) -> Stateful<Div> {
+pub(super) fn button(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    primary: bool,
+) -> Stateful<Div> {
     div()
         .id(id)
         .flex_none()
@@ -71,7 +76,8 @@ fn toolbar(title: impl Into<SharedString>, detail: String) -> Div {
 }
 
 impl Shell {
-    pub(super) fn voice_screen(&mut self, cx: &mut Context<Self>) -> Div {
+    /// Script: the text to read, its length, the prompter.
+    pub(super) fn script_screen(&mut self, cx: &mut Context<Self>) -> Div {
         let found = sentences(&self.session.script);
         let words: usize = found.iter().map(|s| s.tokens.len()).sum();
         #[allow(clippy::cast_precision_loss)]
@@ -83,20 +89,14 @@ impl Shell {
             duration = clock(minutes * 60.0)
         )
         .to_string();
-        let rush = self
-            .session
-            .data
-            .rush
-            .as_ref()
-            .and_then(|p| p.file_name())
-            .map(|n| n.to_string_lossy().into_owned());
+        let record = self.session.data.start == Start::Script;
         div()
             .flex_1()
             .min_w(px(0.))
             .flex()
             .flex_col()
             .child(
-                toolbar(tr!("voice.title"), detail)
+                toolbar(tr!("steps.script"), detail)
                     .child(
                         button("prompter", tr!("voice.prompter"), false).on_click(cx.listener(
                             |shell, _: &ClickEvent, window: &mut Window, cx| {
@@ -104,14 +104,132 @@ impl Shell {
                             },
                         )),
                     )
-                    .child(button("import", tr!("voice.import"), true).on_click(
-                        cx.listener(|shell, _: &ClickEvent, _, cx| shell.prompt_import(cx)),
-                    ))
-                    .child(button("magic", tr!("voice.magic"), false).on_click(
-                        cx.listener(|shell, _: &ClickEvent, _, cx| shell.start_magic(cx)),
-                    )),
+                    .when(record, |d| {
+                        d.child(button("to-voice", tr!("voice.go_record"), true).on_click(
+                            cx.listener(|shell, _: &ClickEvent, _, cx| {
+                                shell.go_to(super::STEP_VOICE, cx);
+                            }),
+                        ))
+                    }),
             )
-            .when_some(rush, |d, name| {
+            .child(
+                div()
+                    .flex_1()
+                    .min_h(px(0.))
+                    .p(px(16.))
+                    .child(Textarea::new(&self.script).h_full()),
+            )
+    }
+
+    /// Takes recorded in enfait, newest first.
+    fn recordings(&self) -> Vec<std::path::PathBuf> {
+        let mut list: Vec<std::path::PathBuf> = std::fs::read_dir(self.session.recordings_dir())
+            .map(|dir| {
+                dir.filter_map(Result::ok)
+                    .map(|e| e.path())
+                    .filter(|p| p.extension().is_some_and(|e| e == "wav"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        list.sort();
+        list.reverse();
+        list
+    }
+
+    /// Voice: record it here (with the prompter) or import a voice or a
+    /// video; whether the take is cut automatically.
+    #[allow(clippy::too_many_lines)]
+    pub(super) fn voice_screen(&mut self, cx: &mut Context<Self>) -> Div {
+        let data = &self.session.data;
+        let record = data.start == Start::Script;
+        let derush = data.derush;
+        let rush = data.rush.clone();
+        let rush_name = rush
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().into_owned());
+        let recordings = if record {
+            self.recordings()
+        } else {
+            Vec::new()
+        };
+        let next = if derush {
+            (super::STEP_CUT, tr!("voice.see_cut"))
+        } else {
+            (super::STEP_STORYBOARD, tr!("voice.to_storyboard"))
+        };
+        let listeners: &Context<Self> = cx;
+        let no_takes = recordings.is_empty();
+        let takes = recordings.into_iter().enumerate().map(|(i, path)| {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let current = rush.as_deref() == Some(path.as_path());
+            div()
+                .flex()
+                .items_center()
+                .gap(px(10.))
+                .px(px(12.))
+                .h(px(ROW_HEIGHT))
+                .border_b_1()
+                .border_color(color(tokens::LINE))
+                .child(mono(name).flex_1().text_size(px(12.)))
+                .child(if current {
+                    div()
+                        .text_size(px(11.))
+                        .text_color(color(tokens::SIGNAL))
+                        .child(tr!("voice.current_take"))
+                        .into_any_element()
+                } else {
+                    super::studio::chip(("use-take", i), tr!("voice.use_take"), false, true)
+                        .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                            shell.import_rush(path.clone(), cx);
+                        }))
+                        .into_any_element()
+                })
+        });
+        let derush_chips = div()
+            .flex()
+            .items_center()
+            .gap(px(4.))
+            .child(super::label(tr!("voice.cut_label")).mr(px(4.)))
+            .child(
+                super::studio::chip("derush-on", tr!("home.derush_on"), derush, true).on_click(
+                    cx.listener(|shell, _: &ClickEvent, _, cx| shell.set_derush(true, cx)),
+                ),
+            )
+            .child(
+                super::studio::chip("derush-off", tr!("home.derush_off"), !derush, true).on_click(
+                    cx.listener(|shell, _: &ClickEvent, _, cx| shell.set_derush(false, cx)),
+                ),
+            );
+        div()
+            .flex_1()
+            .min_w(px(0.))
+            .flex()
+            .flex_col()
+            .child(
+                toolbar(
+                    if record {
+                        tr!("voice.title_record")
+                    } else {
+                        tr!("voice.title_import")
+                    },
+                    String::new(),
+                )
+                .child(
+                    button("import", tr!("voice.import"), !record).on_click(
+                        cx.listener(|shell, _: &ClickEvent, _, cx| shell.prompt_import(cx)),
+                    ),
+                )
+                .when(!record, |d| {
+                    d.child(button("magic", tr!("voice.magic"), false).on_click(
+                        cx.listener(|shell, _: &ClickEvent, _, cx| shell.start_magic(cx)),
+                    ))
+                }),
+            )
+            .when_some(rush_name, |d, name| {
                 d.child(
                     div()
                         .flex()
@@ -127,23 +245,148 @@ impl Shell {
                         .child(tr!("voice.take", name = name))
                         .child(
                             div()
-                                .id("to-cut")
+                                .id("to-next")
                                 .cursor_pointer()
                                 .text_color(color(tokens::SIGNAL))
-                                .child(tr!("voice.see_cut"))
-                                .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
-                                    shell.go_to(super::STEP_CUT, cx);
+                                .child(next.1)
+                                .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                                    shell.go_to(next.0, cx);
                                 })),
                         ),
                 )
             })
             .child(
                 div()
+                    .id("voice-body")
                     .flex_1()
                     .min_h(px(0.))
-                    .p(px(16.))
-                    .child(Textarea::new(&self.script).h_full()),
+                    .overflow_y_scroll()
+                    .p(px(20.))
+                    .flex()
+                    .flex_col()
+                    .gap(px(14.))
+                    .when(record, |d| {
+                        d.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(14.))
+                                .child(
+                                    div()
+                                        .id("record")
+                                        .flex()
+                                        .items_center()
+                                        .gap(px(8.))
+                                        .h(px(40.))
+                                        .px(px(18.))
+                                        .rounded(px(3.))
+                                        .cursor_pointer()
+                                        .bg(color(tokens::SIGNAL))
+                                        .text_color(color(tokens::ON_SIGNAL))
+                                        .hover(|d| d.bg(color(tokens::SIGNAL_HOVER)))
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(
+                                            div()
+                                                .size(px(10.))
+                                                .rounded(px(5.))
+                                                .bg(color(tokens::ERROR)),
+                                        )
+                                        .child(tr!("voice.record"))
+                                        .on_click(cx.listener(
+                                            |shell, _: &ClickEvent, window, cx| {
+                                                shell.start_recording(window, cx);
+                                            },
+                                        )),
+                                )
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .text_size(px(12.))
+                                        .text_color(color(tokens::FG2))
+                                        .child(tr!("voice.record_help")),
+                                ),
+                        )
+                        .when(self.session.script.trim().is_empty(), |d| {
+                            d.child(
+                                div()
+                                    .id("write-first")
+                                    .cursor_pointer()
+                                    .text_size(px(12.))
+                                    .text_color(color(tokens::MIXED))
+                                    .child(tr!("voice.script_empty"))
+                                    .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                                        shell.go_to(super::STEP_SCRIPT, cx);
+                                    })),
+                            )
+                        })
+                        .child(super::label(tr!("voice.takes")))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .border_1()
+                                .border_color(color(tokens::LINE))
+                                .rounded(px(3.))
+                                .when(no_takes, |d| {
+                                    d.child(
+                                        div()
+                                            .px(px(12.))
+                                            .py(px(8.))
+                                            .text_size(px(12.))
+                                            .text_color(color(tokens::MUTE))
+                                            .child(tr!("voice.no_takes")),
+                                    )
+                                })
+                                .children(takes),
+                        )
+                    })
+                    .when(!record, |d| {
+                        d.child(
+                            div()
+                                .id("voice-drop")
+                                .flex()
+                                .flex_col()
+                                .items_center()
+                                .justify_center()
+                                .gap(px(8.))
+                                .h(px(160.))
+                                .rounded(px(4.))
+                                .border_1()
+                                .border_dashed()
+                                .border_color(color(tokens::LINE_STRONG))
+                                .text_color(color(tokens::FG2))
+                                .child(tr!("voice.drop_here"))
+                                .child(
+                                    div()
+                                        .text_size(px(12.))
+                                        .text_color(color(tokens::MUTE))
+                                        .child(tr!("voice.drop_help")),
+                                ),
+                        )
+                    })
+                    .child(derush_chips)
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(color(tokens::MUTE))
+                            .child(if derush {
+                                tr!("home.derush_on_text")
+                            } else {
+                                tr!("home.derush_off_text")
+                            }),
+                    ),
             )
+    }
+
+    /// Turns the automatic cut on or off.
+    fn set_derush(&mut self, derush: bool, cx: &mut Context<Self>) {
+        if self.session.data.derush == derush {
+            return;
+        }
+        self.session.data.derush = derush;
+        self.session.save_data();
+        self.apply_cut(cx);
+        cx.notify();
     }
 
     /// `playing`: time of the take being played.

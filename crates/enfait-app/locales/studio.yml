@@ -123,8 +123,8 @@ _version: 2
   en: "queued"
   fr: "en attente"
 "studio.state.ready":
-  en: "animated"
-  fr: "animée"
+  en: "ready"
+  fr: "monté"
 "studio.state.running":
   en: "running…"
   fr: "en cours…"
@@ -140,3 +140,24 @@ _version: 2
 "studio.writing":
   en: "Storyboard: %{what}"
   fr: "Storyboard : %{what}"
+"studio.check":
+  en: "Check in Retouch"
+  fr: "Vérifier dans Retouches"
+"studio.choose_all":
+  en: "Choose all"
+  fr: "Tout choisir"
+"studio.chosen":
+  en: "%{count} chosen · Shift or Ctrl+click"
+  fr: "%{count} choisi(s) · Maj ou Ctrl+clic"
+"studio.quality.light":
+  en: "Light"
+  fr: "Léger"
+"studio.send_again":
+  en: "Edit again…"
+  fr: "Remonter…"
+"studio.send_block":
+  en: "Send to montage…"
+  fr: "Envoyer au montage…"
+"studio.send_to_montage":
+  en: "Send to montage (%{count})"
+  fr: "Envoyer au montage (%{count})"

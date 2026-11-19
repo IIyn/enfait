@@ -117,6 +117,7 @@ impl GpuArg {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum QualityArg {
+    Light,
     Fast,
     Polished,
     Ultra,
@@ -125,6 +126,7 @@ pub enum QualityArg {
 impl From<QualityArg> for Quality {
     fn from(q: QualityArg) -> Self {
         match q {
+            QualityArg::Light => Self::Light,
             QualityArg::Fast => Self::Fast,
             QualityArg::Polished => Self::Polished,
             QualityArg::Ultra => Self::Ultra,

@@ -31,7 +31,76 @@ impl Look {
                 rules.push('\n');
             }
         }
+        if let Some(named) = self.mentions_brief(&self.style.rules) {
+            rules.push_str("\n\n");
+            rules.push_str(&named);
+        }
         (!rules.trim().is_empty()).then_some(rules)
+    }
+
+    /// Library files named in `text` with `@file`, in order, without
+    /// duplicates. Punctuation after the name (end of sentence) is ignored.
+    pub fn mentioned(&self, text: &str) -> Vec<&Asset> {
+        let mut out: Vec<&Asset> = Vec::new();
+        for (i, _) in text.match_indices('@') {
+            let before = text.get(..i).and_then(|b| b.chars().next_back());
+            if before.is_some_and(|c| !c.is_whitespace() && !"([{\"'«“".contains(c)) {
+                continue;
+            }
+            let rest = text.get(i.saturating_add(1)..).unwrap_or_default();
+            let mut token: &str = rest.split(char::is_whitespace).next().unwrap_or_default();
+            let found = loop {
+                if let Some(asset) = self.assets.iter().find(|a| a.file == token) {
+                    break Some(asset);
+                }
+                match token.char_indices().next_back() {
+                    Some((last, c)) if c.is_ascii_punctuation() || "»”’…".contains(c) => {
+                        token = token.get(..last).unwrap_or_default();
+                    }
+                    _ => break None,
+                }
+            };
+            if let Some(asset) = found
+                && !out.iter().any(|a| a.file == asset.file)
+            {
+                out.push(asset);
+            }
+        }
+        out
+    }
+
+    /// What the `@file` mentions of `text` designate, for a model brief.
+    pub fn mentions_brief(&self, text: &str) -> Option<String> {
+        let named = self.mentioned(text);
+        if named.is_empty() {
+            return None;
+        }
+        let mut out = String::from("Files the user names with @ (from their library):\n");
+        for asset in named {
+            let usage = match asset.kind {
+                AssetKind::Image | AssetKind::Svg => "use this exact file",
+                AssetKind::Font => "use this font family",
+                AssetKind::Video => {
+                    "a video: it cannot play inside an animation, show a still or \
+                     suggest it as a b-roll shot"
+                }
+                AssetKind::Audio => {
+                    "a sound: it is placed by the sound finish, not in the animation"
+                }
+            };
+            out.push_str(&format!(
+                "- @{} → library file `{}` ({}, \"{}\"): {usage}",
+                asset.file,
+                asset.file,
+                asset.kind.label(),
+                asset.name
+            ));
+            if !asset.description.trim().is_empty() {
+                out.push_str(&format!("; note: {}", asset.description.trim()));
+            }
+            out.push('\n');
+        }
+        Some(out)
     }
 }
 
@@ -234,6 +303,42 @@ pub struct Asset {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mentions() {
+        let asset = |file: &str, kind| Asset {
+            file: file.into(),
+            kind,
+            name: file.into(),
+            description: String::new(),
+            origin: None,
+        };
+        let look = Look {
+            assets: vec![
+                asset("logo.svg", AssetKind::Svg),
+                asset("perso.png", AssetKind::Image),
+            ],
+            ..Look::default()
+        };
+        let named = look.mentioned(
+            "Le @logo.svg en haut, puis @perso.png. Encore @logo.svg, x@perso.png @absent",
+        );
+        let files: Vec<&str> = named.iter().map(|a| a.file.as_str()).collect();
+        assert_eq!(files, ["logo.svg", "perso.png"]);
+        assert!(look.mentions_brief("rien").is_none());
+        let brief = look.mentions_brief("(@perso.png)").unwrap_or_default();
+        assert!(brief.contains("`perso.png`"));
+        let rules = Look {
+            style: StyleChoice {
+                rules: "Logo @logo.svg en bas à droite.".into(),
+                ..StyleChoice::default()
+            },
+            ..look
+        }
+        .rules()
+        .unwrap_or_default();
+        assert!(rules.contains("library file `logo.svg`"));
+    }
 
     #[test]
     fn neutral_and_clamping() {

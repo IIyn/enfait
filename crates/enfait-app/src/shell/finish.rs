@@ -268,7 +268,7 @@ impl Shell {
     }
 
     /// Copies the finish values into the sliders.
-    fn sync_knobs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn sync_knobs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let cue = self.selected_cue;
         for (knob, state) in &self.knobs {
             let (min, max, _) = knob.range();

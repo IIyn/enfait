@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=enfait
+Comment=Voice-over to motion design video
+Comment[fr]=De la voix off à la vidéo motion design
+Exec=enfait %F
+Icon=enfait
+Terminal=false
+Categories=AudioVideo;Video;AudioVideoEditing;
+StartupWMClass=enfait

@@ -21,7 +21,13 @@ pub struct Storyboard {
     /// Fingerprint of the original edit (see [`key`]).
     pub key: String,
     pub history: History,
+    /// Block shown in the inspector.
     pub selected: Option<BlockId>,
+    /// Blocks chosen for the edit (Shift+click: range, Ctrl/Cmd+click:
+    /// one more), in storyboard order; contains `selected`.
+    pub marked: Vec<BlockId>,
+    /// Start of a Shift+click range.
+    pub anchor: Option<BlockId>,
     /// Word chosen in the selected block (index in `transcript.words`).
     pub word: Option<usize>,
     /// Moment chosen in the selected block.
@@ -60,7 +66,9 @@ impl Storyboard {
             enfait_speech::segment(&transcript, &enfait_speech::SegmentParams::standard()?)?
         };
         if ranges.is_empty() && transcript.media_duration > Flicks::ZERO {
-            ranges.push(TimeRange::new(Flicks::ZERO, transcript.media_duration)?);
+            // Nothing said (video without voice): blocks of about five
+            // seconds, to be merged or split by hand.
+            ranges = even_blocks(transcript.media_duration)?;
         }
         let mut used = vec![false; previous.map_or(0, |p| p.project.blocks().len())];
         let blocks = ranges
@@ -97,6 +105,8 @@ impl Storyboard {
             key,
             history: History::new(),
             selected: None,
+            marked: Vec::new(),
+            anchor: None,
             word: None,
             moment: None,
         })
@@ -109,15 +119,20 @@ impl Storyboard {
             .ok()?;
         let montage: Montage =
             serde_json::from_slice(&std::fs::read(dir.join("montage.json")).ok()?).ok()?;
-        Some(Self {
+        let first = project.blocks().first().map(|b| b.id);
+        let mut board = Self {
             project,
             transcript: montage.transcript,
             key: montage.key,
             history: History::new(),
             selected: None,
+            marked: Vec::new(),
+            anchor: None,
             word: None,
             moment: None,
-        })
+        };
+        board.select(first);
+        Some(board)
     }
 
     pub fn save(&self, dir: &Path) {
@@ -160,6 +175,64 @@ impl Storyboard {
             self.moment = None;
         }
         self.selected = id;
+        self.marked = id.into_iter().collect();
+        self.anchor = id;
+    }
+
+    /// Shift+click: every block from the anchor to `id`.
+    pub fn select_range(&mut self, id: BlockId) {
+        let blocks = self.project.blocks();
+        let to = blocks.iter().position(|b| b.id == id);
+        let from = self
+            .anchor
+            .and_then(|a| blocks.iter().position(|b| b.id == a))
+            .or(to);
+        let (Some(from), Some(to)) = (from, to) else {
+            return;
+        };
+        let (a, b) = (from.min(to), from.max(to));
+        self.marked = blocks
+            .get(a..=b)
+            .map(|s| s.iter().map(|b| b.id).collect())
+            .unwrap_or_default();
+        if self.selected != Some(id) {
+            self.word = None;
+            self.moment = None;
+        }
+        self.selected = Some(id);
+    }
+
+    /// Ctrl/Cmd+click: adds or removes one block.
+    pub fn toggle_marked(&mut self, id: BlockId) {
+        if let Some(i) = self.marked.iter().position(|m| *m == id) {
+            if self.marked.len() > 1 {
+                self.marked.remove(i);
+                if self.selected == Some(id) {
+                    self.selected = self.marked.last().copied();
+                    self.word = None;
+                    self.moment = None;
+                }
+            }
+            return;
+        }
+        self.marked.push(id);
+        let order: Vec<BlockId> = self.project.blocks().iter().map(|b| b.id).collect();
+        self.marked
+            .sort_by_key(|m| order.iter().position(|o| o == m).unwrap_or(usize::MAX));
+        if self.selected != Some(id) {
+            self.word = None;
+            self.moment = None;
+        }
+        self.selected = Some(id);
+        self.anchor = Some(id);
+    }
+
+    /// Every block chosen.
+    pub fn mark_all(&mut self) {
+        self.marked = self.project.blocks().iter().map(|b| b.id).collect();
+        if self.selected.is_none() {
+            self.selected = self.marked.first().copied();
+        }
     }
 
     /// Spoken words of a block: (index, word).
@@ -211,6 +284,14 @@ impl Storyboard {
 
     /// After an edit, the selection may point to a block or moment that is gone.
     fn repair_selection(&mut self) {
+        let project = &self.project;
+        self.marked.retain(|id| project.block(*id).is_some());
+        if let Some(id) = self.selected
+            && project.block(id).is_some()
+            && !self.marked.contains(&id)
+        {
+            self.marked.push(id);
+        }
         let Some(block) = self.block() else {
             self.selected = self.project.blocks().first().map(|b| b.id);
             self.word = None;
@@ -259,6 +340,58 @@ impl Storyboard {
         Ok(())
     }
 
+    /// Cuts the block under time `t` (edit seconds) there: for passages
+    /// without words. The second part is selected.
+    pub fn split_at_time(&mut self, t: f64) -> Result<(), enfait_core::EditError> {
+        #[allow(clippy::cast_possible_truncation)]
+        let at = Flicks::from_millis((t * 1000.0).round() as i64)?;
+        let Some(block) = self
+            .project
+            .blocks()
+            .iter()
+            .find(|b| b.range.contains(at) && at > b.range.start())
+        else {
+            return Err(enfait_core::EditError::SplitOutsideBlock);
+        };
+        let new_block = BlockId::new();
+        self.apply(Edit::Split {
+            block: block.id,
+            at,
+            new_block,
+        })?;
+        self.select(Some(new_block));
+        Ok(())
+    }
+
+    /// Sets a moment at time `t` (edit seconds) in the selected block,
+    /// anchored on the word said then if there is one.
+    pub fn add_moment_at(&mut self, t: f64) -> Result<(), enfait_core::EditError> {
+        let Some(block) = self.block() else {
+            return Ok(());
+        };
+        #[allow(clippy::cast_possible_truncation)]
+        let at = Flicks::from_millis((t * 1000.0).round() as i64)?;
+        if !block.range.contains(at) || block.moments.iter().any(|m| m.at == at) {
+            return Ok(());
+        }
+        let word = self
+            .transcript
+            .words
+            .iter()
+            .find(|w| w.range.contains(at))
+            .map(|w| w.text.clone())
+            .unwrap_or_default();
+        let id = block.id;
+        let moment = Moment {
+            at,
+            word,
+            note: String::new(),
+        };
+        self.apply(Edit::AddMoment { block: id, moment })?;
+        self.moment = Some(at);
+        Ok(())
+    }
+
     /// Sets a moment at the start of the chosen word, and selects it.
     pub fn add_moment(&mut self) -> Result<(), enfait_core::EditError> {
         let (Some(id), Some(word)) = (
@@ -277,6 +410,29 @@ impl Storyboard {
         self.moment = Some(at);
         Ok(())
     }
+}
+
+/// Target length of the blocks of a passage without words.
+const EVEN_BLOCK_SECONDS: f64 = 5.0;
+
+/// `duration` in blocks of about five seconds.
+fn even_blocks(duration: Flicks) -> Result<Vec<TimeRange>> {
+    let total = duration.as_secs_f64();
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let count = ((total / EVEN_BLOCK_SECONDS).round() as i64).max(1);
+    let step = duration.get() / count;
+    let mut out = Vec::new();
+    let mut start = Flicks::ZERO;
+    for i in 1..=count {
+        let end = if i == count {
+            duration
+        } else {
+            Flicks::new(step.saturating_mul(i))
+        };
+        out.push(TimeRange::new(start, end)?);
+        start = end;
+    }
+    Ok(out)
 }
 
 /// Moments of an old block, shifted onto the new one, if they fall in it.

@@ -65,6 +65,8 @@ struct Shared {
     mix_requested: AtomicBool,
     /// Activity of each running job (0: preview), for the interface.
     activity: Mutex<BTreeMap<u64, String>>,
+    /// Phase of each running job, for the Montage screen.
+    phases: Mutex<BTreeMap<u64, Phase>>,
     /// Export requested, not started yet.
     export_request: Mutex<Option<ExportRequest>>,
     export_state: Mutex<ExportState>,
@@ -73,6 +75,25 @@ struct Shared {
     write_state: Mutex<WriteState>,
     /// Finished work, for notifications.
     events: Mutex<Vec<Event>>,
+}
+
+/// Where a running job stands: preparation (direction, frames of the
+/// take), the edit itself (model calls), finalisation (render).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Phase {
+    Preparing,
+    Editing,
+    Finishing,
+}
+
+fn set_phase(shared: &Shared, id: u64, phase: Option<Phase>) {
+    if let Ok(mut p) = shared.phases.lock() {
+        match phase {
+            Some(phase) => p.insert(id, phase),
+            None => p.remove(&id),
+        };
+    }
+    shared.changed.store(true, Ordering::Release);
 }
 
 /// Something the engine finished, worth a notification.
@@ -220,6 +241,7 @@ impl Worker {
             preview_requested: AtomicBool::new(false),
             mix_requested: AtomicBool::new(false),
             activity: Mutex::new(BTreeMap::new()),
+            phases: Mutex::new(BTreeMap::new()),
             export_request: Mutex::new(None),
             export_state: Mutex::new(ExportState::Idle),
             write_request: Mutex::new(None),
@@ -345,6 +367,16 @@ impl Worker {
             .unwrap_or_default()
     }
 
+    /// Phase of a running job.
+    pub fn phase(&self, job: u64) -> Option<Phase> {
+        self.shared.phases.lock().ok()?.get(&job).copied()
+    }
+
+    /// Activity text of a running job.
+    pub fn job_activity(&self, job: u64) -> Option<String> {
+        self.shared.activity.lock().ok()?.get(&job).cloned()
+    }
+
     pub fn activity(&self) -> Option<String> {
         let activity = self.shared.activity.lock().ok()?;
         (!activity.is_empty()).then(|| activity.values().cloned().collect::<Vec<_>>().join(" · "))
@@ -429,6 +461,7 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                 Arc::clone(shared),
                 Arc::clone(&running),
             );
+            set_phase(&shared, job.id, Some(Phase::Preparing));
             runtime.spawn(async move {
                 let number = snapshot.as_ref().map_or(0, |s| {
                     s.project
@@ -466,6 +499,7 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                     q.finish(job.id, status);
                 }
                 set_activity(&shared, job.id, None);
+                set_phase(&shared, job.id, None);
                 running.fetch_sub(1, Ordering::AcqRel);
                 wake(&shared);
             });
@@ -1035,7 +1069,9 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
         scene_cutouts: None,
     };
 
+    let phase = |p: Phase| set_phase(shared, job.id, Some(p));
     if job.kind == JobKind::Transition {
+        phase(Phase::Editing);
         say(&t!("worker.transition"));
         return render_transition(engine, snap, &studio, &direction, index, true).await;
     }
@@ -1074,6 +1110,10 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
         .map(|m| (m.at.as_secs_f64() - start, m.word.clone(), m.note.clone()))
         .collect();
     brief.library = enfait_studio::userlib::brief(&snap.look);
+    if let Some(named) = snap.look.mentions_brief(&block.description) {
+        brief.intent.push_str("\n\n");
+        brief.intent.push_str(&named);
+    }
     brief.layer = match block.kind {
         BlockKind::Mixed if block.cutout => Some(SceneLayer::MixedCutout),
         BlockKind::Mixed => Some(SceneLayer::Mixed),
@@ -1101,6 +1141,7 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
         }
         studio.scene_frames = Some((dir, count));
     }
+    phase(Phase::Editing);
     match &job.kind {
         JobKind::Create => {
             say(&t!("worker.animation"));
@@ -1116,6 +1157,7 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
         }
         JobKind::Transition => {}
     }
+    phase(Phase::Finishing);
     say(&t!("worker.render_clip"));
     enfait_studio::render_clip(
         &studio,

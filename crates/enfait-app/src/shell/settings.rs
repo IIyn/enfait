@@ -600,8 +600,7 @@ impl Shell {
     }
 
     fn general_section(&self, cx: &mut Context<Self>) -> Div {
-        let session = self.session.studio_dir();
-        let session = session.parent().map(PathBuf::from).unwrap_or(session);
+        let session = self.session.dir().to_path_buf();
         let shown = session.display().to_string();
         div()
             .flex()

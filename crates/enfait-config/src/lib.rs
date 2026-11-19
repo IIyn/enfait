@@ -11,6 +11,7 @@
 
 pub mod paths;
 pub mod process;
+pub mod projects;
 pub mod secrets;
 mod settings;
 
