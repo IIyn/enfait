@@ -98,11 +98,16 @@ pub struct Clock {
     /// Seek asked by the interface, applied at the next [`Clock::tick`] (NaN:
     /// none).
     pending: AtomicF64,
-    /// What is heard: position `heard` at time `heard_at` (seconds since
-    /// `epoch`), then extrapolated at the current speed.
-    heard: AtomicF64,
-    heard_at: AtomicF64,
+    /// What is heard, as the position it would have at `epoch` at the
+    /// current speed: at time `now`, `origin + speed × now`. A single atomic,
+    /// so a reader never sees half of an update.
+    origin: AtomicF64,
 }
+
+/// While playing, the anchor of what is heard never moves back against the
+/// playing direction (timer or audio callback jitter would make the picture
+/// shake), unless it is this far behind (a real stall of the output).
+const STALL: f64 = 0.25;
 
 impl Clock {
     /// `frame_duration`: duration of a frame in seconds (1/25 without video).
@@ -118,8 +123,7 @@ impl Clock {
             cursor: AtomicF64::new(0.0),
             speed: AtomicF64::new(0.0),
             pending: AtomicF64::new(f64::NAN),
-            heard: AtomicF64::new(0.0),
-            heard_at: AtomicF64::new(0.0),
+            origin: AtomicF64::new(0.0),
         }
     }
 
@@ -142,8 +146,7 @@ impl Clock {
         if speed == 0.0 {
             return self.cursor.load();
         }
-        let elapsed = (now - self.heard_at.load()).max(0.0);
-        self.clamp(self.heard.load() + speed * elapsed)
+        self.clamp(self.origin.load() + speed * now)
     }
 
     pub fn speed(&self) -> f64 {
@@ -162,12 +165,12 @@ impl Clock {
         }
     }
 
-    fn jump(&self, t: f64) {
+    /// Goes to `t`, about to play at `speed`.
+    fn jump(&self, t: f64, speed: f64) {
         let t = self.clamp(t);
         self.cursor.store(t);
         self.pending.store(t);
-        self.heard.store(t);
-        self.heard_at.store(self.now());
+        self.origin.store(t - speed * self.now());
     }
 
     pub fn apply(&self, command: Command) {
@@ -175,16 +178,16 @@ impl Clock {
         let position = self.position();
         let next = shuttle(speed, command);
         match command {
-            Command::Seek(t) => self.jump(t),
+            Command::Seek(t) => self.jump(t, next),
             Command::Step(n) => {
                 // Snap to the start of a frame, then move by `n`.
                 #[allow(clippy::cast_precision_loss)]
                 let frames = (position / self.frame + 1e-6).floor() + n as f64;
-                self.jump(frames * self.frame);
+                self.jump(frames * self.frame, next);
             }
             Command::Forward | Command::Toggle if next > 0.0 && position >= self.duration => {
                 // Start again from the beginning at the end.
-                self.jump(0.0);
+                self.jump(0.0, next);
             }
             // At the start, J does nothing (as in editing software).
             Command::Backward if position <= 0.0 => {
@@ -193,7 +196,7 @@ impl Clock {
             }
             // Speed change: restart from what is heard, not from the output
             // cursor, which is ahead.
-            _ if next != speed => self.jump(position),
+            _ if next != speed => self.jump(position, next),
             _ => {}
         }
         self.speed.store(next);
@@ -208,11 +211,8 @@ impl Clock {
 
     fn tick_at(&self, dt: f64, delay: f64, now: f64) -> Tick {
         let pending = self.pending.swap(f64::NAN);
-        let start = if pending.is_nan() {
-            self.cursor.load()
-        } else {
-            pending
-        };
+        let seeked = !pending.is_nan();
+        let start = if !seeked { self.cursor.load() } else { pending };
         let speed = self.speed();
         if speed == 0.0 {
             return Tick { start, speed };
@@ -223,8 +223,11 @@ impl Clock {
         if self.pending.load().is_nan() {
             self.cursor.store(clamped);
             // `start` will be heard in `delay` seconds.
-            self.heard.store(start - speed * delay.max(0.0));
-            self.heard_at.store(now);
+            let origin = start - speed * delay.max(0.0) - speed * now;
+            let ahead = (origin - self.origin.load()) * speed.signum();
+            if seeked || ahead >= 0.0 || ahead < -STALL {
+                self.origin.store(origin);
+            }
         }
         if clamped != end {
             self.speed.store(0.0);
@@ -316,6 +319,28 @@ mod tests {
     }
 
     #[test]
+    fn late_ticks_never_move_backward_playback_forward() {
+        let c = Clock::new(10.0, 0.04);
+        c.apply(Command::Seek(5.0));
+        c.apply(Command::Backward);
+        // Timer ticks of 4 ms, some arriving late: each anchors `start` (the
+        // previous cursor) at `now`, behind the extrapolation.
+        let mut now = 1.0;
+        c.tick_at(0.004, 0.0, now); // applies the seek
+        let mut last = c.position_at(now);
+        for late in [0.0, 0.0, 0.02, 0.0, 0.03, 0.001, 0.0, 0.015] {
+            let dt = 0.004 + late;
+            now += dt;
+            let before = c.position_at(now);
+            assert!(before <= last + 1e-12, "{before} after {last}");
+            c.tick_at(dt, 0.0, now);
+            let after = c.position_at(now);
+            assert!(after <= before + 1e-12, "tick moved {before} to {after}");
+            last = after;
+        }
+    }
+
+    #[test]
     fn position_follows_what_is_heard() {
         let c = Clock::new(10.0, 0.04);
         c.apply(Command::Forward);
@@ -326,7 +351,7 @@ mod tests {
         assert!((c.position_at(1.05) - 0.0).abs() < 1e-9);
         assert!((c.position_at(1.08) - 0.03).abs() < 1e-9);
         // Paused, restart from what was heard, not from the cursor.
-        c.heard_at.store(c.now() - 0.08);
+        c.origin.store(0.03 - c.now());
         c.apply(Command::Pause);
         let p = c.position();
         assert!(p < 0.1 && (p - 0.03).abs() < 0.01, "{p}");
