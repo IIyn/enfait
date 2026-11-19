@@ -94,6 +94,12 @@ impl Renderer {
                 }
             }
         }
+        // Inside a Flatpak, Chromium cannot create its own sandbox (no user
+        // namespaces): Flatpak's sandbox stands in, and the page has no
+        // network anyway (`--host-resolver-rules` above).
+        if Path::new("/.flatpak-info").exists() {
+            builder = builder.no_sandbox();
+        }
         // Experimentation setting: extra Chromium options.
         if let Ok(extra) = std::env::var("ENFAIT_CHROME_ARGS") {
             builder = builder.args(flags(&extra.split_whitespace().collect::<Vec<_>>()));

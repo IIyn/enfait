@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.iiyn.enfait</id>
+  <name>enfait</name>
+  <summary>Voice-over to motion design video</summary>
+  <summary xml:lang="fr">De la voix off à la vidéo motion design</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <description>
+    <p>Record or import a voice-over and turn it into an edited motion design video.</p>
+    <p xml:lang="fr">Enregistrez ou importez une voix off et transformez-la en vidéo motion design montée.</p>
+  </description>
+  <launchable type="desktop-id">io.github.iiyn.enfait.desktop</launchable>
+  <url type="homepage">https://github.com/IIyn/enfait</url>
+  <content_rating type="oars-1.1"/>
+</component>

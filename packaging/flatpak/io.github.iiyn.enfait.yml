@@ -1,0 +1,52 @@
+# Flatpak built by .github/workflows/release.yml. It repackages the Linux
+# release tarball (built on Ubuntu 22.04, older glibc than the runtime) and a
+# static ffmpeg build, both copied next to this file by the workflow:
+#   enfait.tar.gz  ffmpeg.tar.xz
+app-id: io.github.iiyn.enfait
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: enfait
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Microphone (cpal goes through ALSA → PulseAudio/PipeWire) and playback.
+  - --socket=pulseaudio
+  # AI providers, Chromium and model downloads.
+  - --share=network
+  # Voice-overs, rushes and exports live anywhere in the home folder.
+  - --filesystem=home
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # API keys in the system keyring (Secret Service).
+  - --talk-name=org.freedesktop.secrets
+modules:
+  - name: ffmpeg
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 bin/ffmpeg /app/bin/ffmpeg
+      - install -Dm755 bin/ffprobe /app/bin/ffprobe
+    sources:
+      - type: archive
+        path: ffmpeg.tar.xz
+
+  - name: enfait
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 enfait /app/bin/enfait
+      - install -Dm755 enfait-cli /app/bin/enfait-cli
+      - sed 's/^Icon=.*/Icon=io.github.iiyn.enfait/' enfait.desktop > io.github.iiyn.enfait.desktop
+      - install -Dm644 io.github.iiyn.enfait.desktop -t /app/share/applications
+      - install -Dm644 io.github.iiyn.enfait.metainfo.xml -t /app/share/metainfo
+      - |
+        for size in 16 22 32 48 64 128 256 512; do
+          install -Dm644 icons/enfait-$size.png \
+            /app/share/icons/hicolor/${size}x${size}/apps/io.github.iiyn.enfait.png
+        done
+    sources:
+      - type: archive
+        path: enfait.tar.gz
+      - type: file
+        path: io.github.iiyn.enfait.metainfo.xml

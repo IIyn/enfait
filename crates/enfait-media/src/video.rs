@@ -20,7 +20,7 @@ use std::process::{Child, ChildStdout, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// A decoded frame.
 #[derive(Debug)]
@@ -166,9 +166,23 @@ impl FrameMap {
     }
 }
 
+/// Frame on screen, with the moment it was chosen from the clock. Two
+/// threads write it (the worker and [`VideoDecoder::latest`]): the most
+/// recent choice wins, so a frame picked for an older clock position never
+/// replaces a newer one (backward playback would jump forward).
+type Slot = Arc<Mutex<Option<(Arc<Frame>, Instant)>>>;
+
+fn store(slot: &Slot, frame: Arc<Frame>, chosen_at: Instant) {
+    if let Ok(mut slot) = slot.lock()
+        && slot.as_ref().is_none_or(|(_, at)| *at <= chosen_at)
+    {
+        *slot = Some((frame, chosen_at));
+    }
+}
+
 /// Background decoder. Stops when dropped.
 pub struct VideoDecoder {
-    latest: Arc<Mutex<Option<Arc<Frame>>>>,
+    latest: Slot,
     /// Shared frame memory: [`VideoDecoder::latest`] looks up the clock's
     /// frame there directly, without waiting for the decoding thread (which
     /// can be blocked a few tens of milliseconds while ffmpeg starts).
@@ -231,13 +245,17 @@ impl VideoDecoder {
     /// Frame to show now: the clock's if it is in memory, else the last
     /// published one.
     pub fn latest(&self) -> Option<Arc<Frame>> {
+        let chosen_at = Instant::now();
         let (target, _) = self.map.source(self.map.output_at(self.clock.position()));
         let cached = self.cache.lock().ok().and_then(|c| c.get(target));
-        let mut slot = self.latest.lock().ok()?;
         if let Some(frame) = cached {
-            *slot = Some(frame);
+            store(&self.latest, frame, chosen_at);
         }
-        slot.clone()
+        self.latest
+            .lock()
+            .ok()?
+            .as_ref()
+            .map(|(frame, _)| Arc::clone(frame))
     }
 
     /// Source frame expected at the current clock position.
@@ -386,7 +404,7 @@ struct Worker {
     size: (u32, u32),
     filter: Option<String>,
     clock: Arc<Clock>,
-    latest: Arc<Mutex<Option<Arc<Frame>>>>,
+    latest: Slot,
     cache: Arc<Mutex<FrameCache>>,
     stop: Arc<AtomicBool>,
     on_frame: Box<dyn Fn() + Send>,
@@ -398,10 +416,9 @@ impl Worker {
         self.map.output_at(self.clock.position())
     }
 
-    fn publish(&self, frame: Arc<Frame>) {
-        if let Ok(mut slot) = self.latest.lock() {
-            *slot = Some(frame);
-        }
+    /// `chosen_at`: when the clock was read to pick `frame`.
+    fn publish(&self, frame: Arc<Frame>, chosen_at: Instant) {
+        store(&self.latest, frame, chosen_at);
         (self.on_frame)();
     }
 
@@ -411,6 +428,7 @@ impl Worker {
         // Start of a failed decoding: do not restart ffmpeg in a loop.
         let mut failed: Option<i64> = None;
         while !self.stop.load(Ordering::Acquire) {
+            let chosen_at = Instant::now();
             let situation = Situation {
                 target: self.target(),
                 last: self.map.last_output,
@@ -428,7 +446,7 @@ impl Worker {
                     let (wanted, _) = self.map.source(situation.target);
                     let frame = self.cache.lock().ok().and_then(|c| c.get(wanted));
                     if let Some(frame) = frame {
-                        self.publish(frame);
+                        self.publish(frame, chosen_at);
                         shown = Some(wanted);
                     }
                 }
@@ -480,6 +498,7 @@ impl Worker {
             if !reader.read(&mut data) {
                 return false;
             }
+            let chosen_at = Instant::now();
             let (wanted, _) = self.map.source(self.target());
             let frame = Arc::new(Frame {
                 index,
@@ -496,7 +515,7 @@ impl Worker {
             if *shown != Some(wanted)
                 && let Some(frame) = ready
             {
-                self.publish(frame);
+                self.publish(frame, chosen_at);
                 *shown = Some(wanted);
             }
             if !present && !(start..=end).contains(&wanted) {

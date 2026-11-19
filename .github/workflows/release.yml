@@ -127,6 +127,44 @@ jobs:
           name: arch
           path: dist/*
 
+  flatpak:
+    name: Flatpak
+    needs: linux
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: linux
+
+      # Static ffmpeg/ffprobe (GPL, sources: github.com/BtbN/FFmpeg-Builds).
+      - name: Sources
+        run: |
+          VERSION="${TAG#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp "linux/enfait-${VERSION}-x86_64-linux.tar.gz" packaging/flatpak/enfait.tar.gz
+          curl -sSfL -o packaging/flatpak/ffmpeg.tar.xz \
+            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: packaging/flatpak/io.github.iiyn.enfait.yml
+          bundle: enfait-${{ env.VERSION }}-x86_64.flatpak
+          upload-artifact: false
+          cache: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: enfait-*.flatpak
+
   windows:
     name: Windows (setup.exe, zip)
     runs-on: windows-2022
@@ -192,7 +230,7 @@ jobs:
 
   publish:
     name: Attach to the release
-    needs: [linux, arch, windows, macos]
+    needs: [linux, arch, flatpak, windows, macos]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
