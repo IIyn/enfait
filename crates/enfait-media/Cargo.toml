@@ -7,12 +7,19 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = ["audio-devices"]
+# Sound card input and output (cpal, hence ALSA on Linux): playback driving
+# the clock, voice recording. Off for headless uses (servers, batch
+# rendering), which then need neither a sound card nor the ALSA headers.
+audio-devices = ["dep:cpal"]
+
 [dependencies]
 enfait-config.workspace = true
 enfait-core.workspace = true
 
 blake3.workspace = true
-cpal.workspace = true
+cpal = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -740,7 +740,7 @@ mod tests {
         assert_eq!((frame.width, frame.height), (180, 320));
         let video = recorder.finish().unwrap();
         let audio = dir.path().join("a.wav");
-        crate::record::write_wav(&audio, &vec![0.0; 48_000 * 2], 48_000).unwrap();
+        crate::wav::write_wav(&audio, &vec![0.0; 48_000 * 2], 48_000).unwrap();
         let out = dir.path().join("take.mp4");
         mux(&video, &audio, &out).unwrap();
         let info = crate::probe::probe(&out).unwrap();

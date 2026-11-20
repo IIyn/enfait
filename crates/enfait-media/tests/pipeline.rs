@@ -154,6 +154,7 @@ fn prepare_and_decode() {
 /// Backward playback at normal speed on the proxy: most frames must show,
 /// without a long freeze.
 #[test]
+#[cfg(feature = "audio-devices")]
 fn backward_playback_is_smooth() {
     if !has_ffmpeg() {
         return;
@@ -230,6 +231,7 @@ fn backward_playback_is_smooth() {
 /// Forward playback of a three-piece edit: the frames come from the right
 /// places of the source, without long freezes at the cuts.
 #[test]
+#[cfg(feature = "audio-devices")]
 fn cut_playback_crosses_cuts_smoothly() {
     if !has_ffmpeg() {
         return;

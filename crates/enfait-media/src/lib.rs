@@ -11,8 +11,10 @@
 //! - [`transport`]: shared playback clock and J/K/L commands;
 //! - [`encode`] and [`loudness`]: H.264/AAC encoding of rendered frames,
 //!   sound normalised to a target loudness;
-//! - [`output`]: audio output (cpal) driving the clock;
-//! - [`record`] and [`camera`]: recording the voice and filming.
+//! - `output`: audio output (cpal) driving the clock;
+//! - `record` and [`camera`]: recording the voice and filming.
+//!
+//! `output` and `record` need the `audio-devices` feature (on by default).
 
 pub mod audio;
 pub mod cache;
@@ -23,17 +25,21 @@ mod error;
 mod ffmpeg;
 pub mod fx;
 pub mod loudness;
+#[cfg(feature = "audio-devices")]
 pub mod output;
 pub mod probe;
+#[cfg(feature = "audio-devices")]
 pub mod record;
 pub mod transport;
 pub mod video;
+pub mod wav;
 pub mod waveform;
 
 pub use audio::AudioBuffer;
 pub use cache::{MediaCache, Prepared, Stage, VideoSource};
 pub use edl::Edl;
 pub use error::MediaError;
+#[cfg(feature = "audio-devices")]
 pub use output::Playback;
 pub use probe::{AudioInfo, MediaInfo, VideoInfo};
 pub use transport::{Clock, Command};
