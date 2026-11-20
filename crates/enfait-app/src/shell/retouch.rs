@@ -42,12 +42,7 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> Div {
         let narrow = below.is_some();
-        let player = div()
-            .flex_none()
-            .h(relative(if narrow { 0.3 } else { 0.55 }))
-            .border_b_1()
-            .border_color(color(tokens::LINE))
-            .child(self.player.clone());
+        let player = self.player_pane(narrow, cx);
         let screen = div().flex_1().min_w(px(0.)).flex().flex_col().child(player);
         let Some(board) = &self.board else {
             return screen.child(
@@ -212,9 +207,7 @@ impl Shell {
             .flex()
             .flex_col()
             .bg(color(tokens::PANEL))
-            .when(side, |d| {
-                d.w(px(340.)).border_l_1().border_color(color(tokens::LINE))
-            });
+            .when(side, |d| d.border_l_1().border_color(color(tokens::LINE)));
         let Some((index, block)) = self.board.as_ref().and_then(|b| {
             let block = b.block()?.clone();
             let index = b.project.blocks().iter().position(|x| x.id == block.id)?;

@@ -10,7 +10,6 @@ use gpui_kit::component::input::Textarea;
 use gpui_kit::prelude::*;
 use gpui_kit::{
     ClickEvent, Context, Div, ElementId, FontWeight, SharedString, Stateful, Window, div, px,
-    relative,
 };
 
 /// Average reading rate, to estimate the duration of a script.
@@ -563,14 +562,7 @@ impl Shell {
             .min_w(px(0.))
             .flex()
             .flex_col()
-            .child(
-                div()
-                    .flex_none()
-                    .h(relative(0.5))
-                    .border_b_1()
-                    .border_color(color(tokens::LINE))
-                    .child(self.player.clone()),
-            )
+            .child(self.player_pane(false, cx))
             .child(
                 toolbar(tr!("cut.title"), detail)
                     .child(button("montage", tr!("cut.montage"), montage).on_click(

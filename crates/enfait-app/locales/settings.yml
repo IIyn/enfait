@@ -194,6 +194,51 @@ _version: 2
 "settings.theme_help":
   en: "\"System\" follows the light or dark appearance of the desktop."
   fr: "« Système » suit l'apparence claire ou sombre du bureau."
+"settings.update":
+  en: "Updates"
+  fr: "Mises à jour"
+"settings.update_again":
+  en: "Check again"
+  fr: "Vérifier à nouveau"
+"settings.update_available":
+  en: "Version %{version} is available (installed: %{current})."
+  fr: "La version %{version} est disponible (installée : %{current})."
+"settings.update_check":
+  en: "Check for updates"
+  fr: "Rechercher une mise à jour"
+"settings.update_checking":
+  en: "Checking…"
+  fr: "Recherche…"
+"settings.update_command":
+  en: "To install it, run in a terminal:"
+  fr: "Pour l'installer, lance dans un terminal :"
+"settings.update_downloaded":
+  en: "Downloaded: %{path}"
+  fr: "Téléchargée : %{path}"
+"settings.update_failed":
+  en: "Could not check: %{error}"
+  fr: "Impossible de vérifier : %{error}"
+"settings.update_help":
+  en: "Installed version: %{version}. Looks for the latest release on GitHub."
+  fr: "Version installée : %{version}. Cherche la dernière version publiée sur GitHub."
+"settings.update_install":
+  en: "Update"
+  fr: "Mettre à jour"
+"settings.update_latest":
+  en: "enfait is up to date (latest version: %{version})."
+  fr: "enfait est à jour (dernière version : %{version})."
+"settings.update_no_notes":
+  en: "No release notes."
+  fr: "Pas de note de version."
+"settings.update_none":
+  en: "No public release found (none published yet, or private repository)."
+  fr: "Aucune version publique trouvée (rien de publié pour l'instant, ou dépôt privé)."
+"settings.update_open":
+  en: "Open the installer"
+  fr: "Ouvrir l'installeur"
+"settings.update_page":
+  en: "See on GitHub"
+  fr: "Voir sur GitHub"
 "settings.title":
   en: "Settings"
   fr: "Réglages"

@@ -142,6 +142,52 @@ pub struct Settings {
     pub microphone: Option<String>,
     /// Camera for filming (a device id); `None`: the first one.
     pub camera: Option<String>,
+    /// Sizes of the panels resized with the mouse.
+    pub panels: PanelSizes,
+    /// The player decodes the original file at its own size rather than
+    /// the proxy.
+    pub player_native: bool,
+}
+
+/// Sizes of the panels the user resizes with the mouse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PanelSizes {
+    /// Width of the left column (style, library), in logical pixels.
+    pub sidebar: u32,
+    /// Width of the right panel (inspector, retouches, finish), in logical
+    /// pixels.
+    pub inspector: u32,
+    /// Height of the player, in thousandths of the height of the screen
+    /// under the header.
+    pub player: u32,
+}
+
+impl PanelSizes {
+    pub const SIDEBAR: (u32, u32) = (200, 560);
+    pub const INSPECTOR: (u32, u32) = (260, 720);
+    pub const PLAYER: (u32, u32) = (200, 800);
+
+    /// Sizes within their bounds (a hand-edited file stays usable).
+    #[must_use]
+    pub fn clamped(self) -> Self {
+        let clamp = |v: u32, (min, max): (u32, u32)| v.clamp(min, max);
+        Self {
+            sidebar: clamp(self.sidebar, Self::SIDEBAR),
+            inspector: clamp(self.inspector, Self::INSPECTOR),
+            player: clamp(self.player, Self::PLAYER),
+        }
+    }
+}
+
+impl Default for PanelSizes {
+    fn default() -> Self {
+        Self {
+            sidebar: 280,
+            inspector: 340,
+            player: 500,
+        }
+    }
 }
 
 /// Ollama's OpenAI-compatible endpoint.
@@ -161,6 +207,8 @@ impl Default for Settings {
             record_camera: false,
             microphone: None,
             camera: None,
+            panels: PanelSizes::default(),
+            player_native: false,
         }
     }
 }
@@ -257,6 +305,12 @@ mod tests {
             record_camera: true,
             microphone: Some("pulseaudio:mic".into()),
             camera: Some("/dev/video2".into()),
+            panels: PanelSizes {
+                sidebar: 300,
+                inspector: 420,
+                player: 640,
+            },
+            player_native: true,
         };
         settings.save_to(&path).unwrap();
         assert_eq!(Settings::load_from(&path).unwrap(), Some(settings));
@@ -264,10 +318,25 @@ mod tests {
         std::fs::write(&path, r#"{ "theme": "nord" }"#).unwrap();
         let partial = Settings::load_from(&path).unwrap().unwrap();
         assert_eq!(partial.theme, ThemeId::Nord);
+        assert_eq!(partial.panels, PanelSizes::default());
         assert_eq!(partial.local_url, DEFAULT_LOCAL_URL);
         assert!(!partial.onboarded);
         assert!(partial.notifications);
         assert!(!partial.record_camera);
         assert_eq!(partial.microphone, None);
+    }
+
+    #[test]
+    fn panel_sizes_are_clamped() {
+        let wild = PanelSizes {
+            sidebar: 0,
+            inspector: 9_999,
+            player: 1_000,
+        }
+        .clamped();
+        assert_eq!(wild.sidebar, PanelSizes::SIDEBAR.0);
+        assert_eq!(wild.inspector, PanelSizes::INSPECTOR.1);
+        assert_eq!(wild.player, PanelSizes::PLAYER.1);
+        assert_eq!(PanelSizes::default().clamped(), PanelSizes::default());
     }
 }

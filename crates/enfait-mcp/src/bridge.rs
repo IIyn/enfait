@@ -46,14 +46,46 @@ pub enum RequestKind {
     /// Magic mode on the take of the session: storyboard, shots, sounds,
     /// animations and export (no block).
     Magic,
+    /// New version of the animation of the block following `notes`.
+    Retouch,
+    /// Back to version `version` of the animation of the block (no model
+    /// call).
+    Restore,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Request {
     /// The block aimed at; none for a request on the whole project.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block: Option<BlockId>,
     pub kind: RequestKind,
+    /// Retouch: (seconds from the start of the block, remark).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<(f64, String)>,
+    /// Restore: the version to go back to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<u32>,
+    /// Care level to use from now on (`light`, `fast`, `polished`,
+    /// `ultra`); none: the app's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality: Option<String>,
+    /// Model provider to use from now on (`auto`, `api`, `claude_code`,
+    /// `local`); none: the app's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+}
+
+impl Request {
+    pub const fn new(block: Option<BlockId>, kind: RequestKind) -> Self {
+        Self {
+            block,
+            kind,
+            notes: Vec::new(),
+            version: None,
+            quality: None,
+            provider: None,
+        }
+    }
 }
 
 /// Atomic write (temporary file, then rename).
@@ -138,30 +170,9 @@ mod tests {
         clear_heartbeat(&dir);
         assert!(!app_alive(&dir));
         let (a, b) = (BlockId::new(), BlockId::new());
-        send_request(
-            &dir,
-            &Request {
-                block: Some(a),
-                kind: RequestKind::Animation,
-            },
-        )
-        .unwrap();
-        send_request(
-            &dir,
-            &Request {
-                block: Some(b),
-                kind: RequestKind::Transition,
-            },
-        )
-        .unwrap();
-        send_request(
-            &dir,
-            &Request {
-                block: None,
-                kind: RequestKind::Magic,
-            },
-        )
-        .unwrap();
+        send_request(&dir, &Request::new(Some(a), RequestKind::Animation)).unwrap();
+        send_request(&dir, &Request::new(Some(b), RequestKind::Transition)).unwrap();
+        send_request(&dir, &Request::new(None, RequestKind::Magic)).unwrap();
         let taken = take_requests(&dir);
         assert_eq!(taken.len(), 3);
         assert_eq!(taken[0].block, Some(a), "in drop order");

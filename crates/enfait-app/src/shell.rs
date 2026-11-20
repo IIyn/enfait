@@ -20,6 +20,7 @@ mod retouch;
 mod screens;
 mod settings;
 mod side;
+mod split;
 mod studio;
 
 use crate::cut::{CutState, CutStatus};
@@ -38,8 +39,8 @@ use enfait_media::Command;
 use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    Context, Div, Entity, ExternalPaths, FocusHandle, FontWeight, KeyBinding, PathPromptOptions,
-    SharedString, Subscription, Window, actions, div, px, relative,
+    Context, Div, DragMoveEvent, Entity, ExternalPaths, FocusHandle, FontWeight, KeyBinding,
+    PathPromptOptions, SharedString, Subscription, Window, actions, div, px, relative,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -237,6 +238,8 @@ pub struct Shell {
     watch: bridge::Watch,
     /// Left column opened over the content (narrow window).
     sidebar_open: bool,
+    /// Panel sizes while a handle is dragged (saved when it is dropped).
+    panels: Option<enfait_config::PanelSizes>,
     /// Animations: job queue shared with the engine.
     queue: std::sync::Arc<std::sync::Mutex<JobQueue>>,
     worker: Worker,
@@ -275,7 +278,8 @@ pub struct Shell {
 
 impl Shell {
     pub fn new(window: &mut Window, cx: &mut Context<Self>, media: Option<PathBuf>) -> Self {
-        let player = cx.new(|_| Player::new(media_cache()));
+        let native = prefs::settings(cx).player_native;
+        let player = cx.new(|_| Player::new(media_cache(), native));
         cx.observe(&player, |_, _, cx| cx.notify()).detach();
         let focus = cx.focus_handle();
         focus.focus(window, cx);
@@ -467,6 +471,7 @@ impl Shell {
             export_sfx: true,
             watch: bridge::Watch::default(),
             sidebar_open: false,
+            panels: None,
             queue,
             worker,
             retouch,
@@ -515,6 +520,9 @@ impl Shell {
     pub fn open_settings(&mut self, cx: &mut Context<Self>) {
         self.settings.open = true;
         self.command(Command::Pause, cx);
+        if self.settings.update_unchecked() {
+            self.check_update(cx);
+        }
         cx.notify();
     }
 
@@ -1398,7 +1406,14 @@ impl Render for Shell {
             .on_action(cx.listener(|s, _: &Step7, _, cx| s.go_to_nth(6, cx)))
             .on_action(cx.listener(|s, _: &GoHome, _, cx| s.show_home(cx)))
             .on_action(cx.listener(|s, _: &OpenSettings, _, cx| s.open_settings(cx)))
-            .on_action(cx.listener(|s, _: &CloseOverlay, _, cx| s.close_overlay(cx)))
+            .on_action(cx.listener(|s, _: &CloseOverlay, window, cx| {
+                if s.player.read(cx).is_expanded() {
+                    s.player
+                        .update(cx, |p, cx| p.set_expanded(false, window, cx));
+                } else {
+                    s.close_overlay(cx);
+                }
+            }))
             .on_action(cx.listener(|s, _: &Undo, window, cx| {
                 if s.step == STEP_FINISH {
                     s.finish_undo(window, cx);
@@ -1419,7 +1434,13 @@ impl Render for Shell {
             }))
             .on_drop(cx.listener(|s, paths: &ExternalPaths, _, cx| {
                 s.dropped(paths.paths(), cx);
-            }))
+            }));
+
+        // Player filling the window (button in its corner, Escape to leave).
+        if self.player.read(cx).is_expanded() {
+            return root.child(div().flex_1().min_h(px(0.)).child(self.player.clone()));
+        }
+        let root = root
             .child(self.header(!show_panel, style_step && !show_sidebar, timecode, cx))
             .children(self.magic_banner(cx));
 
@@ -1466,19 +1487,42 @@ impl Render for Shell {
         };
 
         let strip = !matches!(self.step, STEP_SCRIPT | STEP_MONTAGE);
+        let sidebar_width = self.panel_width(split::Splitter::Sidebar, cx);
+        let inspector_width = self.panel_width(split::Splitter::Inspector, cx);
         root.child(
             div()
                 .flex_1()
                 .min_h(px(0.))
                 .flex()
-                .when_some(sidebar, |d, s| d.child(s))
+                .on_drag_move(
+                    cx.listener(|shell, event: &DragMoveEvent<split::Resize>, _, cx| {
+                        shell.drag_panel(event, cx);
+                    }),
+                )
+                .on_drop(cx.listener(|shell, _: &split::Resize, _, cx| {
+                    shell.drop_panel(cx);
+                }))
+                .when_some(sidebar, |d, s| {
+                    d.child(
+                        s.w(sidebar_width)
+                            .relative()
+                            .child(split::handle(split::Splitter::Sidebar, cx)),
+                    )
+                })
                 .child(center)
-                .when_some(inspector, |d, i| d.child(i)),
+                .when_some(inspector, |d, i| {
+                    d.child(
+                        i.w(inspector_width)
+                            .relative()
+                            .child(split::handle(split::Splitter::Inspector, cx)),
+                    )
+                }),
         )
         .when(strip, |d| d.child(self.timeline(cx)))
         .when_some(overlay, |d, s| {
             d.child(
-                s.absolute()
+                s.w(sidebar_width)
+                    .absolute()
                     .top(px(44.))
                     .bottom_0()
                     .left_0()

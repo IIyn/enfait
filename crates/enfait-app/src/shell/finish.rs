@@ -399,12 +399,7 @@ impl Shell {
 
     /// Finish screen: player, tracks, list of placed sounds.
     pub(super) fn finish_screen(&mut self, cx: &mut Context<Self>) -> Div {
-        let player = div()
-            .flex_none()
-            .h(relative(0.45))
-            .border_b_1()
-            .border_color(color(tokens::LINE))
-            .child(self.player.clone());
+        let player = self.player_pane(false, cx);
         let Some(board) = &self.board else {
             return div()
                 .flex_1()
@@ -756,9 +751,7 @@ impl Shell {
             .flex()
             .flex_col()
             .bg(color(tokens::PANEL))
-            .when(side, |d| {
-                d.w(px(340.)).border_l_1().border_color(color(tokens::LINE))
-            });
+            .when(side, |d| d.border_l_1().border_color(color(tokens::LINE)));
         let selection = self.selection_section(cx);
         let sounds = self.sounds_section(cx);
         let ducking = self.ducking_section(cx);

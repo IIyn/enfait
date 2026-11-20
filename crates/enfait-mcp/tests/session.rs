@@ -8,7 +8,7 @@ use enfait_core::{
     Asset, AssetKind, Block, BlockKind, Finish, Flicks, Look, Project, ProjectSettings, TimeRange,
     Transcript, Word,
 };
-use enfait_mcp::bridge::{RequestKind, take_requests};
+use enfait_mcp::bridge::{RequestKind, take_requests, touch_heartbeat};
 use enfait_mcp::{Server, Tools};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
@@ -172,6 +172,208 @@ async fn tools_edit_the_session() {
         "two animations (block 2 has an auto transition, but it is the last one)"
     );
     assert!(requests.iter().all(|r| r.kind == RequestKind::Animation));
+}
+
+fn project(d: &std::path::Path) -> Project {
+    Project::from_json(&std::fs::read_to_string(d.join("project.json")).unwrap()).unwrap()
+}
+
+#[tokio::test]
+async fn split_merge_style_sounds_and_files() {
+    let dir = session();
+    let d = dir.path();
+    let mut server = Server::new(Tools::new(d.to_path_buf()));
+
+    // Split before a word: halfway in the silence before it.
+    let (text, err) = call(
+        &mut server,
+        1,
+        "split_block",
+        json!({ "block": 2, "word": "aiguillage" }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    let p = project(d);
+    assert_eq!(p.blocks().len(), 3);
+    assert_eq!(p.blocks()[1].range, range(2.0, 2.65));
+    assert_eq!(p.blocks()[2].range, range(2.65, 5.0));
+    let (text, err) = call(
+        &mut server,
+        2,
+        "split_block",
+        json!({ "block": 1, "word": "Bonjour" }),
+    )
+    .await;
+    assert!(err && text.contains("first word"), "{text}");
+    let (text, err) = call(
+        &mut server,
+        3,
+        "split_block",
+        json!({ "block": 1, "at": 3.0 }),
+    )
+    .await;
+    assert!(err && text.contains("inside block 1"), "{text}");
+
+    // Merge back.
+    let (text, err) = call(&mut server, 4, "merge_blocks", json!({ "block": 2 })).await;
+    assert!(!err, "{text}");
+    assert_eq!(project(d).blocks()[1].range, range(2.0, 5.0));
+    let (text, err) = call(&mut server, 5, "merge_blocks", json!({ "block": 2 })).await;
+    assert!(err, "last block: nothing to merge with ({text})");
+
+    // Style: preset, rules, bounded post-FX, remembered rules.
+    let (text, err) = call(
+        &mut server,
+        6,
+        "set_style",
+        json!({ "preset": "suisse", "rules": "never pink", "fx": { "grain": 2, "saturation": -0.5 }, "memory": ["big titles", " "] }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    assert!(
+        text.contains("Preset: swiss") && text.contains("never pink"),
+        "{text}"
+    );
+    let look: Look = serde_json::from_slice(&std::fs::read(d.join("look.json")).unwrap()).unwrap();
+    assert_eq!(look.style.preset.as_deref(), Some("swiss"));
+    assert_eq!(look.fx.grain, 1.0);
+    assert_eq!(look.fx.saturation, -0.5);
+    assert_eq!(look.memory, ["big titles"]);
+    let (text, err) = call(&mut server, 7, "set_style", json!({ "preset": "baroque" })).await;
+    assert!(err && text.contains("unknown preset"), "{text}");
+
+    // A placed sound is changed, moved onto a word.
+    let (_, err) = call(
+        &mut server,
+        8,
+        "add_sfx",
+        json!({ "file": "whoosh.wav", "block": 1 }),
+    )
+    .await;
+    assert!(!err);
+    let (text, err) = call(
+        &mut server,
+        9,
+        "edit_sound",
+        json!({ "id": 1, "block": 2, "word": "Voici", "volume_db": -6 }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    let finish: Finish =
+        serde_json::from_slice(&std::fs::read(d.join("finish.json")).unwrap()).unwrap();
+    assert_eq!(finish.sfx[0].block, project(d).blocks()[1].id);
+    assert!((finish.sfx[0].offset - 0.2).abs() < 1e-6);
+    assert_eq!(finish.sfx[0].gain_db, -6.0);
+    let (text, err) = call(&mut server, 10, "edit_sound", json!({ "id": 7 })).await;
+    assert!(err && text.contains("no sound 7"), "{text}");
+
+    // A file of the computer goes into the library.
+    let logo = d.join("logo.svg");
+    std::fs::write(&logo, r#"<svg xmlns="http://www.w3.org/2000/svg"/>"#).unwrap();
+    let (text, err) = call(
+        &mut server,
+        11,
+        "import_file",
+        json!({ "path": logo.display().to_string(), "description": "end logo" }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    let look: Look = serde_json::from_slice(&std::fs::read(d.join("look.json")).unwrap()).unwrap();
+    let added = look
+        .assets
+        .iter()
+        .find(|a| a.description == "end logo")
+        .unwrap();
+    assert!(d.join("library").join(&added.file).is_file());
+}
+
+#[tokio::test]
+async fn retouch_restore_and_care() {
+    let dir = session();
+    let d = dir.path();
+    let mut server = Server::new(Tools::new(d.to_path_buf()));
+    let id = project(d).blocks()[1].id;
+    let sources = d.join("studio").join("sources");
+
+    let (text, err) = call(
+        &mut server,
+        1,
+        "retouch",
+        json!({ "block": 2, "notes": [{ "note": "bigger" }] }),
+    )
+    .await;
+    assert!(err && text.contains("no animation"), "{text}");
+    std::fs::create_dir_all(&sources).unwrap();
+    std::fs::write(sources.join(format!("bloc-{id}.html")), "<html></html>").unwrap();
+    std::fs::write(sources.join(format!("bloc-{id}.1.html")), "<html></html>").unwrap();
+    let (text, err) = call(
+        &mut server,
+        2,
+        "retouch",
+        json!({ "block": 2, "notes": [{ "note": "bigger" }] }),
+    )
+    .await;
+    assert!(err && text.contains("not open"), "{text}");
+
+    touch_heartbeat(d);
+    let (text, err) = call(
+        &mut server,
+        3,
+        "retouch",
+        json!({ "block": 2, "notes": [{ "note": "it tilts here", "word": "aiguillage" }, "and red"], "quality": "Fast" }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    let (text, _) = call(&mut server, 4, "storyboard", json!({})).await;
+    assert!(text.contains("Previous versions: 1"), "{text}");
+    let (text, err) = call(
+        &mut server,
+        5,
+        "restore_version",
+        json!({ "block": 2, "version": 3 }),
+    )
+    .await;
+    assert!(err && text.contains("versions: 1"), "{text}");
+    let (_, err) = call(
+        &mut server,
+        6,
+        "restore_version",
+        json!({ "block": 2, "version": 1 }),
+    )
+    .await;
+    assert!(!err);
+    let (text, err) = call(
+        &mut server,
+        7,
+        "generate",
+        json!({ "blocks": [1], "quality": "superb" }),
+    )
+    .await;
+    assert!(err && text.contains("unknown quality"), "{text}");
+    let (_, err) = call(
+        &mut server,
+        8,
+        "generate",
+        json!({ "blocks": [1], "provider": "claude-code" }),
+    )
+    .await;
+    assert!(!err);
+
+    let requests = take_requests(d);
+    assert_eq!(requests.len(), 3);
+    let retouch = &requests[0];
+    assert_eq!(retouch.kind, RequestKind::Retouch);
+    assert_eq!(retouch.block, Some(id));
+    assert_eq!(retouch.quality.as_deref(), Some("fast"));
+    assert!(
+        (retouch.notes[0].0 - 0.7).abs() < 1e-6,
+        "{:?}",
+        retouch.notes
+    );
+    assert_eq!(retouch.notes[1], (0.0, "and red".to_owned()));
+    assert_eq!(requests[1].kind, RequestKind::Restore);
+    assert_eq!(requests[1].version, Some(1));
+    assert_eq!(requests[2].provider.as_deref(), Some("claude_code"));
 }
 
 /// The whole protocol through streams, as on standard input and output.

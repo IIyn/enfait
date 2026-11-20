@@ -16,7 +16,9 @@ pub mod secrets;
 mod settings;
 
 pub use secrets::Secret;
-pub use settings::{Accent, CloseAction, DEFAULT_LOCAL_URL, Language, Settings, ThemeId};
+pub use settings::{
+    Accent, CloseAction, DEFAULT_LOCAL_URL, Language, PanelSizes, Settings, ThemeId,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {

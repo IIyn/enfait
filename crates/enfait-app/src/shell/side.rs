@@ -468,7 +468,6 @@ impl Shell {
         let notice = self.library_notice.clone();
 
         div()
-            .w(px(280.))
             .flex_none()
             .flex()
             .flex_col()

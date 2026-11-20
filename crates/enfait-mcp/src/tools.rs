@@ -6,9 +6,10 @@ use crate::bridge::{self, Request, RequestKind};
 use enfait_assets::search::{Hit, Media};
 use enfait_core::finish::Placed;
 use enfait_core::{
-    Block, BlockId, BlockKind, Broll, Edit, Finish, Flicks, Look, Moment, Project, Transcript,
-    Transition,
+    Block, BlockId, BlockKind, Broll, Edit, Finish, Flicks, Look, Moment, PostFx, Project,
+    ProjectSettings, Transcript, Transition,
 };
+use enfait_studio::session;
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -103,6 +104,34 @@ fn number_arg(args: &Value, key: &str) -> Option<f64> {
 
 fn text_arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
     args.get(key).and_then(Value::as_str)
+}
+
+/// Care levels and providers, as the app names them.
+const QUALITIES: [&str; 4] = ["light", "fast", "polished", "ultra"];
+const PROVIDERS: [&str; 4] = ["auto", "api", "claude_code", "local"];
+
+/// `quality` and `provider` of a request, checked.
+fn care_args(args: &Value) -> Result<(Option<String>, Option<String>), String> {
+    let pick = |key: &str, names: &[&str]| -> Result<Option<String>, String> {
+        match text_arg(args, key) {
+            None => Ok(None),
+            Some(v) => {
+                let v = v.trim().to_lowercase().replace('-', "_");
+                if names.contains(&v.as_str()) {
+                    Ok(Some(v))
+                } else {
+                    Err(format!("unknown {key} “{v}”: {}", names.join(", ")))
+                }
+            }
+        }
+    };
+    Ok((pick("quality", &QUALITIES)?, pick("provider", &PROVIDERS)?))
+}
+
+/// Value in `[min, max]` as `f32` (post-FX, gains).
+#[allow(clippy::cast_possible_truncation)]
+fn bounded(v: f64, min: f64, max: f64) -> f32 {
+    v.clamp(min, max) as f32
 }
 
 impl Tools {
@@ -240,20 +269,20 @@ impl Tools {
             })
     }
 
-    fn block_state(&self, block: &Block) -> String {
-        let clips = self.studio().join("clips");
+    fn block_state(&self, block: &Block, settings: &ProjectSettings) -> String {
+        let studio = self.studio();
         match block.kind {
             BlockKind::Rush => "take shown as is".to_owned(),
             BlockKind::Broll => match &block.broll {
                 None => "shot to choose".to_owned(),
-                Some(_) if clips.join(format!("broll-{}.mp4", block.id)).is_file() => {
+                Some(_) if session::broll_clip_path(&studio, block.id, settings).is_file() => {
                     "shot edited".to_owned()
                 }
                 Some(_) => "shot to edit (preview)".to_owned(),
             },
             _ => {
                 let job = self.job_status(block.id, false);
-                let ready = clips.join(format!("bloc-{}.mp4", block.id)).is_file();
+                let ready = session::clip_path(&studio, block.id, settings).is_file();
                 match (job.as_deref(), ready) {
                     (Some(j @ (QUEUED | RUNNING)), _) => j.to_owned(),
                     (_, true) => "animated".to_owned(),
@@ -271,6 +300,19 @@ impl Tools {
         let block = json!({
             "description": "Number of the block (1, 2…) as given by `storyboard`.",
             "type": ["integer", "string"],
+        });
+        let quality = json!({
+            "type": "string",
+            "enum": QUALITIES,
+            "description": "Care level, kept as the app's choice: light (Haiku, no critique), \
+                fast (Sonnet, no critique), polished (Opus, 2 critiques on rendered frames), \
+                ultra (Opus, 4 critiques). Default: the app's current choice.",
+        });
+        let provider = json!({
+            "type": "string",
+            "enum": PROVIDERS,
+            "description": "Model provider, kept as the app's choice: auto (API key if set, \
+                else Claude Code), api, claude_code, local. Default: the app's current choice.",
         });
         vec![
             json!({
@@ -435,6 +477,8 @@ impl Tools {
                         "blocks": { "type": "array", "items": { "type": "integer" } },
                         "all": { "type": "boolean", "description": "Everything left to generate." },
                         "transitions": { "type": "boolean", "description": "With the transitions of the asked blocks." },
+                        "quality": quality,
+                        "provider": provider,
                     },
                 },
             }),
@@ -491,6 +535,141 @@ impl Tools {
                 "description": "The script of the voice-over (text written by the user).",
                 "inputSchema": { "type": "object", "properties": {} },
             }),
+            json!({
+                "name": "split_block",
+                "description": "Splits a block in two, before a word of the block (or at a time \
+                    of the video for a passage without words). The second block keeps the type \
+                    and the transition, with an empty description and the moments after the cut; \
+                    the first one gets a hard cut. Both have to be generated again.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "block": block,
+                        "word": { "type": "string", "description": "The second block starts on this word (first match in the block)." },
+                        "at": { "type": "number", "description": "Or: time of the video, in seconds, inside the block." },
+                    },
+                    "required": ["block"],
+                },
+            }),
+            json!({
+                "name": "merge_blocks",
+                "description": "Merges a block with the next one: one scene covering both. \
+                    Descriptions and moments are kept, the transition is the second block's. \
+                    The merged block has to be generated again.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": { "block": block },
+                    "required": ["block"],
+                },
+            }),
+            json!({
+                "name": "retouch",
+                "description": "Asks the enfait app for a new version of the animation of a \
+                    block, following remarks anchored in time (\"the title is too small\", \
+                    \"the circle should appear on 'city'\"). The current version is kept: \
+                    `restore_version` goes back to it. Follow the progress with `storyboard`.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "block": block,
+                        "notes": {
+                            "type": "array",
+                            "description": "Remarks, at least one.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "note": { "type": "string", "description": "What is wrong or what to change." },
+                                    "at": { "type": "number", "description": "Time of the video, in seconds (default: start of the block)." },
+                                    "word": { "type": "string", "description": "Or: when the voice says this word of the block." },
+                                },
+                                "required": ["note"],
+                            },
+                        },
+                        "quality": quality,
+                        "provider": provider,
+                    },
+                    "required": ["block", "notes"],
+                },
+            }),
+            json!({
+                "name": "restore_version",
+                "description": "Goes back to a previous version of the animation of a block \
+                    (versions are listed by `storyboard`); the current one is kept as a new \
+                    version. Re-renders without calling a model. The app must be open.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "block": block,
+                        "version": { "type": "integer", "minimum": 1 },
+                    },
+                    "required": ["block", "version"],
+                },
+            }),
+            json!({
+                "name": "style",
+                "description": "The style of the video: preset, the user's rules, global \
+                    post-FX, rules remembered from retouches, and the available presets.",
+                "inputSchema": { "type": "object", "properties": {} },
+            }),
+            json!({
+                "name": "set_style",
+                "description": "Changes the style of the video. Only the given fields change. \
+                    Rules and preset apply to animations generated from now on; post-FX apply \
+                    to the whole video at once.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "preset": { "type": "string", "description": "Preset id (see `style`), or \"none\"." },
+                        "rules": { "type": "string", "description": "The user's style rules, free text (replaces them; they win over the preset)." },
+                        "fx": {
+                            "type": "object",
+                            "description": "Post-FX, each optional.",
+                            "properties": {
+                                "grain": { "type": "number", "minimum": 0, "maximum": 1 },
+                                "vignette": { "type": "number", "minimum": 0, "maximum": 1 },
+                                "contrast": { "type": "number", "minimum": -1, "maximum": 1 },
+                                "saturation": { "type": "number", "minimum": -1, "maximum": 1, "description": "-1: black and white." },
+                                "temperature": { "type": "number", "minimum": -1, "maximum": 1, "description": "-1 cold, 1 warm." },
+                                "aberration": { "type": "number", "minimum": 0, "maximum": 1 },
+                            },
+                        },
+                        "memory": { "type": "array", "items": { "type": "string" }, "description": "Rules remembered for every animation (replaces the list)." },
+                    },
+                },
+            }),
+            json!({
+                "name": "edit_sound",
+                "description": "Changes a music or a SFX already placed (id given by `finish`). \
+                    Only the given fields change.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "integer" },
+                        "volume_db": { "type": "number" },
+                        "fade_in": { "type": "number", "description": "Music: fade-in, seconds." },
+                        "fade_out": { "type": "number", "description": "Music: fade-out, seconds." },
+                        "offset": { "type": "number", "description": "Music: time of the track where it starts. SFX: seconds from the start of its block (negative: before)." },
+                        "from_block": block,
+                        "to_block": block,
+                        "block": block,
+                        "word": { "type": "string", "description": "SFX: on this word of its block." },
+                    },
+                    "required": ["id"],
+                },
+            }),
+            json!({
+                "name": "import_file",
+                "description": "Copies a file of the computer (image, SVG, video, font, sound) \
+                    into the library of the project. Absolute path.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string" },
+                        "description": { "type": "string", "description": "What it is for, for the animators." },
+                    },
+                    "required": ["path"],
+                },
+            }),
         ]
     }
 
@@ -523,6 +702,14 @@ impl Tools {
             "credits" => Ok(self.credits()),
             "format" => self.set_format(args),
             "export" => self.export(args).await,
+            "split_block" => self.split_block(args),
+            "merge_blocks" => self.merge_blocks(args),
+            "retouch" => self.retouch(args),
+            "restore_version" => self.restore_version(args),
+            "style" => Ok(self.style_text()),
+            "set_style" => self.set_style(args),
+            "edit_sound" => self.edit_sound(args),
+            "import_file" => self.import_file(args),
             "script" => Ok(std::fs::read_to_string(self.dir.join("script.md"))
                 .unwrap_or_else(|_| "(no script)".into())),
             other => Err(format!("unknown tool: {other}")),
@@ -557,7 +744,7 @@ impl Tools {
                 at(b.range.start().as_secs_f64()),
                 at(b.range.end().as_secs_f64()),
                 kind_name(b.kind),
-                self.block_state(b)
+                self.block_state(b, settings)
             );
             let _ = writeln!(out, "Voice: “{}”", transcript.text_in(b.range));
             if !b.description.trim().is_empty() {
@@ -582,6 +769,15 @@ impl Tools {
             }
             if b.cutout {
                 out.push_str("Person cut out.\n");
+            }
+            let versions = self.versions(b, settings);
+            if !versions.is_empty() {
+                let list: Vec<String> = versions.iter().map(u32::to_string).collect();
+                let _ = writeln!(
+                    out,
+                    "Previous versions: {} (`restore_version`)",
+                    list.join(", ")
+                );
             }
             match &b.transition_after {
                 Transition::Cut => {}
@@ -1048,8 +1244,7 @@ impl Tools {
                     .into(),
             );
         }
-        bridge::send_request(&self.dir, &Request { block: None, kind })
-            .map_err(|e| e.to_string())?;
+        bridge::send_request(&self.dir, &Request::new(None, kind)).map_err(|e| e.to_string())?;
         Ok(match kind {
             RequestKind::Magic => "Magic mode requested: the app takes care of it. Follow the \
                 progress with `storyboard`; the video will be exported next to the take."
@@ -1061,6 +1256,7 @@ impl Tools {
     }
 
     fn generate(&self, args: &Value) -> Outcome {
+        let care = care_args(args)?;
         let project = self.project()?;
         let blocks = project.blocks();
         let all = args.get("all").and_then(Value::as_bool).unwrap_or(false);
@@ -1071,7 +1267,10 @@ impl Tools {
         let chosen: Vec<&Block> = if all {
             blocks
                 .iter()
-                .filter(|b| self.block_state(b) == TO_GENERATE || b.kind == BlockKind::Broll)
+                .filter(|b| {
+                    self.block_state(b, project.settings()) == TO_GENERATE
+                        || b.kind == BlockKind::Broll
+                })
                 .collect()
         } else {
             let numbers = args
@@ -1093,8 +1292,9 @@ impl Tools {
             bridge::send_request(
                 &self.dir,
                 &Request {
-                    block: Some(b.id),
-                    kind: RequestKind::Animation,
+                    quality: care.0.clone(),
+                    provider: care.1.clone(),
+                    ..Request::new(Some(b.id), RequestKind::Animation)
                 },
             )
             .map_err(|e| e.to_string())?;
@@ -1109,8 +1309,9 @@ impl Tools {
                     bridge::send_request(
                         &self.dir,
                         &Request {
-                            block: Some(b.id),
-                            kind: RequestKind::Transition,
+                            quality: care.0.clone(),
+                            provider: care.1.clone(),
+                            ..Request::new(Some(b.id), RequestKind::Transition)
                         },
                     )
                     .map_err(|e| e.to_string())?;
@@ -1131,6 +1332,349 @@ impl Tools {
             out.push_str(" The enfait app is closed: the requests will run when it opens.");
         }
         Ok(out)
+    }
+
+    /// Time of the cut before the word: halfway in the silence between it
+    /// and the previous word of the block.
+    fn cut_before(transcript: &Transcript, block: &Block, word: &str) -> Result<Flicks, String> {
+        let (start, text) = Self::find_word(transcript, block, word)?;
+        let previous = transcript
+            .words_in(block.range)
+            .filter(|w| w.range.start() < start)
+            .map(|w| w.range.end().min(start))
+            .max()
+            .ok_or_else(|| format!("“{text}” is the first word of the block"))?;
+        let (a, b) = (previous.get(), start.get());
+        Ok(Flicks::new(a.saturating_add(b.saturating_sub(a) / 2)))
+    }
+
+    fn split_block(&self, args: &Value) -> Outcome {
+        let mut project = self.project()?;
+        let block = Self::block(&project, args.get("block"))?.clone();
+        let at_time = match (text_arg(args, "word"), number_arg(args, "at")) {
+            (Some(word), _) => Self::cut_before(&self.transcript(), &block, word)?,
+            (None, Some(seconds)) => millis(seconds)?,
+            (None, None) => return Err("give `word` (or `at`, in seconds)".into()),
+        };
+        if at_time <= block.range.start() || at_time >= block.range.end() {
+            return Err(format!(
+                "the cut must fall inside block {} ({} → {})",
+                Self::number_of(&project, block.id),
+                at(block.range.start().as_secs_f64()),
+                at(block.range.end().as_secs_f64())
+            ));
+        }
+        let new_block = BlockId::new();
+        Edit::Split {
+            block: block.id,
+            at: at_time,
+            new_block,
+        }
+        .apply(&mut project)
+        .map_err(|e| e.to_string())?;
+        self.save_project(&project)?;
+        Ok(format!(
+            "Block {} split at {}: block {} and block {} (new, without description). Both \
+             have to be generated again.",
+            Self::number_of(&project, block.id),
+            at(at_time.as_secs_f64()),
+            Self::number_of(&project, block.id),
+            Self::number_of(&project, new_block)
+        ))
+    }
+
+    fn merge_blocks(&self, args: &Value) -> Outcome {
+        let mut project = self.project()?;
+        let block = Self::block(&project, args.get("block"))?.clone();
+        Edit::MergeWithNext { block: block.id }
+            .apply(&mut project)
+            .map_err(|e| e.to_string())?;
+        self.save_project(&project)?;
+        let merged = project.block(block.id).ok_or("block lost in the merge")?;
+        Ok(format!(
+            "Merged: block {} now covers {} → {}. It has to be generated again.",
+            Self::number_of(&project, block.id),
+            at(merged.range.start().as_secs_f64()),
+            at(merged.range.end().as_secs_f64())
+        ))
+    }
+
+    /// Previous versions kept for the animation of a block.
+    fn versions(&self, block: &Block, settings: &ProjectSettings) -> Vec<u32> {
+        enfait_studio::versions(&self.studio(), &session::block_name(block.id, settings))
+    }
+
+    fn require_app(&self) -> Result<(), String> {
+        if bridge::app_alive(&self.dir) {
+            Ok(())
+        } else {
+            Err(
+                "the enfait app is not open on this session: start `enfait`, then ask again."
+                    .into(),
+            )
+        }
+    }
+
+    fn retouch(&self, args: &Value) -> Outcome {
+        let (quality, provider) = care_args(args)?;
+        let project = self.project()?;
+        let transcript = self.transcript();
+        let block = Self::block(&project, args.get("block"))?;
+        let name = session::block_name(block.id, project.settings());
+        if !self
+            .studio()
+            .join("sources")
+            .join(format!("{name}.html"))
+            .is_file()
+        {
+            return Err(format!(
+                "block {} has no animation to retouch yet: use `generate`",
+                Self::number_of(&project, block.id)
+            ));
+        }
+        let start = block.range.start().as_secs_f64();
+        let length = block.range.duration().as_secs_f64();
+        let items = args
+            .get("notes")
+            .and_then(Value::as_array)
+            .filter(|n| !n.is_empty())
+            .ok_or("give `notes`: at least one remark")?;
+        let mut notes = Vec::new();
+        for item in items {
+            let note = match item {
+                Value::String(s) => s.trim(),
+                _ => text_arg(item, "note").unwrap_or("").trim(),
+            };
+            if note.is_empty() {
+                return Err("a remark is empty".into());
+            }
+            let t = match (text_arg(item, "word"), number_arg(item, "at")) {
+                (Some(word), _) => {
+                    Self::find_word(&transcript, block, word)?.0.as_secs_f64() - start
+                }
+                (None, Some(seconds)) => seconds - start,
+                (None, None) => 0.0,
+            };
+            notes.push((t.clamp(0.0, length), note.to_owned()));
+        }
+        self.require_app()?;
+        bridge::send_request(
+            &self.dir,
+            &Request {
+                notes,
+                quality,
+                provider,
+                ..Request::new(Some(block.id), RequestKind::Retouch)
+            },
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(format!(
+            "Retouch of block {} requested: the app makes a new version (the current one is \
+             kept). Follow the progress with `storyboard`.",
+            Self::number_of(&project, block.id)
+        ))
+    }
+
+    fn restore_version(&self, args: &Value) -> Outcome {
+        let project = self.project()?;
+        let block = Self::block(&project, args.get("block"))?;
+        let version = args
+            .get("version")
+            .and_then(Value::as_u64)
+            .and_then(|v| u32::try_from(v).ok())
+            .ok_or("give `version`")?;
+        let versions = self.versions(block, project.settings());
+        if !versions.contains(&version) {
+            return Err(if versions.is_empty() {
+                "this block has no previous version".to_owned()
+            } else {
+                format!(
+                    "no version {version}; versions: {}",
+                    versions
+                        .iter()
+                        .map(u32::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            });
+        }
+        self.require_app()?;
+        bridge::send_request(
+            &self.dir,
+            &Request {
+                version: Some(version),
+                ..Request::new(Some(block.id), RequestKind::Restore)
+            },
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(format!(
+            "Back to version {version} of block {} requested (no model call).",
+            Self::number_of(&project, block.id)
+        ))
+    }
+
+    fn style_text(&self) -> String {
+        let look = self.look();
+        let mut out = String::new();
+        let preset = look
+            .style
+            .preset
+            .as_deref()
+            .and_then(enfait_ai::styles::find);
+        let _ = writeln!(
+            out,
+            "Preset: {}",
+            preset.map_or_else(
+                || "none (free style)".to_owned(),
+                |p| format!("{} ({}: {})", p.slug, p.name, p.summary)
+            )
+        );
+        let rules = look.style.rules.trim();
+        let _ = writeln!(
+            out,
+            "Rules of the user: {}",
+            if rules.is_empty() { "(none)" } else { rules }
+        );
+        let fx = look.fx;
+        let _ = writeln!(
+            out,
+            "Post-FX: grain {:.2}, vignette {:.2}, contrast {:+.2}, saturation {:+.2}, \
+             temperature {:+.2}, aberration {:.2}",
+            fx.grain, fx.vignette, fx.contrast, fx.saturation, fx.temperature, fx.aberration
+        );
+        if look.memory.is_empty() {
+            out.push_str("Remembered rules: (none)\n");
+        } else {
+            out.push_str("Remembered rules:\n");
+            for rule in &look.memory {
+                let _ = writeln!(out, "- {rule}");
+            }
+        }
+        out.push_str("\nPresets:\n");
+        for p in enfait_ai::styles::PRESETS {
+            let _ = writeln!(out, "- {}: {} ({})", p.slug, p.name, p.summary);
+        }
+        out
+    }
+
+    fn set_style(&self, args: &Value) -> Outcome {
+        let mut look = self.look();
+        if let Some(preset) = text_arg(args, "preset") {
+            let preset = preset.trim();
+            look.style.preset = if preset.is_empty() || preset.eq_ignore_ascii_case("none") {
+                None
+            } else {
+                let found = enfait_ai::styles::find(preset)
+                    .ok_or_else(|| format!("unknown preset “{preset}” (see `style`)"))?;
+                Some(found.slug.to_owned())
+            };
+        }
+        if let Some(rules) = text_arg(args, "rules") {
+            look.style.rules = rules.trim().to_owned();
+        }
+        if let Some(fx) = args.get("fx") {
+            let get = |key: &str| number_arg(fx, key);
+            let old: PostFx = look.fx;
+            look.fx = PostFx {
+                grain: get("grain").map_or(old.grain, |v| bounded(v, 0.0, 1.0)),
+                vignette: get("vignette").map_or(old.vignette, |v| bounded(v, 0.0, 1.0)),
+                contrast: get("contrast").map_or(old.contrast, |v| bounded(v, -1.0, 1.0)),
+                saturation: get("saturation").map_or(old.saturation, |v| bounded(v, -1.0, 1.0)),
+                temperature: get("temperature").map_or(old.temperature, |v| bounded(v, -1.0, 1.0)),
+                aberration: get("aberration").map_or(old.aberration, |v| bounded(v, 0.0, 1.0)),
+            };
+        }
+        if let Some(memory) = args.get("memory").and_then(Value::as_array) {
+            look.memory = memory
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|r| !r.is_empty())
+                .map(str::to_owned)
+                .collect();
+        }
+        self.save_look(&look)?;
+        Ok(self.style_text())
+    }
+
+    fn edit_sound(&self, args: &Value) -> Outcome {
+        let id = args.get("id").and_then(Value::as_u64).ok_or("give `id`")?;
+        let project = self.project()?;
+        let mut finish = self.finish();
+        let block_of = |key: &str| -> Result<Option<BlockId>, String> {
+            args.get(key)
+                .map(|v| Self::block(&project, Some(v)).map(|b| b.id))
+                .transpose()
+        };
+        let index_of = |id: BlockId| project.blocks().iter().position(|b| b.id == id);
+        if let Some(m) = finish.music_mut(id) {
+            if let Some(gain) = number_arg(args, "volume_db") {
+                m.gain_db = bounded(gain, -60.0, 12.0);
+            }
+            if let Some(f) = number_arg(args, "fade_in") {
+                m.fade_in = f.clamp(0.0, 30.0);
+            }
+            if let Some(f) = number_arg(args, "fade_out") {
+                m.fade_out = f.clamp(0.0, 30.0);
+            }
+            if let Some(offset) = number_arg(args, "offset") {
+                m.offset = offset.max(0.0);
+            }
+            let from = block_of("from_block")?.unwrap_or(m.from);
+            let to = block_of("to_block")?.unwrap_or(m.to);
+            if index_of(from) > index_of(to) {
+                return Err("`from_block` comes after `to_block`".into());
+            }
+            m.from = from;
+            m.to = to;
+        } else if let Some(sfx) = finish.sfx_mut(id) {
+            if let Some(gain) = number_arg(args, "volume_db") {
+                sfx.gain_db = bounded(gain, -60.0, 12.0);
+            }
+            if let Some(b) = block_of("block")? {
+                sfx.block = b;
+            }
+            let block = project
+                .block(sfx.block)
+                .ok_or("the block of this SFX no longer exists: give `block`")?;
+            match (text_arg(args, "word"), number_arg(args, "offset")) {
+                (Some(word), _) => {
+                    let (t, _) = Self::find_word(&self.transcript(), block, word)?;
+                    sfx.offset = t.as_secs_f64() - block.range.start().as_secs_f64();
+                }
+                (None, Some(offset)) => sfx.offset = offset,
+                (None, None) => {}
+            }
+        } else {
+            return Err(format!("no sound {id} (see `finish`)"));
+        }
+        self.save_finish(&finish)?;
+        self.finish_text()
+    }
+
+    fn import_file(&self, args: &Value) -> Outcome {
+        let path = PathBuf::from(text_arg(args, "path").ok_or("give `path`")?.trim());
+        if !path.is_absolute() {
+            return Err("give an absolute path".into());
+        }
+        if !path.is_file() {
+            return Err(format!("{} is not a file", path.display()));
+        }
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let mut asset =
+            enfait_assets::library::add_file(&self.dir.join("library"), &path, &stem, None, None)?;
+        if let Some(d) = text_arg(args, "description") {
+            asset.description = d.trim().to_owned();
+        }
+        let file = asset.file.clone();
+        let kind = asset.kind;
+        let mut look = self.look();
+        look.assets.push(asset);
+        self.save_look(&look)?;
+        Ok(format!("Added to the library: {file} ({kind:?})."))
     }
 
     fn set_format(&self, args: &Value) -> Outcome {

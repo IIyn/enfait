@@ -101,16 +101,49 @@ fn open_stream(
         .ok_or_else(|| MediaError::Output("no audio output".into()))?;
     let supported = device.default_output_config().map_err(|e| err(&e))?;
     let format = supported.sample_format();
-    let config: cpal::StreamConfig = supported.into();
-    match format {
-        cpal::SampleFormat::F32 => build::<f32>(&device, config, clock, audio, edl),
-        cpal::SampleFormat::I16 => build::<i16>(&device, config, clock, audio, edl),
-        cpal::SampleFormat::I32 => build::<i32>(&device, config, clock, audio, edl),
-        cpal::SampleFormat::U16 => build::<u16>(&device, config, clock, audio, edl),
-        cpal::SampleFormat::F64 => build::<f64>(&device, config, clock, audio, edl),
-        other => Err(MediaError::Output(format!(
-            "unsupported sample format {other}"
-        ))),
+    let mut config: cpal::StreamConfig = supported.into();
+    config.buffer_size = buffer_size(supported.buffer_size(), config.sample_rate);
+    let open = |config: cpal::StreamConfig| {
+        let (clock, audio, edl) = (Arc::clone(&clock), audio.clone(), Arc::clone(&edl));
+        match format {
+            cpal::SampleFormat::F32 => build::<f32>(&device, config, clock, audio, edl),
+            cpal::SampleFormat::I16 => build::<i16>(&device, config, clock, audio, edl),
+            cpal::SampleFormat::I32 => build::<i32>(&device, config, clock, audio, edl),
+            cpal::SampleFormat::U16 => build::<u16>(&device, config, clock, audio, edl),
+            cpal::SampleFormat::F64 => build::<f64>(&device, config, clock, audio, edl),
+            other => Err(MediaError::Output(format!(
+                "unsupported sample format {other}"
+            ))),
+        }
+    };
+    match open(config) {
+        Err(e) if config.buffer_size != cpal::BufferSize::Default => {
+            tracing::warn!("short audio buffer refused ({e}), using the default one");
+            open(cpal::StreamConfig {
+                buffer_size: cpal::BufferSize::Default,
+                ..config
+            })
+        }
+        result => result,
+    }
+}
+
+/// Duration of the sound asked per callback. With the default size,
+/// PulseAudio (and PipeWire's pulse server) queues about 2 s of sound: play,
+/// pause and seeks would lag by as much, since the picture follows what is
+/// heard.
+const BUFFER_SECONDS: f64 = 0.02;
+
+/// Callback size for about [`BUFFER_SECONDS`], within what the device
+/// supports.
+fn buffer_size(supported: &cpal::SupportedBufferSize, rate: u32) -> cpal::BufferSize {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let wanted = (f64::from(rate) * BUFFER_SECONDS).round().max(64.0) as u32;
+    match supported {
+        cpal::SupportedBufferSize::Range { min, max } if min <= max => {
+            cpal::BufferSize::Fixed(wanted.clamp(*min, *max))
+        }
+        _ => cpal::BufferSize::Fixed(wanted),
     }
 }
 

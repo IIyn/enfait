@@ -391,6 +391,20 @@ impl Shell {
         }
     }
 
+    /// Word clicked in a block row: that block, then that word.
+    fn pick_word(
+        &mut self,
+        block: BlockId,
+        word: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.board.as_ref().and_then(|b| b.selected) != Some(block) {
+            self.select_block(Some(block), false, window, cx);
+        }
+        self.select_word(word, window, cx);
+    }
+
     fn select_word(&mut self, word: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.commit_inputs(cx);
         let Some(board) = &mut self.board else { return };
@@ -474,12 +488,7 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> Div {
         let narrow = below.is_some();
-        let player = div()
-            .flex_none()
-            .h(relative(if narrow { 0.3 } else { 0.5 }))
-            .border_b_1()
-            .border_color(color(tokens::LINE))
-            .child(self.player.clone());
+        let player = self.player_pane(narrow, cx);
         let Some(board) = &self.board else {
             let notice = self
                 .board_notice
@@ -533,6 +542,7 @@ impl Shell {
                     playing == Some(block.id),
                     rate,
                     states.get(i),
+                    listeners,
                 )
                 .on_click(
                     listeners.listener(move |shell, event: &ClickEvent, window, cx| {
@@ -627,9 +637,7 @@ impl Shell {
             .flex()
             .flex_col()
             .bg(color(tokens::PANEL))
-            .when(side, |d| {
-                d.w(px(340.)).border_l_1().border_color(color(tokens::LINE))
-            });
+            .when(side, |d| d.border_l_1().border_color(color(tokens::LINE)));
         let Some(board) = &self.board else {
             return panel.child(
                 div()
@@ -1020,7 +1028,9 @@ fn block_row(
     playing: bool,
     rate: FrameRate,
     state: Option<&super::studio::BlockState>,
+    cx: &Context<Shell>,
 ) -> Stateful<Div> {
+    let words = selected.then(|| row_words(index, block, board, cx));
     let badge = state.and_then(|s| s.label().map(|l| (l, s.tone())));
     let range = format!(
         "{} → {}",
@@ -1135,16 +1145,19 @@ fn block_row(
                                         .min_w(px(0.))
                                         .overflow_hidden()
                                         .text_color(color(tokens::MUTE))
-                                        .child({
-                                            let said = board.text_of(block);
-                                            if said.is_empty() {
-                                                SharedString::default()
-                                            } else {
-                                                tr!("common.quoted", text = said)
-                                            }
+                                        .when(words.is_none(), |d| {
+                                            d.child({
+                                                let said = board.text_of(block);
+                                                if said.is_empty() {
+                                                    SharedString::default()
+                                                } else {
+                                                    tr!("common.quoted", text = said)
+                                                }
+                                            })
                                         }),
                                 ),
                         )
+                        .when_some(words.flatten(), |d, words| d.child(words))
                         .child(
                             div()
                                 .text_color(color(if block.description.is_empty() {
@@ -1175,4 +1188,93 @@ fn block_row(
                     .child(text),
             )
         })
+}
+
+/// Words of the selected block in its row, clickable (go to the word, choose
+/// where to cut), with « Cut before » and « Merge with the next one ».
+/// `None` without words (silent passage: the inspector cuts at the playhead).
+fn row_words(index: usize, block: &Block, board: &Storyboard, cx: &Context<Shell>) -> Option<Div> {
+    let words = board.words_of(block);
+    let first = words.first().map(|(i, _)| *i)?;
+    let id = block.id;
+    let chosen = board
+        .word
+        .and_then(|i| words.iter().find(|(w, _)| *w == i))
+        .map(|(i, w)| (*i, w.text.clone()));
+    let can_split = chosen.as_ref().is_some_and(|(i, _)| *i != first);
+    let last = index.saturating_add(1) >= board.project.blocks().len();
+    let chips = words.iter().map(|(i, w)| {
+        let i = *i;
+        let on = chosen.as_ref().is_some_and(|(c, _)| *c == i);
+        div()
+            .id(("row-word", i))
+            .px(px(3.))
+            .rounded(px(2.))
+            .cursor_pointer()
+            .map(|d| {
+                if on {
+                    d.bg(color(tokens::SIGNAL))
+                        .text_color(color(tokens::ON_SIGNAL))
+                } else {
+                    d.text_color(color(tokens::FG2))
+                        .hover(|d| d.bg(color(tokens::HOVER)))
+                }
+            })
+            .child(SharedString::from(w.text.clone()))
+            .on_click(cx.listener(move |shell, _: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                shell.pick_word(id, i, window, cx);
+            }))
+    });
+    let split_label = chosen.as_ref().map_or_else(
+        || tr!("board.row_hint"),
+        |(_, text)| {
+            tr!(
+                "board.split_before",
+                word = format!(" {}", tr!("common.quoted", text = text))
+            )
+        },
+    );
+    Some(
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap_y(px(2.))
+                    .line_height(px(22.))
+                    .text_size(px(13.))
+                    .children(chips),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(4.))
+                    .child(
+                        chip(("row-split", index), split_label, false, can_split).when(
+                            can_split,
+                            |d| {
+                                d.on_click(cx.listener(|shell, _: &ClickEvent, window, cx| {
+                                    cx.stop_propagation();
+                                    shell.board_action(Storyboard::split_at_word, window, cx);
+                                }))
+                            },
+                        ),
+                    )
+                    .when(!last, |d| {
+                        d.child(
+                            chip(("row-merge", index), tr!("board.merge"), false, true).on_click(
+                                cx.listener(move |shell, _: &ClickEvent, window, cx| {
+                                    cx.stop_propagation();
+                                    shell.edit_board(Edit::MergeWithNext { block: id }, window, cx);
+                                }),
+                            ),
+                        )
+                    }),
+            ),
+    )
 }

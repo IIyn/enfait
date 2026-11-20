@@ -11,6 +11,7 @@ use super::{Shell, label};
 use crate::prefs;
 use crate::theme::{self, color, tokens};
 use crate::tr;
+use crate::update::{self, Package, Release};
 use enfait_ai::ProviderChoice;
 use enfait_config::secrets::{self, Source};
 use enfait_config::{Accent, CloseAction, Language, Secret, ThemeId};
@@ -119,6 +120,20 @@ pub(super) struct SettingsUi {
     sync: bool,
     notice: Option<(SharedString, bool)>,
     downloads: BTreeMap<Tool, Download>,
+    update: UpdateState,
+    /// The update file being downloaded (or downloaded) and where it goes.
+    update_file: Option<(Download, PathBuf, Package)>,
+}
+
+/// Where the update check stands.
+enum UpdateState {
+    Idle,
+    Checking,
+    UpToDate(String),
+    /// No public release to compare with.
+    NoRelease,
+    Available(Box<Release>),
+    Failed(String),
 }
 
 fn key_input(window: &mut Window, cx: &mut Context<Shell>) -> Entity<InputState> {
@@ -214,9 +229,16 @@ impl SettingsUi {
                 sync: true,
                 notice: None,
                 downloads: BTreeMap::new(),
+                update: UpdateState::Idle,
+                update_file: None,
             },
             subscriptions,
         )
+    }
+
+    /// No update check yet in this session.
+    pub(super) const fn update_unchecked(&self) -> bool {
+        matches!(self.update, UpdateState::Idle)
     }
 
     /// Fields that need the window: settings copied in, saved keys emptied.
@@ -458,6 +480,279 @@ impl Shell {
         cx.notify();
     }
 
+    /// Looks for the latest release in the background (once at a time).
+    pub(super) fn check_update(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.settings.update, UpdateState::Checking) {
+            return;
+        }
+        self.settings.update = UpdateState::Checking;
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_spawn(async {
+                    super::assets::block_on(async {
+                        let client = enfait_assets::search::client().map_err(|e| e.to_string())?;
+                        update::latest(&client).await
+                    })
+                    .and_then(|r| r)
+                })
+                .await;
+            let _ = this.update(cx, |shell, cx| {
+                shell.settings.update = match result {
+                    Ok(Some(release)) if update::is_newer(release.version(), update::CURRENT) => {
+                        UpdateState::Available(Box::new(release))
+                    }
+                    Ok(Some(release)) => UpdateState::UpToDate(release.version().to_owned()),
+                    Ok(None) => UpdateState::NoRelease,
+                    Err(e) => {
+                        tracing::warn!("update check: {e}");
+                        UpdateState::Failed(e)
+                    }
+                };
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    /// Downloads the file of the new release for this installation into
+    /// the downloads folder, then opens it in the system installer when
+    /// there is one. Without a fitting file: the release page.
+    fn download_update(&mut self, cx: &mut Context<Self>) {
+        let UpdateState::Available(release) = &self.settings.update else {
+            return;
+        };
+        if self
+            .settings
+            .update_file
+            .as_ref()
+            .is_some_and(|(d, _, _)| d.finished().is_none())
+        {
+            return;
+        }
+        let package = Package::detect();
+        let Some(asset) = package.asset(release).cloned() else {
+            cx.open_url(&release.html_url);
+            return;
+        };
+        let path = update::download_dir().join(&asset.name);
+        let download = Download::new();
+        self.settings.update_file = Some((download.clone(), path.clone(), package));
+        let job = download.clone();
+        let target = path.clone();
+        let _ = std::thread::Builder::new()
+            .name("enfait-update".into())
+            .spawn(move || {
+                let result = super::assets::block_on(async {
+                    let client =
+                        enfait_assets::search::download_client().map_err(|e| e.to_string())?;
+                    let progress = |done: u64, total: Option<u64>| {
+                        job.done.store(done, Ordering::Relaxed);
+                        job.total.store(total.unwrap_or(0), Ordering::Relaxed);
+                    };
+                    enfait_assets::search::download_large(
+                        &client,
+                        &asset.browser_download_url,
+                        &target,
+                        &progress,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())
+                })
+                .and_then(|r| r);
+                if let Ok(mut slot) = job.result.lock() {
+                    *slot = Some(result);
+                }
+            });
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(300))
+                    .await;
+                let finished = download.finished();
+                let opened = this.update(cx, |_, cx| {
+                    if matches!(finished, Some(Ok(()))) && package.opens_installer() {
+                        cx.open_with_system(&path);
+                    }
+                    cx.notify();
+                });
+                if opened.is_err() || finished.is_some() {
+                    break;
+                }
+            }
+        })
+        .detach();
+        cx.notify();
+    }
+
+    fn update_field(&self, cx: &mut Context<Self>) -> Div {
+        let help = tr!("settings.update_help", version = update::current());
+        let field = field(tr!("settings.update"), Some(help));
+        let check = |id: &'static str, text: SharedString| {
+            chip(id, text, false, true)
+                .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| shell.check_update(cx)))
+        };
+        let row = div().flex().flex_wrap().items_center().gap(px(8.));
+        match &self.settings.update {
+            UpdateState::Idle => {
+                field.child(row.child(check("update-check", tr!("settings.update_check"))))
+            }
+            UpdateState::Checking => {
+                field.child(row.child(small(tr!("settings.update_checking"), tokens::FG2)))
+            }
+            UpdateState::UpToDate(latest) => field.child(
+                row.child(small(
+                    tr!("settings.update_latest", version = latest),
+                    tokens::OK,
+                ))
+                .child(check("update-again", tr!("settings.update_again"))),
+            ),
+            UpdateState::NoRelease => field.child(
+                row.child(small(tr!("settings.update_none"), tokens::FG2))
+                    .child(check("update-again", tr!("settings.update_again"))),
+            ),
+            UpdateState::Failed(e) => field.child(
+                row.child(small(
+                    tr!("settings.update_failed", error = e),
+                    tokens::ERROR,
+                ))
+                .child(check("update-again", tr!("settings.update_again"))),
+            ),
+            UpdateState::Available(release) => field.child(self.update_available(release, cx)),
+        }
+    }
+
+    fn update_available(&self, release: &Release, cx: &mut Context<Self>) -> Div {
+        let notes = release.notes();
+        let page = release.html_url.clone();
+        let file = self.settings.update_file.as_ref();
+        let running = file.is_some_and(|(d, _, _)| d.finished().is_none());
+        let action: Div = match file.map(|(d, path, package)| (d.finished(), path, *package)) {
+            Some((None, _, _)) => {
+                let text = file.and_then(|(d, _, _)| d.fraction()).map_or_else(
+                    || tr!("settings.tools.downloading"),
+                    |f| {
+                        tr!(
+                            "settings.tools.downloading_pct",
+                            pct = format!("{:.0}", f * 100.0)
+                        )
+                    },
+                );
+                div().child(small(text, tokens::FG2))
+            }
+            Some((Some(Ok(())), path, package)) => {
+                let shown = path.display().to_string();
+                let open = path.clone();
+                let reveal = path.clone();
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .child(small(
+                        tr!("settings.update_downloaded", path = shown),
+                        tokens::OK,
+                    ))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .gap(px(6.))
+                            .when(package.opens_installer(), |d| {
+                                d.child(
+                                    chip("update-open", tr!("settings.update_open"), false, true)
+                                        .on_click(move |_, _, cx| cx.open_with_system(&open)),
+                                )
+                            })
+                            .child(
+                                chip("update-reveal", tr!("settings.show_folder"), false, true)
+                                    .on_click(move |_, _, cx| cx.reveal_path(&reveal)),
+                            ),
+                    )
+                    .when_some(package.command(path), |d, command| {
+                        d.child(small(tr!("settings.update_command"), tokens::FG2))
+                            .child(super::mono(command).text_size(px(12.)))
+                    })
+            }
+            failed => div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap(px(8.))
+                .child(
+                    chip(
+                        "update-install",
+                        tr!("settings.update_install"),
+                        false,
+                        !running,
+                    )
+                    .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                        shell.download_update(cx);
+                    })),
+                )
+                .when_some(
+                    failed.and_then(|(r, _, _)| match r {
+                        Some(Err(e)) => Some(e),
+                        _ => None,
+                    }),
+                    |d, e| {
+                        d.child(small(
+                            tr!("settings.tools.failed", error = e),
+                            tokens::ERROR,
+                        ))
+                    },
+                ),
+        };
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(small(
+                tr!(
+                    "settings.update_available",
+                    version = release.version(),
+                    current = update::current()
+                ),
+                tokens::MIXED,
+            ))
+            .child(
+                div()
+                    .id("update-notes")
+                    .max_h(px(240.))
+                    .overflow_y_scroll()
+                    .p(px(10.))
+                    .rounded(px(3.))
+                    .bg(color(tokens::RAISED))
+                    .text_size(px(12.))
+                    .line_height(px(18.))
+                    .text_color(color(tokens::FG))
+                    .map(|d| {
+                        if notes.is_empty() {
+                            d.child(small(tr!("settings.update_no_notes"), tokens::MUTE))
+                        } else {
+                            d.children(notes.into_iter().map(|line| {
+                                if line.is_empty() {
+                                    div().h(px(8.))
+                                } else {
+                                    div().child(line)
+                                }
+                            }))
+                        }
+                    }),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(px(6.))
+                    .child(action)
+                    .child(
+                        chip("update-page", tr!("settings.update_page"), false, true)
+                            .on_click(move |_, _, cx| cx.open_url(&page)),
+                    ),
+            )
+    }
+
     /// The settings page: sections on the left, the chosen one on the right.
     pub(super) fn settings_page(&mut self, _: &mut Window, cx: &mut Context<Self>) -> Div {
         let current = self.settings.section;
@@ -608,6 +903,7 @@ impl Shell {
             .child(self.language_field(cx))
             .child(self.close_field(cx))
             .child(self.notifications_field(cx))
+            .child(self.update_field(cx))
             .child(
                 field(tr!("settings.session"), Some(tr!("settings.session_help")))
                     .child(super::mono(shown).text_size(px(12.)))

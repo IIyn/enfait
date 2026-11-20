@@ -1957,6 +1957,7 @@ dependencies = [
  "gpui-kit",
  "image",
  "notify-rust",
+ "reqwest",
  "rust-i18n",
  "serde",
  "serde_json",
@@ -2042,6 +2043,7 @@ dependencies = [
 name = "enfait-mcp"
 version = "0.1.0"
 dependencies = [
+ "enfait-ai",
  "enfait-assets",
  "enfait-config",
  "enfait-core",

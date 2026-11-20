@@ -7,6 +7,7 @@
 use super::Shell;
 use crate::jobs::JobKind;
 use crate::storyboard::Storyboard;
+use enfait_ai::{ProviderChoice, Quality};
 use enfait_core::{Finish, History, Look};
 use enfait_mcp::bridge::{self, RequestKind};
 use gpui_kit::Context;
@@ -39,6 +40,11 @@ fn changed(path: &Path, seen: &mut Option<SystemTime>) -> bool {
     now.is_some()
 }
 
+/// A setting named as in its JSON form (`fast`, `claude_code`…).
+fn parse<T: serde::de::DeserializeOwned>(name: &str) -> Option<T> {
+    serde_json::from_value(serde_json::Value::String(name.trim().to_owned())).ok()
+}
+
 fn read<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
     std::fs::read(path)
         .ok()
@@ -55,6 +61,18 @@ impl Shell {
         self.watch.ticks = self.watch.ticks.wrapping_add(1);
 
         for request in bridge::take_requests(&dir) {
+            // Care level and provider asked by the agent, kept as the app's
+            // own choice (the care dialog does the same).
+            if let Some(quality) = request.quality.as_deref().and_then(parse::<Quality>) {
+                self.set_quality(quality, cx);
+            }
+            if let Some(provider) = request
+                .provider
+                .as_deref()
+                .and_then(parse::<ProviderChoice>)
+            {
+                self.set_provider(provider, cx);
+            }
             let block = request.block.filter(|id| {
                 self.board
                     .as_ref()
@@ -71,8 +89,28 @@ impl Shell {
                     self.write_storyboard(cx);
                 }
                 (RequestKind::Magic, _) => self.start_magic(cx),
-                // Block gone (storyboard rebuilt): request ignored.
-                (RequestKind::Animation | RequestKind::Transition, None) => {}
+                (RequestKind::Retouch, Some(id)) if !request.notes.is_empty() => {
+                    self.enqueue(
+                        id,
+                        JobKind::Revise {
+                            notes: request.notes,
+                        },
+                        cx,
+                    );
+                }
+                (RequestKind::Restore, Some(id)) => {
+                    if let Some(version) = request.version {
+                        self.enqueue(id, JobKind::Restore { version }, cx);
+                    }
+                }
+                // Block gone (storyboard rebuilt) or nothing to do: ignored.
+                (
+                    RequestKind::Animation
+                    | RequestKind::Transition
+                    | RequestKind::Retouch
+                    | RequestKind::Restore,
+                    _,
+                ) => {}
             }
         }
 

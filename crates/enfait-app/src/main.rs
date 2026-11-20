@@ -15,6 +15,7 @@ mod shell;
 mod storyboard;
 mod theme;
 mod tray;
+mod update;
 mod worker;
 
 use gpui_kit::{

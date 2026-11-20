@@ -43,6 +43,13 @@ pub struct Player {
     pending_seek: Option<f64>,
     /// Post-FX applied to the frames (preview).
     fx: PostFx,
+    /// Frames decoded from the original file at its own size, rather than
+    /// from the proxy (sharper, heavier).
+    native: bool,
+    /// The player fills the window.
+    expanded: bool,
+    /// The window was put fullscreen by the player (and goes back on exit).
+    made_fullscreen: bool,
 }
 
 enum State {
@@ -91,7 +98,7 @@ fn file_name(path: &std::path::Path) -> SharedString {
 }
 
 impl Player {
-    pub fn new(cache: PathBuf) -> Self {
+    pub fn new(cache: PathBuf, native: bool) -> Self {
         Self {
             cache,
             state: State::Empty,
@@ -102,6 +109,9 @@ impl Player {
             loading: None,
             pending_seek: None,
             fx: PostFx::NEUTRAL,
+            native,
+            expanded: false,
+            made_fullscreen: false,
         }
     }
 
@@ -194,10 +204,8 @@ impl Player {
                 if let Some(t) = self.pending_seek.take() {
                     clock.apply(Command::Seek(t));
                 }
-                let decoder = prepared
-                    .video
-                    .as_ref()
-                    .map(|v| decoder_for(v, &prepared, rate, &edl, &clock, &self.fx));
+                let decoder = video_source(&prepared, self.native)
+                    .map(|v| decoder_for(&v, &prepared, rate, &edl, &clock, &self.fx));
                 let playback =
                     Playback::start(Arc::clone(&clock), prepared.audio.clone(), Arc::clone(&edl));
                 let proxy_progress = prepared
@@ -249,14 +257,17 @@ impl Player {
                 l.proxy_progress = None;
                 match result {
                     Ok(Some(video)) => {
-                        l.decoder = Some(decoder_for(
-                            &video,
-                            &l.prepared,
-                            l.rate,
-                            &l.edl,
-                            &l.clock,
-                            &player.fx,
-                        ));
+                        // In native quality the original keeps being read.
+                        if !player.native {
+                            l.decoder = Some(decoder_for(
+                                &video,
+                                &l.prepared,
+                                l.rate,
+                                &l.edl,
+                                &l.clock,
+                                &player.fx,
+                            ));
+                        }
                         l.prepared.video = Some(video);
                     }
                     Ok(None) => {}
@@ -328,11 +339,8 @@ impl Player {
             l.prepared.audio.clone(),
             Arc::clone(&edl),
         );
-        l.decoder = l
-            .prepared
-            .video
-            .as_ref()
-            .map(|v| decoder_for(v, &l.prepared, l.rate, &edl, &clock, &fx));
+        l.decoder = video_source(&l.prepared, self.native)
+            .map(|v| decoder_for(&v, &l.prepared, l.rate, &edl, &clock, &fx));
         l.edl = edl;
         l.clock = clock;
         *self.wave.borrow_mut() = WaveCache::default();
@@ -356,11 +364,44 @@ impl Player {
         self.fx = fx;
         if let State::Ready(l) = &mut self.state {
             l.decoder = None;
-            l.decoder = l
-                .prepared
-                .video
-                .as_ref()
-                .map(|v| decoder_for(v, &l.prepared, l.rate, &l.edl, &l.clock, &fx));
+            l.decoder = video_source(&l.prepared, self.native)
+                .map(|v| decoder_for(&v, &l.prepared, l.rate, &l.edl, &l.clock, &fx));
+        }
+        cx.notify();
+    }
+
+    /// Native quality: frames from the original file at its own size.
+    pub fn set_native(&mut self, native: bool, cx: &mut Context<Self>) {
+        if native == self.native {
+            return;
+        }
+        self.native = native;
+        crate::prefs::update(cx, |s| s.player_native = native);
+        if let State::Ready(l) = &mut self.state {
+            l.decoder = None;
+            l.decoder = video_source(&l.prepared, native)
+                .map(|v| decoder_for(&v, &l.prepared, l.rate, &l.edl, &l.clock, &self.fx));
+        }
+        cx.notify();
+    }
+
+    pub const fn is_expanded(&self) -> bool {
+        self.expanded
+    }
+
+    /// The player fills the window, put fullscreen (Escape goes back).
+    pub fn set_expanded(&mut self, expanded: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if expanded == self.expanded {
+            return;
+        }
+        self.expanded = expanded;
+        if expanded {
+            self.made_fullscreen = !window.is_fullscreen();
+            if self.made_fullscreen {
+                window.toggle_fullscreen();
+            }
+        } else if std::mem::take(&mut self.made_fullscreen) && window.is_fullscreen() {
+            window.toggle_fullscreen();
         }
         cx.notify();
     }
@@ -649,8 +690,67 @@ impl Player {
     }
 }
 
+impl Player {
+    /// Small buttons in the corner of the picture, shown on hover: native
+    /// quality and fullscreen.
+    fn corner(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let button = |id: &'static str, text: SharedString, on: bool| {
+            div()
+                .id(id)
+                .px(px(6.))
+                .h(px(20.))
+                .flex()
+                .items_center()
+                .rounded(px(3.))
+                .cursor_pointer()
+                .text_size(px(11.))
+                .bg(gpui_kit::black().opacity(0.55))
+                .text_color(color(if on { tokens::SIGNAL } else { tokens::FG2 }))
+                .hover(|d| d.text_color(color(tokens::FG)))
+                .child(text)
+        };
+        let has_video = matches!(&self.state, State::Ready(l) if l.prepared.video.is_some());
+        div()
+            .absolute()
+            .top(px(8.))
+            .right(px(8.))
+            .flex()
+            .gap(px(4.))
+            .invisible()
+            .group_hover("stage", |s| s.visible())
+            .when(has_video, |d| {
+                d.child(
+                    button("player-native", tr!("player.native"), self.native)
+                        .tooltip(|window, cx| {
+                            gpui_kit::component::tooltip::Tooltip::new(tr!("player.native_help"))
+                                .build(window, cx)
+                        })
+                        .on_click(cx.listener(|player, _: &gpui_kit::ClickEvent, _, cx| {
+                            player.set_native(!player.native, cx);
+                        })),
+                )
+            })
+            .child(
+                button(
+                    "player-expand",
+                    if self.expanded {
+                        tr!("player.collapse")
+                    } else {
+                        tr!("player.expand")
+                    },
+                    false,
+                )
+                .on_click(cx.listener(
+                    |player, _: &gpui_kit::ClickEvent, window, cx| {
+                        player.set_expanded(!player.expanded, window, cx);
+                    },
+                )),
+            )
+    }
+}
+
 impl Render for Player {
-    fn render(&mut self, window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.update_image(window) {
             window.request_animation_frame();
         }
@@ -660,12 +760,14 @@ impl Render for Player {
             .flex_col()
             .child(
                 div()
+                    .group("stage")
                     .relative()
                     .flex_1()
                     .min_h(px(0.))
                     .overflow_hidden()
                     .bg(gpui_kit::black())
-                    .child(self.stage()),
+                    .child(self.stage())
+                    .child(self.corner(cx)),
             )
             .child(self.transport())
     }
@@ -673,6 +775,22 @@ impl Render for Player {
 
 fn frame_duration(rate: FrameRate) -> f64 {
     f64::from(rate.den()) / f64::from(rate.num())
+}
+
+/// Where the frames come from: the original at its own size in native
+/// quality, else the proxy (or the original at proxy size until it exists).
+fn video_source(prepared: &Prepared, native: bool) -> Option<VideoSource> {
+    let video = prepared.video.clone()?;
+    match prepared.info.video {
+        Some(info) if native => Some(VideoSource {
+            path: prepared.source.clone(),
+            // Even sizes, as for the proxy.
+            width: (info.width / 2).max(1) * 2,
+            height: (info.height / 2).max(1) * 2,
+            is_proxy: false,
+        }),
+        _ => Some(video),
+    }
 }
 
 fn decoder_for(

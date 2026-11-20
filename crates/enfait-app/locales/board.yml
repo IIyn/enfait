@@ -53,6 +53,9 @@ _version: 2
 "board.retouch_placeholder":
   en: "What is wrong at this moment, then Enter"
   fr: "Ce qui ne va pas à cet instant, puis Entrée"
+"board.row_hint":
+  en: "Click a word to cut before it"
+  fr: "Clique sur un mot pour couper avant"
 "board.scene":
   en: "SC %{n}"
   fr: "SC %{n}"

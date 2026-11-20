@@ -11,6 +11,18 @@ _version: 2
 "player.loading":
   en: "%{name} · %{stage} %{pct} %"
   fr: "%{name} · %{stage} %{pct} %"
+"player.collapse":
+  en: "Exit fullscreen"
+  fr: "Quitter le plein écran"
+"player.expand":
+  en: "Fullscreen"
+  fr: "Plein écran"
+"player.native":
+  en: "Native quality"
+  fr: "Qualité native"
+"player.native_help":
+  en: "Reads the original file at its own size instead of the light proxy: sharper, heavier to play."
+  fr: "Lit le fichier d'origine à sa taille réelle au lieu du proxy allégé : plus net, plus lourd à lire."
 "player.no_output":
   en: "no audio output"
   fr: "sans sortie audio"

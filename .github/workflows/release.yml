@@ -18,6 +18,8 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   TAG: ${{ inputs.tag || github.ref_name }}
+  # Version reported by the app (update check), e.g. v0.1.1.
+  ENFAIT_VERSION: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   linux:
