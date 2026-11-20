@@ -6,10 +6,10 @@ use std::path::PathBuf;
 const HTML: &str = r##"<!doctype html><html><head><style>
 html,body{margin:0;background:#101312;color:#E6ECE9;font-family:"Fraunces";overflow:hidden}
 h1{position:absolute;left:160px;top:420px;font-size:140px;margin:0;font-weight:600}
-.bar{position:absolute;left:160px;top:620px;height:12px;width:900px;background:#C3F53C;transform-origin:left}
+.bar{position:absolute;left:160px;top:620px;height:12px;width:900px;background:#F5B53D;transform-origin:left}
 svg{position:absolute;left:1200px;top:300px}
 </style></head><body><h1 id="t">Hello everyone</h1><div class="bar"></div><div id="n" style="position:absolute;left:160px;top:760px;font:600 90px Inter">0</div><div id="m" style="position:absolute;left:760px;top:760px;font:600 90px Inter">0</div>
-<svg width="500" height="500" viewBox="0 0 500 500"><circle id="c" cx="250" cy="250" r="200" fill="none" stroke="#C3F53C" stroke-width="10"/></svg>
+<svg width="500" height="500" viewBox="0 0 500 500"><circle id="c" cx="250" cy="250" r="200" fill="none" stroke="#F5B53D" stroke-width="10"/></svg>
 <script>
 const { createTimeline, splitText, stagger, svg } = anime;
 const { chars } = splitText("#t", { chars: { wrap: "clip" } });

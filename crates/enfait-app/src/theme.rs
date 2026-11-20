@@ -224,7 +224,7 @@ const DARK: Base = Base {
     music: 0xE58F6E,
     ok: 0x5FD39A,
     error: 0xE5566E,
-    accents: [0xC3F53C, 0x5FE3B0, 0x6CC4F5, 0xF2C04A, 0xF27BA6, 0xB39DF5],
+    accents: [0xC3F53C, 0x5FE3B0, 0x6CC4F5, 0xF5B53D, 0xF27BA6, 0xB39DF5],
 };
 
 /// enfait light: the same greys, inverted.
@@ -427,9 +427,9 @@ pub fn accent_color(theme: ThemeId, accent: Accent, appearance: WindowAppearance
 
 static CURRENT: RwLock<Palette> = RwLock::new(Palette {
     base: DARK,
-    signal: 0xC3F53C,
-    signal_hover: 0xD0F765,
-    signal_pressed: 0xACD835,
+    signal: 0xF5B53D,
+    signal_hover: 0xF7C260,
+    signal_pressed: 0xD89F36,
     on_signal: 0x0E1110,
 });
 

@@ -14,7 +14,7 @@
     <rect x="43.5" y="26" width="3.6" height="16" rx="1.8"/>
     <rect x="50" y="30" width="3.6" height="8" rx="1.8"/>
   </g>
-  <g fill="#C3F53C" stroke="#C3F53C">
+  <g fill="#F5B53D" stroke="#F5B53D">
     <line x1="35.55" y1="17" x2="35.55" y2="53" stroke-width="3" stroke-linecap="round"/>
     <path d="M31.05 10H40.05V14.5L35.55 18.5L31.05 14.5Z" stroke-width="2" stroke-linejoin="round"/>
   </g>
