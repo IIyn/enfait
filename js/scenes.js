@@ -37,8 +37,8 @@
   function footage(root) {
     const b = bag();
     // Microphone head in the clip at about 2 s (frame coordinates).
-    const mx = 652;
-    const my = 378;
+    const mx = 695;
+    const my = 500;
     const arcs = [70, 110, 150]
       .map((r) => `<path d="M ${mx - r * 0.5} ${my - r * 0.87} A ${r} ${r} 0 0 0 ${mx - r * 0.5} ${my + r * 0.87}"/>` +
         `<path d="M ${mx + r * 0.5} ${my - r * 0.87} A ${r} ${r} 0 0 1 ${mx + r * 0.5} ${my + r * 0.87}"/>`)

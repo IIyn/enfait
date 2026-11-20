@@ -17,7 +17,7 @@
   --tx: #E6ECE9;
   --tx-2: #AEB8B4;
   --tx-3: #85908C;
-  --acc: #C3F53C;
+  --acc: #F5B53D;
   --on-acc: #0E1110;
   --gut: 32px;
   --max: 1360px;
@@ -146,7 +146,7 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 }
 .btn:hover { border-color: var(--tx-3); }
 .btn-main { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
-.btn-main:hover { background: #D2FA63; border-color: #D2FA63; }
+.btn-main:hover { background: #F8C765; border-color: #F8C765; }
 
 /* Sections ----------------------------------------------------------- */
 .sec { max-width: var(--max); margin: 0 auto; padding: 72px var(--gut); border-top: 1px solid var(--line); }
@@ -229,19 +229,19 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .s1-video { inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.35) brightness(.72); transition: filter .5s; }
 .is-on .s1-video { filter: saturate(1.1) brightness(1); }
 .s1-fx { inset: 0; width: 100%; height: 100%; overflow: visible; }
-.s1-rings circle { fill: none; stroke: #C3F53C; opacity: 0; }
-.s1-arcs path { fill: none; stroke: #C3F53C; stroke-width: 7; stroke-linecap: round; }
+.s1-rings circle { fill: none; stroke: #F5B53D; opacity: 0; }
+.s1-arcs path { fill: none; stroke: #F5B53D; stroke-width: 7; stroke-linecap: round; }
 .s1-cursor { left: 1400px; top: 0; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45)); }
 .s1-cursor svg { display: block; transform-origin: 9px 6px; }
 .s1-meter { left: 48px; bottom: 44px; display: flex; gap: 5px; align-items: flex-end; height: 80px; opacity: 0; }
-.s1-meter i { width: 8px; height: 100%; background: #C3F53C; transform-origin: bottom; transform: scaleY(.1); transition: transform 90ms linear; }
+.s1-meter i { width: 8px; height: 100%; background: #F5B53D; transform-origin: bottom; transform: scaleY(.1); transition: transform 90ms linear; }
 .s1-rec {
   left: 48px; top: 44px; opacity: 0;
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; background: #0E1110; color: #E6ECE9;
   font: 400 26px/1 "Plex Mono", monospace; letter-spacing: .12em; border-radius: 3px;
 }
-.s1-rec span { width: 16px; height: 16px; border-radius: 50%; background: #C3F53C; }
+.s1-rec span { width: 16px; height: 16px; border-radius: 50%; background: #F5B53D; }
 
 /* Scene 2: pixel art */
 .stage[data-scene="1"] { background: #000; }
