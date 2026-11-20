@@ -9,13 +9,9 @@
 use crate::preview::{Output, Quality, assemble, pieces};
 use crate::session::{Sources, Visuals};
 use anyhow::{Context as _, Result};
-use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Target loudness (integrated LUFS): that of YouTube, Instagram and TikTok.
-pub const TARGET_LUFS: f64 = -14.0;
-/// Maximum true peak (dBTP).
-pub const TRUE_PEAK: f64 = -1.0;
+pub use enfait_media::loudness::{TARGET_LUFS, TRUE_PEAK};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ExportOptions {
@@ -44,16 +40,6 @@ pub struct ExportReport {
     pub missing: Vec<usize>,
     /// Loudness of the mix before normalisation (LUFS), if measured.
     pub measured_lufs: Option<f64>,
-}
-
-/// Measurements of the first `loudnorm` pass.
-#[derive(Debug, Clone, Deserialize)]
-struct Measure {
-    input_i: String,
-    input_tp: String,
-    input_lra: String,
-    input_thresh: String,
-    target_offset: String,
 }
 
 /// Working folder of the export, next to the final file.
@@ -126,13 +112,21 @@ pub async fn video(
         progress(0.96);
         // 3. Loudness, then assembly.
         let measure = match options.loudness {
-            Some(_) => Some(measure(&mix).await?),
+            Some(_) => {
+                let mix = mix.clone();
+                let measure = tokio::task::spawn_blocking(move || {
+                    enfait_media::loudness::measure(&mix, TARGET_LUFS)
+                })
+                .await
+                .context("loudness")?
+                .context("loudness")?;
+                Some(measure)
+            }
             None => None,
         };
         let measured = measure
             .as_ref()
-            .and_then(|m| m.input_i.parse::<f64>().ok())
-            .filter(|i| i.is_finite());
+            .and_then(enfait_media::loudness::Measure::integrated);
         let total: f64 = enfait_media::Edl::from_ranges(sources.parts)
             .parts()
             .iter()
@@ -145,17 +139,10 @@ pub async fn video(
             .arg(&mix)
             .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy"]);
         // An almost silent mix (under −70 LUFS) is not raised.
-        if let (Some(target), Some(m), Some(i)) = (options.loudness, &measure, measured)
-            && i > -70.0
+        if let (Some(target), Some(m)) = (options.loudness, &measure)
+            && let Some(filter) = m.filter(target)
         {
-            cmd.args([
-                "-af",
-                &format!(
-                    "loudnorm=I={target}:TP={TRUE_PEAK}:LRA=11:measured_I={}:measured_TP={}:\
-                     measured_LRA={}:measured_thresh={}:offset={}:linear=true",
-                    m.input_i, m.input_tp, m.input_lra, m.input_thresh, m.target_offset
-                ),
-            ]);
+            cmd.args(["-af", &filter]);
         }
         cmd.args(["-ar", "48000", "-c:a", "aac", "-b:a", "320k"])
             .args(["-t", &format!("{total:.3}"), "-movflags", "+faststart"]);
@@ -186,47 +173,9 @@ async fn ffmpeg(cmd: &mut tokio::process::Command, what: &str) -> Result<()> {
     Ok(())
 }
 
-/// First `loudnorm` pass: measurements of the mix.
-async fn measure(audio: &Path) -> Result<Measure> {
-    let output = enfait_config::process::tokio_command("ffmpeg")
-        .args(["-nostdin", "-hide_banner", "-nostats", "-i"])
-        .arg(audio)
-        .args([
-            "-af",
-            &format!("loudnorm=I={TARGET_LUFS}:TP={TRUE_PEAK}:LRA=11:print_format=json"),
-            "-f",
-            "null",
-            "-",
-        ])
-        .output()
-        .await
-        .context("starting ffmpeg")?;
-    let text = String::from_utf8_lossy(&output.stderr);
-    anyhow::ensure!(output.status.success(), "loudness : {}", text.trim());
-    parse_measure(&text).context("loudness: unreadable measurement")
-}
-
-/// The JSON block `loudnorm` writes at the end of its messages.
-fn parse_measure(text: &str) -> Option<Measure> {
-    let start = text.rfind('{')?;
-    let end = text.rfind('}')?;
-    serde_json::from_str(text.get(start..=end)?).ok()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn loudnorm_output_is_read() {
-        let text = "[Parsed_loudnorm_0 @ 0x5]\n{\n\t\"input_i\" : \"-23.54\",\n\t\"input_tp\" : \
-                    \"-5.21\",\n\t\"input_lra\" : \"3.10\",\n\t\"input_thresh\" : \"-33.9\",\n\t\
-                    \"output_i\" : \"-14.0\",\n\t\"target_offset\" : \"0.12\"\n}\n";
-        let m = parse_measure(text).unwrap();
-        assert_eq!(m.input_i, "-23.54");
-        assert_eq!(m.target_offset, "0.12");
-        assert!(parse_measure("no measurement").is_none());
-    }
 
     #[test]
     fn work_dir_sits_next_to_the_output() {

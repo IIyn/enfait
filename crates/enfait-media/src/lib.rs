@@ -9,6 +9,8 @@
 //! - [`audio`] and [`waveform`]: samples in memory and peaks;
 //! - [`video`]: decoding proxy frames, as the clock asks;
 //! - [`transport`]: shared playback clock and J/K/L commands;
+//! - [`encode`] and [`loudness`]: H.264/AAC encoding of rendered frames,
+//!   sound normalised to a target loudness;
 //! - [`output`]: audio output (cpal) driving the clock;
 //! - [`record`] and [`camera`]: recording the voice and filming.
 
@@ -16,9 +18,11 @@ pub mod audio;
 pub mod cache;
 pub mod camera;
 pub mod edl;
+pub mod encode;
 mod error;
 mod ffmpeg;
 pub mod fx;
+pub mod loudness;
 pub mod output;
 pub mod probe;
 pub mod record;
