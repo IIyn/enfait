@@ -135,7 +135,11 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
-      options: --privileged
+      # /var/lib/flatpak on a volume rather than the image's overlayfs:
+      # updating the preinstalled runtimes there renames directories from a
+      # lower layer, which fails with EXDEV ("Invalid cross-device link").
+      # Docker seeds the anonymous volume with the image's contents.
+      options: --privileged --volume /var/lib/flatpak
     steps:
       - uses: actions/checkout@v4
         with:
