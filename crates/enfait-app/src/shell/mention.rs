@@ -313,7 +313,7 @@ impl Shell {
         }
         self.session.save_look();
         self.push_snapshot();
-        self.reload_inputs = true;
+        self.reload_look_inputs = true;
         cx.notify();
     }
 }

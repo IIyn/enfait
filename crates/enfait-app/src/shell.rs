@@ -213,6 +213,16 @@ pub struct Shell {
     )>,
     asset_note: Entity<InputState>,
     selected_asset: Option<String>,
+    /// Styles saved by the user, shared by every project.
+    saved_styles: Vec<enfait_assets::styles::Stored>,
+    /// Name of the style being saved; shown while `naming_style`.
+    style_name: Entity<InputState>,
+    naming_style: bool,
+    /// The style fields (rules, effect sliders) must be copied from the
+    /// look at the next render.
+    reload_look_inputs: bool,
+    /// Saved style whose deletion awaits a confirmation.
+    confirm_style_delete: Option<String>,
     library_notice: Option<SharedString>,
     /// Royalty-free search (left column).
     search_input: Entity<InputState>,
@@ -316,6 +326,8 @@ impl Shell {
         });
         let asset_note =
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("assets.note_placeholder")));
+        let style_name = cx
+            .new(|cx| InputState::new(window, cx).placeholder(tr!("side.style_name_placeholder")));
         let search_input =
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("assets.search_placeholder")));
         let (fx_sliders, slider_subscriptions) = side::fx_sliders(&session.look.fx, cx);
@@ -377,6 +389,14 @@ impl Shell {
                         shell.update_mention(mention::Field::Style, &text, cursor, cx);
                     }
                     _ => {}
+                },
+            ),
+            cx.subscribe(
+                &style_name,
+                |shell: &mut Self, _, event: &InputEvent, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        shell.save_style(cx);
+                    }
                 },
             ),
             cx.subscribe(
@@ -457,6 +477,11 @@ impl Shell {
             fx_sliders,
             asset_note,
             selected_asset: None,
+            saved_styles: enfait_assets::styles::list(&enfait_assets::styles::default_root()),
+            style_name,
+            naming_style: false,
+            reload_look_inputs: false,
+            confirm_style_delete: None,
             library_notice: None,
             search_input,
             search: assets::SearchState::default(),
@@ -534,6 +559,7 @@ impl Shell {
             (&self.asset_note, tr!("assets.note_placeholder")),
             (&self.search_input, tr!("assets.search_placeholder")),
             (&self.retouch, tr!("board.retouch_placeholder")),
+            (&self.style_name, tr!("side.style_name_placeholder")),
         ];
         for (input, text) in inputs {
             input.update(cx, |s, cx| s.set_placeholder(text, window, cx));
@@ -685,6 +711,14 @@ impl Shell {
         let script = self.session.script.clone();
         self.script
             .update(cx, |s, cx| s.set_value(script, window, cx));
+        self.reload_look_inputs(window, cx);
+        self.sync_knobs(window, cx);
+        self.sync_inputs(window, cx);
+    }
+
+    /// Style rules and effect sliders from the look.
+    fn reload_look_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.reload_look_inputs = false;
         let rules = self.session.look.style.rules.clone();
         self.style_rules
             .update(cx, |s, cx| s.set_value(rules, window, cx));
@@ -693,8 +727,6 @@ impl Shell {
             let v = field.get(&fx);
             state.update(cx, |s, cx| s.set_value(v, window, cx));
         }
-        self.sync_knobs(window, cx);
-        self.sync_inputs(window, cx);
     }
 
     /// Back to the home screen; the project stays loaded (its engine keeps
@@ -1277,6 +1309,9 @@ impl Shell {
             self.care = None;
         } else if self.mention.is_some() {
             self.mention = None;
+        } else if self.naming_style || self.confirm_style_delete.is_some() {
+            self.naming_style = false;
+            self.confirm_style_delete = None;
         } else if self.settings.open {
             self.settings.open = false;
         } else if self.sidebar_open {
@@ -1293,6 +1328,9 @@ impl Render for Shell {
         }
         if std::mem::take(&mut self.reload_inputs) {
             self.reload_project_inputs(window, cx);
+        }
+        if self.reload_look_inputs {
+            self.reload_look_inputs(window, cx);
         }
         if std::mem::take(&mut self.reset_wizard_inputs) {
             self.new_title

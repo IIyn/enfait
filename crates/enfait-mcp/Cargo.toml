@@ -3,6 +3,7 @@ name = "enfait-mcp"
 description = "enfait's MCP server: tools for agents (storyboard, library, finish) and bridge with the app."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

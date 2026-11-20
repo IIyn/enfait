@@ -216,6 +216,184 @@ impl Shell {
         cx.notify();
     }
 
+    /// "Save this style…": asks for its name.
+    fn start_saving_style(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_style_rules(cx);
+        self.confirm_style_delete = None;
+        self.naming_style = true;
+        self.style_name.update(cx, |s, cx| {
+            s.set_value("", window, cx);
+            s.focus(window, cx);
+        });
+        cx.notify();
+    }
+
+    /// Saves the style of the project under the name typed.
+    pub(super) fn save_style(&mut self, cx: &mut Context<Self>) {
+        let name = self.style_name.read(cx).value().trim().to_owned();
+        if name.is_empty() {
+            return;
+        }
+        self.commit_style_rules(cx);
+        let root = enfait_assets::styles::default_root();
+        match enfait_assets::styles::save(
+            &root,
+            &name,
+            &self.session.look,
+            &self.session.library_dir(),
+        ) {
+            Ok(stored) => {
+                self.toast(tr!("side.style_saved", name = stored.style.name));
+                self.naming_style = false;
+            }
+            Err(e) => self.toast(tr!("side.style_error", error = e)),
+        }
+        self.saved_styles = enfait_assets::styles::list(&root);
+        cx.notify();
+    }
+
+    /// Applies a saved style to the project.
+    fn apply_saved_style(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.commit_style_rules(cx);
+        self.confirm_style_delete = None;
+        let Some(stored) = self.saved_styles.iter().find(|s| s.id == id).cloned() else {
+            return;
+        };
+        let library = self.session.library_dir();
+        match enfait_assets::styles::apply(
+            &enfait_assets::styles::default_root(),
+            &stored,
+            &mut self.session.look,
+            &library,
+        ) {
+            Ok(()) => {
+                self.session.save_look();
+                self.push_snapshot();
+                // Rules and sliders show the new values at the next render.
+                self.reload_look_inputs = true;
+                self.toast(tr!("side.style_applied", name = stored.style.name));
+            }
+            Err(e) => self.toast(tr!("side.style_error", error = e)),
+        }
+        self.apply_fx(cx);
+    }
+
+    /// × on a saved style: a first click asks, the second deletes.
+    fn remove_saved_style(&mut self, id: &str, cx: &mut Context<Self>) {
+        if self.confirm_style_delete.as_deref() != Some(id) {
+            self.confirm_style_delete = Some(id.to_owned());
+            cx.notify();
+            return;
+        }
+        self.confirm_style_delete = None;
+        let root = enfait_assets::styles::default_root();
+        if let Err(e) = enfait_assets::styles::remove(&root, id) {
+            self.toast(tr!("side.style_error", error = e));
+        }
+        self.saved_styles = enfait_assets::styles::list(&root);
+        cx.notify();
+    }
+
+    /// Saved styles and the button to save the current one.
+    fn saved_styles_view(&self, cx: &mut Context<Self>) -> Div {
+        let look = &self.session.look;
+        let rows = self.saved_styles.iter().enumerate().map(|(i, stored)| {
+            let saved = &stored.style;
+            let on = look.style == saved.style && look.fx.clamped() == saved.fx.clamped();
+            let confirming = self.confirm_style_delete.as_deref() == Some(stored.id.as_str());
+            let apply = stored.id.clone();
+            let remove = stored.id.clone();
+            div()
+                .flex()
+                .items_center()
+                .h(px(24.))
+                .rounded(px(3.))
+                .text_size(px(12.))
+                .map(|d| {
+                    if on {
+                        d.bg(color(tokens::SIGNAL))
+                            .text_color(color(tokens::ON_SIGNAL))
+                    } else {
+                        d.border_1()
+                            .border_color(color(tokens::LINE_STRONG))
+                            .text_color(color(tokens::FG2))
+                    }
+                })
+                .child(
+                    div()
+                        .id(("saved-style", i))
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .pl(px(8.))
+                        .pr(px(4.))
+                        .cursor_pointer()
+                        .when(!on, |d| d.hover(|d| d.bg(color(tokens::HOVER))))
+                        .child(SharedString::from(saved.name.clone()))
+                        .tooltip(|window, cx| {
+                            gpui_kit::component::tooltip::Tooltip::new(tr!("side.saved_style_tip"))
+                                .build(window, cx)
+                        })
+                        .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                            shell.apply_saved_style(&apply, cx);
+                        })),
+                )
+                .child(
+                    div()
+                        .id(("remove-saved-style", i))
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .px(px(6.))
+                        .cursor_pointer()
+                        .map(|d| {
+                            if confirming {
+                                d.bg(color(tokens::ERROR))
+                                    .text_color(color(tokens::ON_SIGNAL))
+                                    .child(tr!("side.style_delete_confirm"))
+                            } else {
+                                d.hover(|d| d.text_color(color(tokens::ERROR))).child("×")
+                            }
+                        })
+                        .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                            shell.remove_saved_style(&remove, cx);
+                        })),
+                )
+        });
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .pt(px(4.))
+            .child(
+                div()
+                    .text_size(px(11.))
+                    .text_color(color(tokens::MUTE))
+                    .child(tr!("side.my_styles")),
+            )
+            .when(!self.saved_styles.is_empty(), |d| {
+                d.child(div().flex().flex_wrap().gap(px(4.)).children(rows))
+            })
+            .map(|d| {
+                if self.naming_style {
+                    d.child(Input::new(&self.style_name)).child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(color(tokens::MUTE))
+                            .child(tr!("side.style_name_hint")),
+                    )
+                } else {
+                    d.child(div().flex().child(
+                        chip("save-style", tr!("side.save_style"), false).on_click(cx.listener(
+                            |shell, _: &ClickEvent, window, cx| {
+                                shell.start_saving_style(window, cx);
+                            },
+                        )),
+                    ))
+                }
+            })
+    }
+
     pub(super) fn commit_style_rules(&mut self, cx: &mut Context<Self>) {
         let rules = self.style_rules.read(cx).value().to_string();
         if rules != self.session.look.style.rules {
@@ -295,6 +473,7 @@ impl Shell {
         let style_suggestions = self.mention_suggestions(super::mention::Field::Style, cx);
         let details = self.asset_details(cx);
         let credits = self.credits_section(cx);
+        let saved_styles = self.saved_styles_view(cx);
         let look = &self.session.look;
         let current_style = look.style.preset.clone();
         let summary = current_style
@@ -516,7 +695,8 @@ impl Shell {
                                     .text_size(px(11.))
                                     .text_color(color(tokens::MUTE))
                                     .child(tr!("side.style_drop_hint")),
-                            ),
+                            )
+                            .child(saved_styles),
                     )
                     .child(
                         section(tr!("side.label.look"))

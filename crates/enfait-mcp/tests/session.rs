@@ -288,6 +288,78 @@ async fn split_merge_style_sounds_and_files() {
 }
 
 #[tokio::test]
+async fn saved_styles_go_from_one_project_to_another() {
+    let first = session();
+    let second = session();
+    let styles = tempfile::tempdir().unwrap();
+    let tools = |d: &std::path::Path| {
+        Tools::new(d.to_path_buf()).with_styles_root(styles.path().to_path_buf())
+    };
+    let mut server = Server::new(tools(first.path()));
+
+    let (text, err) = call(&mut server, 1, "saved_styles", json!({})).await;
+    assert!(!err && text.contains("No saved style"), "{text}");
+
+    // A style naming a library file.
+    let logo = first.path().join("logo.svg");
+    std::fs::write(&logo, r#"<svg xmlns="http://www.w3.org/2000/svg"/>"#).unwrap();
+    let (_, err) = call(
+        &mut server,
+        2,
+        "import_file",
+        json!({ "path": logo.display().to_string() }),
+    )
+    .await;
+    assert!(!err);
+    let (text, err) = call(
+        &mut server,
+        3,
+        "set_style",
+        json!({ "preset": "swiss", "rules": "@logo.svg at the end", "fx": { "grain": 0.4 } }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    let (text, err) = call(&mut server, 4, "save_style", json!({ "name": "Ma marque" })).await;
+    assert!(!err && text.contains("1 file"), "{text}");
+    let (text, err) = call(&mut server, 5, "saved_styles", json!({})).await;
+    assert!(
+        !err && text.contains("Ma marque (id ma-marque): used by this project")
+            && text.contains("files: logo.svg"),
+        "{text}"
+    );
+
+    // Applied in another project: the file comes along.
+    let mut other = Server::new(tools(second.path()));
+    let (text, err) = call(
+        &mut other,
+        6,
+        "apply_saved_style",
+        json!({ "style": "ma MARQUE" }),
+    )
+    .await;
+    assert!(!err && text.contains("Preset: swiss"), "{text}");
+    let look: Look =
+        serde_json::from_slice(&std::fs::read(second.path().join("look.json")).unwrap()).unwrap();
+    assert_eq!(look.style.rules, "@logo.svg at the end");
+    assert!((look.fx.grain - 0.4).abs() < 1e-6);
+    assert!(second.path().join("library/logo.svg").is_file());
+    assert!(look.assets.iter().any(|a| a.file == "logo.svg"));
+
+    let (text, err) = call(&mut other, 7, "apply_saved_style", json!({ "style": "x" })).await;
+    assert!(err && text.contains("Ma marque"), "{text}");
+    let (text, err) = call(
+        &mut other,
+        8,
+        "delete_saved_style",
+        json!({ "style": "ma-marque" }),
+    )
+    .await;
+    assert!(!err, "{text}");
+    let (text, _) = call(&mut other, 9, "saved_styles", json!({})).await;
+    assert!(text.contains("No saved style"), "{text}");
+}
+
+#[tokio::test]
 async fn retouch_restore_and_care() {
     let dir = session();
     let d = dir.path();

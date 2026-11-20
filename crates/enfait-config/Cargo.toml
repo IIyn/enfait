@@ -3,6 +3,7 @@ name = "enfait-config"
 description = "User settings, API keys (system keychain), paths and platform helpers shared by every enfait binary."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

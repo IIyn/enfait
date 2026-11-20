@@ -125,3 +125,30 @@ _version: 2
 "side.style_drop_hint":
   en: "Drop a file here to add it and name it in the style (logo, font…)."
   fr: "Dépose un fichier ici pour l'ajouter et le citer dans le style (logo, police…)."
+"side.my_styles":
+  en: "Your saved styles, for every project:"
+  fr: "Tes styles enregistrés, pour tous les projets :"
+"side.save_style":
+  en: "Save this style…"
+  fr: "Enregistrer ce style…"
+"side.style_name_placeholder":
+  en: "Name of the style, then Enter"
+  fr: "Nom du style, puis Entrée"
+"side.style_name_hint":
+  en: "Saves the style, your rules, the look, the remembered rules and the files named with @. A style with the same name is replaced. Escape to cancel."
+  fr: "Enregistre le style, tes règles, le look, les règles mémorisées et les fichiers cités avec @. Un style du même nom est remplacé. Échap pour annuler."
+"side.saved_style_tip":
+  en: "Apply to this project"
+  fr: "Appliquer à ce projet"
+"side.style_delete_confirm":
+  en: "Delete?"
+  fr: "Supprimer ?"
+"side.style_saved":
+  en: "Style “%{name}” saved."
+  fr: "Style « %{name} » enregistré."
+"side.style_applied":
+  en: "Style “%{name}” applied."
+  fr: "Style « %{name} » appliqué."
+"side.style_error":
+  en: "Style: %{error}"
+  fr: "Style : %{error}"

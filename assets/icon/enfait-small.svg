@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- enfait icon, 32 px and under: fewer, thicker bars than enfait.svg so
+       the wave stays readable on a few pixels. -->
+  <rect width="64" height="64" rx="12" fill="#101312"/>
+  <g fill="#E6ECE9">
+    <rect x="7" y="28" width="6" height="14" rx="3"/>
+    <rect x="16" y="17" width="6" height="36" rx="3"/>
+    <rect x="25" y="23" width="6" height="24" rx="3"/>
+  </g>
+  <g fill="#85908C">
+    <rect x="42" y="21" width="6" height="28" rx="3"/>
+    <rect x="51" y="28" width="6" height="14" rx="3"/>
+  </g>
+  <g fill="#C3F53C" stroke="#C3F53C">
+    <line x1="36" y1="14" x2="36" y2="57" stroke-width="5" stroke-linecap="round"/>
+    <path d="M30 6H42V11.5L36 16.5L30 11.5Z" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+</svg>

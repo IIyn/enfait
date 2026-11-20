@@ -3,6 +3,7 @@ name = "enfait-cli"
 description = "The whole pipeline on the command line: voice-over → motion design video."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

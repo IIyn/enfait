@@ -5,6 +5,7 @@
   <summary>Voice-over to motion design video</summary>
   <summary xml:lang="fr">De la voix off à la vidéo motion design</summary>
   <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
   <description>
     <p>Record or import a voice-over and turn it into an edited motion design video.</p>
     <p xml:lang="fr">Enregistrez ou importez une voix off et transformez-la en vidéo motion design montée.</p>

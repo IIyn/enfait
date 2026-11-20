@@ -29,6 +29,8 @@ pub struct Tools {
     /// Follow the project open in the app (re-read at every call).
     follow: bool,
     found: Vec<Hit>,
+    /// Styles saved by the user, shared by every project.
+    styles_root: PathBuf,
 }
 
 /// File next to `project.json`: the transcript of the edit.
@@ -141,7 +143,15 @@ impl Tools {
             dir,
             follow: false,
             found: Vec::new(),
+            styles_root: enfait_assets::styles::default_root(),
         }
+    }
+
+    /// Saved styles kept in `root` instead of the user's data folder.
+    #[must_use]
+    pub fn with_styles_root(mut self, root: PathBuf) -> Self {
+        self.styles_root = root;
+        self
     }
 
     /// Tools working on the project open in the app: when the user opens
@@ -151,6 +161,7 @@ impl Tools {
             dir: bridge::session_dir(),
             follow: true,
             found: Vec::new(),
+            styles_root: enfait_assets::styles::default_root(),
         }
     }
 
@@ -612,6 +623,51 @@ impl Tools {
                 "inputSchema": { "type": "object", "properties": {} },
             }),
             json!({
+                "name": "saved_styles",
+                "description": "Styles the user saved to reuse in other projects: name, \
+                    preset, rules, post-FX, remembered rules and files named in the rules. \
+                    Says which one the project uses.",
+                "inputSchema": { "type": "object", "properties": {} },
+            }),
+            json!({
+                "name": "save_style",
+                "description": "Saves the style of the project (preset, rules, post-FX, \
+                    remembered rules, library files named with @ in the rules) under a name, \
+                    to apply it to other projects. A saved style of the same name is replaced.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string", "description": "Name of the style, as the user will see it." },
+                    },
+                    "required": ["name"],
+                },
+            }),
+            json!({
+                "name": "apply_saved_style",
+                "description": "Applies a saved style to the project: replaces its preset, \
+                    rules and post-FX, adds the remembered rules and copies the named files \
+                    into the library.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "style": { "type": "string", "description": "Name or id of the saved style (see `saved_styles`)." },
+                    },
+                    "required": ["style"],
+                },
+            }),
+            json!({
+                "name": "delete_saved_style",
+                "description": "Deletes a saved style, in every project. Cannot be undone: \
+                    only when the user asks for it.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "style": { "type": "string", "description": "Name or id of the saved style (see `saved_styles`)." },
+                    },
+                    "required": ["style"],
+                },
+            }),
+            json!({
                 "name": "set_style",
                 "description": "Changes the style of the video. Only the given fields change. \
                     Rules and preset apply to animations generated from now on; post-FX apply \
@@ -708,6 +764,10 @@ impl Tools {
             "restore_version" => self.restore_version(args),
             "style" => Ok(self.style_text()),
             "set_style" => self.set_style(args),
+            "saved_styles" => Ok(self.saved_styles()),
+            "save_style" => self.save_style(args),
+            "apply_saved_style" => self.apply_saved_style(args),
+            "delete_saved_style" => self.delete_saved_style(args),
             "edit_sound" => self.edit_sound(args),
             "import_file" => self.import_file(args),
             "script" => Ok(std::fs::read_to_string(self.dir.join("script.md"))
@@ -1595,6 +1655,130 @@ impl Tools {
         }
         self.save_look(&look)?;
         Ok(self.style_text())
+    }
+
+    fn saved_styles(&self) -> String {
+        let all = enfait_assets::styles::list(&self.styles_root);
+        if all.is_empty() {
+            return "No saved style yet (see `save_style`).".to_owned();
+        }
+        let look = self.look();
+        let mut out = String::new();
+        for stored in &all {
+            let saved = &stored.style;
+            let current = look.style == saved.style && look.fx.clamped() == saved.fx.clamped();
+            let _ = writeln!(
+                out,
+                "- {} (id {}){}",
+                saved.name,
+                stored.id,
+                if current {
+                    ": used by this project"
+                } else {
+                    ""
+                }
+            );
+            let _ = writeln!(
+                out,
+                "  preset: {}",
+                saved.style.preset.as_deref().unwrap_or("none (free style)")
+            );
+            let rules = saved.style.rules.trim();
+            if !rules.is_empty() {
+                let _ = writeln!(out, "  rules: {}", rules.replace('\n', " / "));
+            }
+            let fx = saved.fx;
+            if !fx.is_neutral() {
+                let _ = writeln!(
+                    out,
+                    "  post-FX: grain {:.2}, vignette {:.2}, contrast {:+.2}, saturation \
+                     {:+.2}, temperature {:+.2}, aberration {:.2}",
+                    fx.grain,
+                    fx.vignette,
+                    fx.contrast,
+                    fx.saturation,
+                    fx.temperature,
+                    fx.aberration
+                );
+            }
+            if !saved.memory.is_empty() {
+                let _ = writeln!(out, "  remembered rules: {}", saved.memory.join(" / "));
+            }
+            if !saved.assets.is_empty() {
+                let files: Vec<&str> = saved.assets.iter().map(|a| a.file.as_str()).collect();
+                let _ = writeln!(out, "  files: {}", files.join(", "));
+            }
+        }
+        out
+    }
+
+    /// The saved style called `style` (name, any case, or id).
+    fn find_saved_style(&self, args: &Value) -> Result<enfait_assets::styles::Stored, String> {
+        let wanted = text_arg(args, "style")
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .ok_or("give `style`")?;
+        let all = enfait_assets::styles::list(&self.styles_root);
+        all.iter()
+            .find(|s| s.id == wanted)
+            .or_else(|| {
+                all.iter()
+                    .find(|s| s.style.name.to_lowercase() == wanted.to_lowercase())
+            })
+            .cloned()
+            .ok_or_else(|| {
+                let names: Vec<&str> = all.iter().map(|s| s.style.name.as_str()).collect();
+                if names.is_empty() {
+                    format!("no saved style “{wanted}”: none is saved yet")
+                } else {
+                    format!("no saved style “{wanted}”: {}", names.join(", "))
+                }
+            })
+    }
+
+    fn save_style(&self, args: &Value) -> Outcome {
+        let name = text_arg(args, "name").unwrap_or_default();
+        let stored = enfait_assets::styles::save(
+            &self.styles_root,
+            name,
+            &self.look(),
+            &self.dir.join("library"),
+        )?;
+        let files = stored.style.assets.len();
+        Ok(format!(
+            "Style “{}” saved (id {}){}. It can be applied to any project with \
+             `apply_saved_style`.",
+            stored.style.name,
+            stored.id,
+            if files == 0 {
+                String::new()
+            } else {
+                format!(", with {files} file(s) of the library")
+            }
+        ))
+    }
+
+    fn apply_saved_style(&self, args: &Value) -> Outcome {
+        let stored = self.find_saved_style(args)?;
+        let mut look = self.look();
+        enfait_assets::styles::apply(
+            &self.styles_root,
+            &stored,
+            &mut look,
+            &self.dir.join("library"),
+        )?;
+        self.save_look(&look)?;
+        Ok(format!(
+            "Style “{}” applied.\n\n{}",
+            stored.style.name,
+            self.style_text()
+        ))
+    }
+
+    fn delete_saved_style(&self, args: &Value) -> Outcome {
+        let stored = self.find_saved_style(args)?;
+        enfait_assets::styles::remove(&self.styles_root, &stored.id)?;
+        Ok(format!("Saved style “{}” deleted.", stored.style.name))
     }
 
     fn edit_sound(&self, args: &Value) -> Outcome {

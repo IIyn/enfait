@@ -5,7 +5,7 @@ pkgrel=1
 pkgdesc="Voice-over to motion design video"
 arch=('x86_64')
 url="https://github.com/IIyn/enfait"
-license=('custom')
+license=('AGPL-3.0-or-later')
 depends=('ffmpeg' 'alsa-lib' 'fontconfig' 'freetype2' 'libxkbcommon' 'libxkbcommon-x11'
          'wayland' 'libx11' 'libxcb' 'vulkan-icd-loader' 'dbus')
 provides=('enfait')
@@ -19,6 +19,7 @@ package() {
     install -Dm755 enfait "$pkgdir/usr/bin/enfait"
     install -Dm755 enfait-cli "$pkgdir/usr/bin/enfait-cli"
     install -Dm644 enfait.desktop "$pkgdir/usr/share/applications/enfait.desktop"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     for size in 16 22 32 48 64 128 256 512; do
         install -Dm644 "icons/enfait-${size}.png" \
             "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/enfait.png"

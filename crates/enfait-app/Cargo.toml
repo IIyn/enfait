@@ -3,6 +3,7 @@ name = "enfait-app"
 description = "enfait desktop app (gpui)."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
@@ -68,8 +69,7 @@ assets = [
 
 [package.metadata.generate-rpm]
 name = "enfait"
-# TODO: set once the project licence is chosen.
-license = "TBD"
+license = "AGPL-3.0-or-later"
 summary = "Voice-over to motion design video"
 assets = [
     { source = "target/release/enfait", dest = "/usr/bin/enfait", mode = "755" },

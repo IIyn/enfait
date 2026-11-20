@@ -3,6 +3,7 @@ name = "enfait-media"
 description = "Media engine: analysis, proxies, audio, waveform, frame decoding and playback (clock, audio output)."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

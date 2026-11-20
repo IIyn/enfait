@@ -82,7 +82,7 @@ jobs:
         run: |
           dir="enfait-${VERSION}-x86_64-linux"
           mkdir -p "$dir/icons"
-          cp target/release/enfait target/release/enfait-cli packaging/linux/enfait.desktop "$dir/"
+          cp target/release/enfait target/release/enfait-cli packaging/linux/enfait.desktop LICENSE "$dir/"
           cp assets/icon/enfait-*.png "$dir/icons/"
           tar czf "dist/$dir.tar.gz" "$dir"
 
@@ -190,7 +190,7 @@ jobs:
         run: |
           $version = $env:TAG.TrimStart('v')
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item target\release\enfait.exe, target\release\enfait-cli.exe dist\
+          Copy-Item target\release\enfait.exe, target\release\enfait-cli.exe, LICENSE dist\
           choco install innosetup -y --no-progress
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
             "/DVersion=$version" "/DSourceDir=$PWD\dist" "/O$PWD\out" `
@@ -203,7 +203,7 @@ jobs:
             -d "Version=$msiVersion" -d "SourceDir=$PWD\dist" `
             -o "out\enfait-$version-x86_64-windows.msi"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Compress-Archive -Path dist\enfait.exe, dist\enfait-cli.exe `
+          Compress-Archive -Path dist\enfait.exe, dist\enfait-cli.exe, dist\LICENSE `
             -DestinationPath "out\enfait-$version-x86_64-windows.zip"
 
       - uses: actions/upload-artifact@v4

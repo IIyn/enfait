@@ -23,6 +23,8 @@ pub(super) struct Watch {
     project: Option<SystemTime>,
     look: Option<SystemTime>,
     finish: Option<SystemTime>,
+    /// Folder of the saved styles (an entry added or removed changes it).
+    styles: Option<SystemTime>,
     ticks: u32,
 }
 
@@ -121,9 +123,15 @@ impl Shell {
         {
             tracing::info!("library or look changed by another program: reloaded");
             self.session.look = look;
+            self.reload_look_inputs = true;
             let fx = self.session.look.fx;
             self.player.update(cx, |p, cx| p.set_fx(fx, cx));
             self.push_snapshot();
+            cx.notify();
+        }
+        let styles = enfait_assets::styles::default_root();
+        if changed(&styles, &mut seen.styles) {
+            self.saved_styles = enfait_assets::styles::list(&styles);
             cx.notify();
         }
         if changed(&dir.join("finish.json"), &mut seen.finish)

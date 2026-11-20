@@ -3,6 +3,7 @@ name = "enfait-studio"
 description = "Animation studio: director, animators, retouches and rendering, shared by the CLI and the interface."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

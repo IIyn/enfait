@@ -3,6 +3,7 @@ name = "enfait-ai"
 description = "enfait's AI: model providers (Anthropic API, Claude Code, local), prompts, editor, director and animators."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

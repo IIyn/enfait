@@ -45,7 +45,8 @@ project starts are shown):
 
    Blocks can be split at a word or merged, and precise moments can be
    anchored on a word. A global style (rules, presets, post-FX, fonts and
-   files of the library) applies to every block.
+   files of the library) applies to every block; it can be saved and
+   applied to other projects.
 5. **Montage**: a director pass sets the art direction, then animators
    create each block in parallel, check it, fix it and (depending on the
    care level) critique it on rendered frames.
@@ -208,6 +209,8 @@ the running app, which must be open.
 | `import_file` | Copies a file of the computer into the library. |
 | `describe_file` | Says what a library file is for (read by the animators). |
 | `style` / `set_style` | Reads or changes the style: preset, rules, post-FX, rules remembered from retouches. |
+| `saved_styles` / `save_style` | Lists the styles saved for every project, or saves the current one (with the library files its rules name). |
+| `apply_saved_style` / `delete_saved_style` | Applies a saved style to the project (its files are copied into the library), or deletes it. |
 | `finish` | The sound finish: music, sound effects, ducking. |
 | `add_music` / `add_sfx` / `remove_sound` | Places or removes music and sound effects (an effect can be anchored on a word). |
 | `edit_sound` | Changes a placed sound: volume, fades, start, blocks covered, block or word of an effect. |
@@ -290,4 +293,9 @@ GitHub release (`.github/workflows/release.yml`).
 
 ## License
 
-No license has been chosen yet.
+enfait is free software, released under the
+[GNU Affero General Public License v3.0 or later](LICENSE)
+(`AGPL-3.0-or-later`). You may use, modify and redistribute it, but any
+modified version you distribute, or let people use over a network (for example
+as a hosted service), must be released under the same license with its full
+source code.

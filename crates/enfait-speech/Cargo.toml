@@ -3,6 +3,7 @@ name = "enfait-speech"
 description = "Speech: audio decoding, word-by-word transcription (whisper), splitting into blocks."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
