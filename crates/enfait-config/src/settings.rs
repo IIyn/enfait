@@ -161,12 +161,16 @@ pub struct PanelSizes {
     /// Height of the player, in thousandths of the height of the screen
     /// under the header.
     pub player: u32,
+    /// Height of the "on screen" field of the storyboard, in logical
+    /// pixels.
+    pub description: u32,
 }
 
 impl PanelSizes {
     pub const SIDEBAR: (u32, u32) = (200, 560);
     pub const INSPECTOR: (u32, u32) = (260, 720);
     pub const PLAYER: (u32, u32) = (200, 800);
+    pub const DESCRIPTION: (u32, u32) = (80, 720);
 
     /// Sizes within their bounds (a hand-edited file stays usable).
     #[must_use]
@@ -176,6 +180,7 @@ impl PanelSizes {
             sidebar: clamp(self.sidebar, Self::SIDEBAR),
             inspector: clamp(self.inspector, Self::INSPECTOR),
             player: clamp(self.player, Self::PLAYER),
+            description: clamp(self.description, Self::DESCRIPTION),
         }
     }
 }
@@ -186,6 +191,7 @@ impl Default for PanelSizes {
             sidebar: 280,
             inspector: 340,
             player: 500,
+            description: 180,
         }
     }
 }
@@ -309,6 +315,7 @@ mod tests {
                 sidebar: 300,
                 inspector: 420,
                 player: 640,
+                description: 260,
             },
             player_native: true,
         };
@@ -332,11 +339,13 @@ mod tests {
             sidebar: 0,
             inspector: 9_999,
             player: 1_000,
+            description: 5,
         }
         .clamped();
         assert_eq!(wild.sidebar, PanelSizes::SIDEBAR.0);
         assert_eq!(wild.inspector, PanelSizes::INSPECTOR.1);
         assert_eq!(wild.player, PanelSizes::PLAYER.1);
+        assert_eq!(wild.description, PanelSizes::DESCRIPTION.0);
         assert_eq!(PanelSizes::default().clamped(), PanelSizes::default());
     }
 }

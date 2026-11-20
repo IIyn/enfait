@@ -1,6 +1,7 @@
 //! Panels resized with the mouse: a handle on the edge of the left column,
-//! of the right panel and under the player. Sizes are kept in the settings;
-//! a double click on a handle restores the default size.
+//! of the right panel, under the player and under the "on screen" field of
+//! the storyboard. Sizes are kept in the settings; a double click on a
+//! handle restores the default size.
 
 use super::Shell;
 use crate::prefs;
@@ -17,6 +18,8 @@ pub(super) enum Splitter {
     Sidebar,
     Inspector,
     Player,
+    /// "On screen" field of the storyboard inspector.
+    Description,
 }
 
 /// Value carried while a handle is dragged.
@@ -63,7 +66,32 @@ pub(super) fn handle(splitter: Splitter, cx: &Context<Shell>) -> Stateful<Div> {
             .bottom(-half)
             .h(px(GRIP))
             .cursor(CursorStyle::ResizeRow),
+        Splitter::Description => grip
+            .left_0()
+            .right_0()
+            .bottom(px(0.))
+            .h(px(GRIP * 2.))
+            .cursor(CursorStyle::ResizeRow),
     }
+}
+
+/// Visible grip under the "on screen" field: drag it to change the height
+/// of the field. To lay inside a `relative()` box around the field.
+pub(super) fn description_grip(cx: &Context<Shell>) -> Div {
+    div()
+        .relative()
+        .h(px(GRIP * 2.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(
+            div()
+                .w(px(32.))
+                .h(px(3.))
+                .rounded(px(2.))
+                .bg(color(tokens::LINE_STRONG)),
+        )
+        .child(handle(Splitter::Description, cx))
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -107,7 +135,28 @@ impl Shell {
                 let y = f32::from(at.y - bounds.top());
                 panels.player = round(y / height * 1000.);
             }
+            // Followed by the field itself, see `drag_description`.
+            Splitter::Description => return,
         }
+        let panels = panels.clamped();
+        if self.panels != Some(panels) {
+            self.panels = Some(panels);
+            cx.notify();
+        }
+    }
+
+    /// Follows the grip of the "on screen" field; `event.bounds`: the field.
+    pub(super) fn drag_description(
+        &mut self,
+        event: &DragMoveEvent<Resize>,
+        cx: &mut Context<Self>,
+    ) {
+        if event.drag(cx).0 != Splitter::Description {
+            return;
+        }
+        let mut panels = self.panels(cx);
+        let y = event.event.position.y - event.bounds.top() - px(GRIP);
+        panels.description = round(f32::from(y));
         let panels = panels.clamped();
         if self.panels != Some(panels) {
             self.panels = Some(panels);
@@ -130,6 +179,7 @@ impl Shell {
             Splitter::Sidebar => panels.sidebar = default.sidebar,
             Splitter::Inspector => panels.inspector = default.inspector,
             Splitter::Player => panels.player = default.player,
+            Splitter::Description => panels.description = default.description,
         }
         self.panels = None;
         prefs::update(cx, |s| s.panels = panels);
@@ -162,6 +212,7 @@ impl Shell {
         let w = match splitter {
             Splitter::Sidebar => panels.sidebar,
             Splitter::Inspector | Splitter::Player => panels.inspector,
+            Splitter::Description => panels.description,
         } as f32;
         px(w)
     }

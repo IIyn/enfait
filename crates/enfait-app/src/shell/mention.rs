@@ -7,7 +7,7 @@ use crate::theme::{color, tokens};
 use crate::tr;
 use enfait_core::{AssetKind, BlockId, Edit};
 use gpui_kit::prelude::*;
-use gpui_kit::{ClickEvent, Context, Div, SharedString, Window, div, px};
+use gpui_kit::{ClickEvent, Context, Div, PathPromptOptions, SharedString, Window, div, px};
 use std::path::PathBuf;
 
 /// Suggestions shown at most.
@@ -52,6 +52,19 @@ fn typed_mention(text: &str, cursor: usize) -> Option<(usize, String)> {
     Some((at, query.to_owned()))
 }
 
+/// Frame of the list of files to mention.
+fn suggestion_box() -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .py(px(4.))
+        .rounded(px(3.))
+        .border_1()
+        .border_color(color(tokens::LINE_STRONG))
+        .bg(color(tokens::RAISED))
+        .text_size(px(12.))
+}
+
 fn kind_name(kind: AssetKind) -> SharedString {
     super::side::asset_kind_name(kind)
 }
@@ -66,7 +79,10 @@ impl Shell {
         cursor: usize,
         cx: &mut Context<Self>,
     ) {
-        let found = typed_mention(text, cursor).filter(|_| !self.session.look.assets.is_empty());
+        // With an empty library, the description still opens the list: it
+        // says how to add files.
+        let found = typed_mention(text, cursor)
+            .filter(|_| field == Field::Description || !self.session.look.assets.is_empty());
         let next = found.map(|(start, query)| Mention {
             field,
             start,
@@ -105,7 +121,16 @@ impl Shell {
     pub(super) fn mention_suggestions(&self, field: Field, cx: &mut Context<Self>) -> Option<Div> {
         let matches = self.mention_matches(field);
         if matches.is_empty() {
-            return None;
+            let typing = self.mention.as_ref().is_some_and(|m| m.field == field);
+            if !typing || !self.session.look.assets.is_empty() {
+                return None;
+            }
+            return Some(
+                suggestion_box()
+                    .px(px(8.))
+                    .text_color(color(tokens::FG2))
+                    .child(tr!("board.mention_empty")),
+            );
         }
         let rows = matches
             .into_iter()
@@ -139,18 +164,7 @@ impl Shell {
                         cx.notify();
                     }))
             });
-        Some(
-            div()
-                .flex()
-                .flex_col()
-                .py(px(4.))
-                .rounded(px(3.))
-                .border_1()
-                .border_color(color(tokens::LINE_STRONG))
-                .bg(color(tokens::RAISED))
-                .text_size(px(12.))
-                .children(rows),
-        )
+        Some(suggestion_box().children(rows))
     }
 
     /// Replaces the typed `@…` with the chosen file.
@@ -232,6 +246,8 @@ impl Shell {
             self.dropped(paths, cx);
             return;
         }
+        // What is being typed is kept before the files are named.
+        self.commit_description(cx);
         let files = self.import_paths(paths, cx);
         if files.is_empty() {
             return;
@@ -249,6 +265,32 @@ impl Shell {
             text.push_str(&file);
         }
         self.edit_board(Edit::SetDescription { block: id, text }, window, cx);
+    }
+
+    /// "+" of the description: picks files, adds them to the library and
+    /// names them in the block, as if they were dropped on it.
+    pub(super) fn pick_for_block(
+        &mut self,
+        id: BlockId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.commit_description(cx);
+        self.mention = None;
+        let paths = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some(tr!("side.add_to_library")),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = paths.await {
+                let _ = this.update_in(cx, |shell, window, cx| {
+                    shell.drop_on_block(id, &paths, window, cx);
+                });
+            }
+        })
+        .detach();
     }
 
     /// Files dropped on the style: added to the library and named in the

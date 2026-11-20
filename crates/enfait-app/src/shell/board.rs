@@ -15,8 +15,8 @@ use enfait_media::Command;
 use gpui_kit::component::input::{Input, Textarea};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    ClickEvent, Context, Div, ElementId, FontWeight, SharedString, Stateful, Window, div, px,
-    relative,
+    ClickEvent, Context, Div, DragMoveEvent, ElementId, FontWeight, SharedString, Stateful, Window,
+    anchored, deferred, div, px, relative,
 };
 
 /// Block kinds offered when the take is filmed: video only, video with an
@@ -684,6 +684,14 @@ impl Shell {
         let studio = self.studio_inspector(cx);
         let suggestions = self.mention_suggestions(super::mention::Field::Description, cx);
         let mentioned = self.mentioned_files(&block.description);
+        let field_height = self.panel_width(super::split::Splitter::Description, cx);
+        // The list of files floats under the field: in the panel it would
+        // fall out of sight when the panel is short.
+        let suggestions_width = if side {
+            (self.panel_width(super::split::Splitter::Inspector, cx) - px(32.)).max(px(200.))
+        } else {
+            px(360.)
+        };
         let has_words = !words.is_empty();
         let kinds: &[BlockKind] = if self.take_has_video()
             || matches!(
@@ -887,13 +895,69 @@ impl Shell {
                 .child(heading(tr!("board.label.type")))
                 .child(div().flex().flex_wrap().gap(px(4.)).children(kinds))
                 .when_some(studio, |d, s| d.child(s))
-                .child(heading(tr!("board.label.visual")))
                 .child(
                     div()
-                        .h(px(110.))
-                        .child(Textarea::new(&self.description).h_full()),
+                        .flex()
+                        .items_end()
+                        .justify_between()
+                        .child(heading(tr!("board.label.visual")))
+                        .child(
+                            div()
+                                .id("add-files")
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .size(px(22.))
+                                .rounded(px(3.))
+                                .border_1()
+                                .border_color(color(tokens::LINE_STRONG))
+                                .text_size(px(15.))
+                                .text_color(color(tokens::FG))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(color(tokens::HOVER)))
+                                .child("+")
+                                .tooltip(|window, cx| {
+                                    gpui_kit::component::tooltip::Tooltip::new(tr!(
+                                        "board.add_files"
+                                    ))
+                                    .build(window, cx)
+                                })
+                                .on_click(listeners.listener(
+                                    move |shell, _: &ClickEvent, window, cx| {
+                                        shell.pick_for_block(id, window, cx);
+                                    },
+                                )),
+                        ),
                 )
-                .when_some(suggestions, |d, s| d.child(s))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .child(
+                            div()
+                                .relative()
+                                .h(field_height)
+                                .on_drag_move(listeners.listener(
+                                    |shell, event: &DragMoveEvent<super::split::Resize>, _, cx| {
+                                        shell.drag_description(event, cx);
+                                    },
+                                ))
+                                .child(Textarea::new(&self.description).h_full())
+                                .when_some(suggestions, |d, s| {
+                                    d.child(
+                                        div().absolute().left_0().top_full().mt(px(2.)).child(
+                                            deferred(
+                                                anchored()
+                                                    .snap_to_window_with_margin(px(8.))
+                                                    .child(s.w(suggestions_width)),
+                                            )
+                                            .with_priority(1),
+                                        ),
+                                    )
+                                }),
+                        )
+                        .child(super::split::description_grip(listeners)),
+                )
                 .when(!mentioned.is_empty(), |d| {
                     d.child(
                         div()
