@@ -336,11 +336,14 @@ mod tests {
             duration: Some(2.5),
             out,
         };
-        let silent = text(&arguments(&options, &partial_path(out)));
+        let partial = partial_path(out);
+        let silent = text(&arguments(&options, &partial));
         assert!(silent.contains(&"30/1".to_owned()));
         assert!(silent.contains(&"2.500".to_owned()));
         assert!(!silent.contains(&"1:a:0".to_owned()));
-        assert_eq!(silent.last().map(String::as_str), Some("/v/o.part.mp4"));
+        // Compared as paths: on Windows the separator joined in is `\`.
+        assert_eq!(silent.last().map(Path::new), Some(partial.as_path()));
+        assert_eq!(partial, PathBuf::from("/v/o.part.mp4"));
 
         options.audio = Some(AudioTrack {
             path: Path::new("/v/src.mp4"),
