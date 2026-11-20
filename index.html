@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="meta.title">enfait · montage vidéo et motion design sur votre machine</title>
+  <meta name="description" data-i18n-attr="content:meta.desc" content="enfait est un logiciel de montage libre : il nettoie vos prises, découpe votre voix en blocs et fait animer chaque bloc en HTML, CSS et SVG. Linux, Windows, macOS.">
+  <meta name="theme-color" content="#101312">
+  <meta property="og:title" content="enfait">
+  <meta property="og:image" content="media/singer.jpg">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#">
+      <img src="icon.svg" alt="" width="28" height="28">
+      <span>enfait</span>
+    </a>
+    <nav class="nav">
+      <a href="#etapes" data-i18n="nav.steps">Étapes</a>
+      <a href="#blocs" data-i18n="nav.blocks">Blocs</a>
+      <a href="#telecharger" data-i18n="nav.install">Télécharger</a>
+      <a href="https://github.com/IIyn/enfait" data-i18n="nav.source">Code source</a>
+    </nav>
+    <div class="lang" role="group" aria-label="Langue / Language">
+      <button type="button" data-lang="fr">FR</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1 class="ask">
+        <span class="ask-lead" data-i18n="hero.lead">En fait je voudrais</span>
+        <span class="ask-wish" aria-live="polite"><span class="wish-text">une souris qui clique sur le micro de la chanteuse</span><span class="caret" aria-hidden="true"></span></span>
+      </h1>
+
+      <div class="deck">
+        <div class="stage" data-scene="0">
+          <div class="frame"></div>
+        </div>
+        <div class="side">
+          <div class="side-head">
+            <span data-i18n="hero.styles">Styles</span>
+            <button type="button" class="pause" aria-pressed="false" data-i18n-attr="aria-label:a11y.pause" aria-label="Mettre en pause le défilement">
+              <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect class="i-pause" x="2" y="1.5" width="2.6" height="9"/><rect class="i-pause" x="7.4" y="1.5" width="2.6" height="9"/><path class="i-play" d="M3 1.5v9l7.5-4.5z"/></svg>
+            </button>
+          </div>
+          <ol class="styles">
+            <li><button type="button" data-i="0"><span class="n">01</span><span class="name" data-i18n="s.0">Prise réelle + curseur</span><span class="bar"><i></i></span></button></li>
+            <li><button type="button" data-i="1"><span class="n">02</span><span class="name" data-i18n="s.1">Pixel art</span><span class="bar"><i></i></span></button></li>
+            <li><button type="button" data-i="2"><span class="n">03</span><span class="name" data-i18n="s.2">Typo suisse</span><span class="bar"><i></i></span></button></li>
+            <li><button type="button" data-i="3"><span class="n">04</span><span class="name" data-i18n="s.3">Craie</span><span class="bar"><i></i></span></button></li>
+            <li><button type="button" data-i="4"><span class="n">05</span><span class="name" data-i18n="s.4">Papier découpé</span><span class="bar"><i></i></span></button></li>
+          </ol>
+          <p class="credit" data-i18n="hero.credit1">Vidéo : u_s7sn6jrr7k, Pixabay. Curseur et effets en HTML/SVG.</p>
+        </div>
+      </div>
+
+      <div class="intro">
+        <p data-i18n="hero.about">enfait est un logiciel de montage vidéo pour ordinateur. Vous enregistrez ou importez votre voix ; enfait nettoie les prises, découpe le texte en blocs, et des animateurs IA construisent chaque bloc en HTML, CSS et SVG. Le rendu se fait image par image, puis tout est monté sur votre voix. Le logiciel tourne sur votre machine.</p>
+        <div class="actions">
+          <a class="btn btn-main" href="#telecharger" data-i18n="hero.get">Télécharger</a>
+          <a class="btn" href="https://github.com/IIyn/enfait" data-i18n="hero.github">Voir sur GitHub</a>
+          <span class="os">Linux · Windows · macOS</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="etapes">
+      <header class="sec-head">
+        <span class="tc">00:07</span>
+        <h2 data-i18n="steps.title">Étapes d’un projet</h2>
+        <p data-i18n="steps.note">Seules les étapes utiles selon le point de départ s’affichent : un texte, une voix off ou une prise filmée.</p>
+      </header>
+      <div class="track">
+        <svg class="wave" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="playhead" aria-hidden="true"></div>
+        <ol class="clips">
+          <li style="--w:2"><span class="k">F5</span><h3 data-i18n="st.1.t">Texte</h3><p data-i18n="st.1.d">Vous écrivez le texte. Un prompteur (F5) vous le lit.</p></li>
+          <li style="--w:2"><span class="k">REC</span><h3 data-i18n="st.2.t">Voix</h3><p data-i18n="st.2.d">Micro, caméra et micro, ou import d’une voix off ou d’une prise filmée.</p></li>
+          <li style="--w:3"><span class="k">whisper</span><h3 data-i18n="st.3.t">Coupe</h3><p data-i18n="st.3.d">Transcription locale avec whisper. Faux départs, bégaiements et reprises sont repérés ; la dernière prise complète de chaque phrase est gardée.</p></li>
+          <li style="--w:3"><span class="k">2–10 s</span><h3 data-i18n="st.4.t">Storyboard</h3><p data-i18n="st.4.d">Le montage est découpé en blocs de 2 à 10 secondes. Pour chaque bloc : un type et une description de ce qu’on voit.</p></li>
+          <li style="--w:3"><span class="k">HTML·SVG</span><h3 data-i18n="st.5.t">Montage</h3><p data-i18n="st.5.d">Une passe de direction fixe la direction artistique, puis les animateurs créent les blocs en parallèle, les vérifient et les corrigent.</p></li>
+          <li style="--w:2"><span class="k">v2</span><h3 data-i18n="st.6.t">Retouches</h3><p data-i18n="st.6.d">Notes à la tête de lecture, nouvelle version, ou retour à une version précédente sans rappeler de modèle.</p></li>
+          <li style="--w:2"><span class="k">−14 LUFS</span><h3 data-i18n="st.7.t">Finition</h3><p data-i18n="st.7.d">Musique, bruitages, ducking. Export MP4 normalisé à −14 LUFS, ou XML FCP7 pour Premiere Pro et DaVinci Resolve.</p></li>
+        </ol>
+      </div>
+      <p class="magic" data-i18n="steps.magic">Le mode magique enchaîne tout à partir d’un seul fichier : nettoyage, storyboard écrit, plans et sons de banques libres, animations, transitions et export.</p>
+    </section>
+
+    <section class="sec" id="blocs">
+      <header class="sec-head">
+        <span class="tc">00:12</span>
+        <h2 data-i18n="blocks.title">Types de bloc</h2>
+      </header>
+      <dl class="rows">
+        <div><dt data-i18n="bk.1.t">Animation</dt><dd data-i18n="bk.1.d">Motion design plein écran.</dd></div>
+        <div><dt data-i18n="bk.2.t">Mixte</dt><dd data-i18n="bk.2.d">La personne filmée, avec une animation à côté ou par-dessus. Elle peut être détourée pour que l’animation passe derrière elle.</dd></div>
+        <div><dt data-i18n="bk.3.t">Rush</dt><dd data-i18n="bk.3.d">La prise telle quelle.</dd></div>
+        <div><dt data-i18n="bk.4.t">Effet</dt><dd data-i18n="bk.4.d">Un effet appliqué à la prise : recadrage, écran partagé, sous-titres…</dd></div>
+        <div><dt data-i18n="bk.5.t">Plan d’illustration</dt><dd data-i18n="bk.5.d">Un vrai plan tiré de votre bibliothèque ou de banques libres : Pexels, Pixabay, Wikimedia Commons, Openverse.</dd></div>
+      </dl>
+      <div class="split">
+        <p data-i18n="blocks.more">Un bloc se coupe sur un mot ou se fusionne avec le suivant, et un moment précis peut être ancré sur un mot. Un style global (règles, préréglages, post-FX, polices, fichiers de la bibliothèque) s’applique à tous les blocs et se réutilise dans d’autres projets.</p>
+        <dl class="facts">
+          <dt data-i18n="fmt.t">Formats</dt><dd data-i18n="fmt.d">16:9, vertical 9:16 (Shorts, Reels, TikTok) et carré.</dd>
+          <dt data-i18n="care.t">Niveaux de soin</dt><dd data-i18n="care.d">Léger (Haiku), Rapide (Sonnet), Soigné et Ultra (Opus, avec plus de passes de critique sur les images rendues).</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="sec" id="calcul">
+      <header class="sec-head">
+        <span class="tc">00:18</span>
+        <h2 data-i18n="run.title">Ce qui tourne où</h2>
+      </header>
+      <div class="cols">
+        <div>
+          <h3 data-i18n="run.local.t">Sur votre machine</h3>
+          <p data-i18n="run.local.d">Transcription (whisper), coupe, rendu des animations (Chromium headless), mixage et export (ffmpeg). Vos fichiers restent chez vous.</p>
+        </div>
+        <div>
+          <h3 data-i18n="run.models.t">Modèles, au choix</h3>
+          <ul class="dash">
+            <li data-i18n="run.m1">une clé API Anthropic, rangée dans le trousseau du système</li>
+            <li data-i18n="run.m2">Claude Code installé et connecté, qui utilise votre compte Claude</li>
+            <li data-i18n="run.m3">un modèle local derrière une API compatible OpenAI</li>
+          </ul>
+        </div>
+        <div>
+          <h3 data-i18n="run.cli.t">Sans interface</h3>
+          <p data-i18n-html="run.cli.d"><code>enfait-cli</code> fait tourner le même moteur en ligne de commande. <code>enfait-cli mcp</code> donne à Claude Code, ou à tout client MCP, l’accès au projet ouvert dans l’application.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="telecharger">
+      <header class="sec-head">
+        <span class="tc">00:24</span>
+        <h2 data-i18n="install.title">Télécharger</h2>
+        <p class="ver"></p>
+      </header>
+      <table class="dl">
+        <thead><tr><th data-i18n="install.sys">Système</th><th data-i18n="install.file">Fichier</th></tr></thead>
+        <tbody>
+          <tr><td>Windows</td><td><a data-asset="enfait-{v}-x86_64-windows-setup.exe">enfait-{v}-x86_64-windows-setup.exe</a> <span class="alt">.msi · .zip</span></td></tr>
+          <tr><td>macOS (Apple silicon)</td><td><a data-asset="enfait-{v}-arm64-macos.dmg">enfait-{v}-arm64-macos.dmg</a></td></tr>
+          <tr><td>Debian, Ubuntu</td><td><a data-asset="enfait_{v}_amd64.deb">enfait_{v}_amd64.deb</a></td></tr>
+          <tr><td>Fedora, openSUSE</td><td><a data-asset="enfait-{v}-1.x86_64.rpm">enfait-{v}-1.x86_64.rpm</a></td></tr>
+          <tr><td>Arch Linux</td><td><a data-asset="enfait-bin-{v}-1-x86_64.pkg.tar.zst">enfait-bin-{v}-1-x86_64.pkg.tar.zst</a></td></tr>
+          <tr><td data-i18n="install.any">Tout Linux</td><td><a data-asset="enfait-{v}-x86_64.flatpak">enfait-{v}-x86_64.flatpak</a> <span class="alt">.tar.gz</span></td></tr>
+        </tbody>
+      </table>
+      <div class="split">
+        <p data-i18n-html="install.req">Il faut ffmpeg et ffprobe dans le PATH (inclus dans le Flatpak). Chromium headless shell et le modèle whisper se téléchargent depuis Réglages → Outils, ou avec <code>enfait-cli setup</code>.</p>
+        <a class="btn" href="https://github.com/IIyn/enfait/releases" data-i18n="install.all">Toutes les versions</a>
+      </div>
+      <h3 class="build" data-i18n="install.build">Compiler depuis les sources</h3>
+      <pre class="code"><code>git clone https://github.com/IIyn/enfait.git
+cd enfait
+cargo build --release -p enfait-app -p enfait-cli</code></pre>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-brand"><img src="icon.svg" alt="" width="22" height="22"> enfait</div>
+    <p data-i18n="foot.license">enfait est un logiciel libre sous licence AGPL-3.0-or-later.</p>
+    <p class="small" data-i18n="foot.credits">Vidéo de la chanteuse : u_s7sn6jrr7k sur Pixabay (licence Pixabay). Polices : IBM Plex, Anton, Caveat, Fraunces, Silkscreen (SIL OFL 1.1). Animations : anime.js (MIT).</p>
+    <p class="small"><a href="https://github.com/IIyn/enfait">github.com/IIyn/enfait</a></p>
+  </footer>
+
+  <script src="vendor/anime/anime.umd.min.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/scenes.js"></script>
+  <script src="js/site.js"></script>
+</body>
+</html>
