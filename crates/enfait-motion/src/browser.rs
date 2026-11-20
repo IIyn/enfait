@@ -29,10 +29,17 @@ struct Download {
     url: String,
 }
 
-/// Platform in the Chrome for Testing sense.
+/// Platform in the Chrome for Testing sense, for the running system.
 fn platform() -> Result<&'static str, MotionError> {
-    match (std::env::consts::OS, std::env::consts::ARCH) {
+    platform_for(std::env::consts::OS, std::env::consts::ARCH)
+}
+
+/// Platform in the Chrome for Testing sense. Linux arm64 is published
+/// since Chrome 153 (August 2026).
+fn platform_for(os: &str, arch: &str) -> Result<&'static str, MotionError> {
+    match (os, arch) {
         ("linux", "x86_64") => Ok("linux64"),
+        ("linux", "aarch64") => Ok("linux-arm64"),
         ("macos", "aarch64") => Ok("mac-arm64"),
         ("macos", "x86_64") => Ok("mac-x64"),
         ("windows", "x86_64") => Ok("win64"),
@@ -131,4 +138,26 @@ pub async fn ensure_browser(dir: &Path) -> Result<PathBuf, MotionError> {
         )));
     }
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_platforms() {
+        assert_eq!(platform_for("linux", "x86_64").unwrap(), "linux64");
+        assert_eq!(platform_for("linux", "aarch64").unwrap(), "linux-arm64");
+        assert_eq!(platform_for("macos", "aarch64").unwrap(), "mac-arm64");
+        assert!(platform_for("linux", "riscv64").is_err());
+    }
+
+    #[test]
+    fn executable_layout() {
+        let path = executable(Path::new("/c/158.0"), "linux-arm64");
+        assert_eq!(
+            path,
+            Path::new("/c/158.0/chrome-headless-shell-linux-arm64/chrome-headless-shell")
+        );
+    }
 }
