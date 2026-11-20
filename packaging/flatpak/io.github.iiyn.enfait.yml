@@ -12,6 +12,9 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+  # Webcam for filmed takes: ffmpeg opens /dev/video* (V4L2) directly, which
+  # only --device=all exposes.
+  - --device=all
   # Microphone (cpal goes through ALSA → PulseAudio/PipeWire) and playback.
   - --socket=pulseaudio
   # AI providers, Chromium and model downloads.

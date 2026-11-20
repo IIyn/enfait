@@ -166,7 +166,7 @@ jobs:
           path: enfait-*.flatpak
 
   windows:
-    name: Windows (setup.exe, zip)
+    name: Windows (setup.exe, msi, zip)
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -193,6 +193,13 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
             "/DVersion=$version" "/DSourceDir=$PWD\dist" "/O$PWD\out" `
             packaging\windows\enfait.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # MSI (WiX 5): the version must be numeric (0.2.0-rc1 → 0.2.0).
+          dotnet tool install --global wix --version 5.0.2
+          $msiVersion = $version -replace '-.*$', ''
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" build packaging\windows\enfait.wxs -arch x64 `
+            -d "Version=$msiVersion" -d "SourceDir=$PWD\dist" `
+            -o "out\enfait-$version-x86_64-windows.msi"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Compress-Archive -Path dist\enfait.exe, dist\enfait-cli.exe `
             -DestinationPath "out\enfait-$version-x86_64-windows.zip"

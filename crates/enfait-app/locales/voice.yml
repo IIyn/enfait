@@ -77,3 +77,54 @@ _version: 2
 "voice.no_takes":
   en: "No take yet."
   fr: "Aucune prise pour l'instant."
+"voice.mode":
+  en: "Recording"
+  fr: "Enregistrement"
+"voice.mode_voice":
+  en: "Voice only"
+  fr: "Voix seule"
+"voice.mode_camera":
+  en: "Voice and camera"
+  fr: "Voix et caméra"
+"voice.microphone":
+  en: "Microphone"
+  fr: "Micro"
+"voice.camera":
+  en: "Camera"
+  fr: "Caméra"
+"voice.default":
+  en: "Default"
+  fr: "Par défaut"
+"voice.default_named":
+  en: "Default · %{name}"
+  fr: "Par défaut · %{name}"
+"voice.devices_refresh":
+  en: "Refresh"
+  fr: "Actualiser"
+"voice.devices_loading":
+  en: "Looking…"
+  fr: "Recherche…"
+"voice.no_camera":
+  en: "No camera found. Plug one in, then Refresh."
+  fr: "Aucune caméra trouvée. Branche-la, puis Actualiser."
+"voice.camera_framing":
+  en: "Framed for the project's format (%{format}): the middle of the picture is kept, the preview shows the crop."
+  fr: "Cadrée au format du projet (%{format}) : le centre de l'image est gardé, l'aperçu montre le cadrage."
+"voice.record_camera":
+  en: "Film with the prompter"
+  fr: "Filmer avec le prompteur"
+"voice.camera_starting":
+  en: "Starting the camera…"
+  fr: "Démarrage de la caméra…"
+"voice.saving_take":
+  en: "Writing the take…"
+  fr: "Écriture de la prise…"
+"voice.camera_busy":
+  en: "The camera is used by another app: close it, then try again."
+  fr: "La caméra est utilisée par une autre application : ferme-la, puis réessaie."
+"voice.camera_failed":
+  en: "Camera unavailable: %{error}"
+  fr: "Caméra indisponible : %{error}"
+"voice.recorded_video":
+  en: "Filmed take recorded."
+  fr: "Prise filmée enregistrée."

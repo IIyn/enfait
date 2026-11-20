@@ -1,4 +1,4 @@
-//! Voice recording from the default audio input (microphone).
+//! Voice recording from an audio input (microphone).
 //!
 //! The sound is kept in memory as mono samples (channels averaged) while
 //! recording, with the current level for a meter, then written as a
@@ -9,24 +9,83 @@ use cpal::SizedSample;
 use cpal::traits::{DeviceTrait as _, HostTrait as _, StreamTrait as _};
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+/// An audio input the user can pick.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputDevice {
+    /// Stable identifier (`cpal::DeviceId` as text), kept in the settings.
+    pub id: String,
+    pub name: String,
+}
+
+/// Audio inputs of the system, the default one first.
+pub fn input_devices() -> Vec<InputDevice> {
+    let host = cpal::default_host();
+    let default = host.default_input_device().and_then(|d| d.id().ok());
+    let mut list: Vec<(bool, InputDevice)> = host
+        .input_devices()
+        .map(|devices| {
+            devices
+                .filter_map(|d| {
+                    let id = d.id().ok()?;
+                    // PulseAudio monitors replay an output, not a microphone.
+                    if id.to_string().ends_with(".monitor") {
+                        return None;
+                    }
+                    let name = d
+                        .description()
+                        .map(|d| d.name().to_owned())
+                        .unwrap_or_else(|_| id.to_string());
+                    Some((
+                        default.as_ref() == Some(&id),
+                        InputDevice {
+                            id: id.to_string(),
+                            name,
+                        },
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    list.sort_by_key(|(is_default, _)| !is_default);
+    let mut seen = std::collections::HashSet::new();
+    list.into_iter()
+        .map(|(_, d)| d)
+        .filter(|d| seen.insert(d.name.clone()))
+        .collect()
+}
 
 pub struct Recorder {
     _stream: cpal::Stream,
     samples: Arc<Mutex<Vec<f32>>>,
     /// Peak of the last buffer, as `f32` bits (0 to 1).
     level: Arc<AtomicU32>,
+    /// Moment the first sample was captured.
+    started: Arc<OnceLock<Instant>>,
     rate: u32,
     device: String,
 }
 
 impl Recorder {
-    /// Starts recording from the default input.
-    pub fn start() -> Result<Self, MediaError> {
+    /// Starts recording from the input `device` (an [`InputDevice::id`]),
+    /// or from the default input when it is `None` or no longer exists.
+    pub fn start(device: Option<&str>) -> Result<Self, MediaError> {
         let err = |e: &dyn std::fmt::Display| MediaError::Output(e.to_string());
         let host = cpal::default_host();
-        let device = host
-            .default_input_device()
+        let chosen = device.and_then(|id| {
+            let found = id
+                .parse::<cpal::DeviceId>()
+                .ok()
+                .and_then(|id| host.device_by_id(&id));
+            if found.is_none() {
+                tracing::warn!("microphone {id} not found; using the default one");
+            }
+            found
+        });
+        let device = chosen
+            .or_else(|| host.default_input_device())
             .ok_or_else(|| MediaError::Output("no microphone found".into()))?;
         let name = device
             .description()
@@ -40,12 +99,18 @@ impl Recorder {
             usize::try_from(rate).unwrap_or(48_000).saturating_mul(60),
         )));
         let level = Arc::new(AtomicU32::new(0));
+        let started = Arc::new(OnceLock::new());
+        let shared = Shared {
+            samples: &samples,
+            level: &level,
+            started: &started,
+        };
         let stream = match format {
-            cpal::SampleFormat::F32 => build::<f32>(&device, config, &samples, &level),
-            cpal::SampleFormat::I16 => build::<i16>(&device, config, &samples, &level),
-            cpal::SampleFormat::I32 => build::<i32>(&device, config, &samples, &level),
-            cpal::SampleFormat::U16 => build::<u16>(&device, config, &samples, &level),
-            cpal::SampleFormat::F64 => build::<f64>(&device, config, &samples, &level),
+            cpal::SampleFormat::F32 => build::<f32>(&device, config, &shared),
+            cpal::SampleFormat::I16 => build::<i16>(&device, config, &shared),
+            cpal::SampleFormat::I32 => build::<i32>(&device, config, &shared),
+            cpal::SampleFormat::U16 => build::<u16>(&device, config, &shared),
+            cpal::SampleFormat::F64 => build::<f64>(&device, config, &shared),
             other => Err(MediaError::Output(format!(
                 "unsupported sample format {other}"
             ))),
@@ -54,6 +119,7 @@ impl Recorder {
             _stream: stream,
             samples,
             level,
+            started,
             rate,
             device: name,
         })
@@ -87,12 +153,22 @@ impl Recorder {
 
     /// Stops and writes the recording to `path` (WAV, 16-bit mono).
     pub fn finish(self, path: &Path) -> Result<(), MediaError> {
-        let samples = self
+        self.finish_from(path, None)
+    }
+
+    /// Like [`Self::finish`], with the sound starting at the moment
+    /// `start` (the first frame of a camera): silence is added before the
+    /// first sample, or the samples captured earlier are dropped.
+    pub fn finish_from(self, path: &Path, start: Option<Instant>) -> Result<(), MediaError> {
+        let mut samples = self
             .samples
             .lock()
             .map(|s| s.clone())
             .map_err(|_| MediaError::Output("recording lost".into()))?;
         drop(self._stream);
+        if let (Some(start), Some(&first)) = (start, self.started.get()) {
+            align(&mut samples, self.rate, first, start);
+        }
         write_wav(path, &samples, self.rate)?;
         Ok(())
     }
@@ -118,22 +194,57 @@ impl Meter {
     }
 }
 
+/// Moves the start of `samples` (first captured at `first`) to `start`.
+fn align(samples: &mut Vec<f32>, rate: u32, first: Instant, start: Instant) {
+    let frames = |d: Duration| {
+        // A few seconds at most: no overflow.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let n = (d.as_secs_f64() * f64::from(rate)).round() as usize;
+        n
+    };
+    if first > start {
+        let pad = frames(first - start);
+        samples.splice(0..0, std::iter::repeat_n(0.0, pad));
+    } else {
+        let cut = frames(start - first).min(samples.len());
+        samples.drain(..cut);
+    }
+}
+
+/// State shared with the audio callback.
+struct Shared<'a> {
+    samples: &'a Arc<Mutex<Vec<f32>>>,
+    level: &'a Arc<AtomicU32>,
+    started: &'a Arc<OnceLock<Instant>>,
+}
+
 fn build<T>(
     device: &cpal::Device,
     config: cpal::StreamConfig,
-    samples: &Arc<Mutex<Vec<f32>>>,
-    level: &Arc<AtomicU32>,
+    shared: &Shared<'_>,
 ) -> Result<cpal::Stream, MediaError>
 where
     T: SizedSample,
     f32: cpal::FromSample<T>,
 {
     let channels = usize::from(config.channels).max(1);
-    let (samples, level) = (Arc::clone(samples), Arc::clone(level));
+    let rate = f64::from(config.sample_rate.max(1));
+    let samples = Arc::clone(shared.samples);
+    let level = Arc::clone(shared.level);
+    let started = Arc::clone(shared.started);
     let stream = device
         .build_input_stream(
             config,
             move |data: &[T], _: &cpal::InputCallbackInfo| {
+                // The buffer ends now: its first sample was captured one
+                // buffer earlier.
+                started.get_or_init(|| {
+                    #[allow(clippy::cast_precision_loss)]
+                    let length = (data.len() / channels) as f64 / rate;
+                    Instant::now()
+                        .checked_sub(Duration::from_secs_f64(length))
+                        .unwrap_or_else(Instant::now)
+                });
                 let mut peak = 0.0f32;
                 if let Ok(mut out) = samples.lock() {
                     for frame in data.chunks(channels) {
@@ -197,11 +308,33 @@ mod tests {
     fn records_from_the_microphone() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mic.wav");
-        let recorder = Recorder::start().unwrap();
+        let recorder = Recorder::start(None).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(1200));
         assert!(recorder.seconds() > 0.5, "{} s", recorder.seconds());
         recorder.finish(&path).unwrap();
         assert!(std::fs::metadata(&path).unwrap().len() > 44 + 16_000);
+    }
+
+    /// Lists the inputs: `cargo test -p enfait-media lists_inputs -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "depends on the machine"]
+    #[allow(clippy::print_stdout)]
+    fn lists_inputs() {
+        for d in input_devices() {
+            println!("{} — {}", d.name, d.id);
+        }
+    }
+
+    #[test]
+    fn aligns_on_a_later_or_earlier_start() {
+        let first = Instant::now();
+        let mut samples = vec![1.0; 10];
+        align(&mut samples, 10, first, first + Duration::from_millis(300));
+        assert_eq!(samples.len(), 7);
+        let mut samples = vec![1.0; 10];
+        align(&mut samples, 10, first + Duration::from_millis(200), first);
+        assert_eq!(samples.len(), 12);
+        assert_eq!(&samples[..3], &[0.0, 0.0, 1.0]);
     }
 
     #[test]

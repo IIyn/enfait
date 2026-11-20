@@ -187,6 +187,11 @@ pub struct Shell {
     mention: Option<mention::Mention>,
     /// Voice being recorded.
     recording: Option<record::Recording>,
+    /// Camera starting, or filmed take being written.
+    recording_busy: Option<record::Busy>,
+    /// Microphones and cameras offered on the Voice screen (listed when
+    /// it opens, and on demand).
+    devices: Option<record::Devices>,
     /// Storyboard built from the edit (absent until there is a cut).
     board: Option<Storyboard>,
     /// Why there is no storyboard yet.
@@ -436,6 +441,8 @@ impl Shell {
             care: None,
             mention: None,
             recording: None,
+            recording_busy: None,
+            devices: None,
             needs_sync: board.is_some(),
             board,
             board_notice: None,

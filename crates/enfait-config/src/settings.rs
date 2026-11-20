@@ -136,6 +136,12 @@ pub struct Settings {
     pub local_url: String,
     /// Local model name (`qwen3-coder:30b`…); empty: not configured.
     pub local_model: String,
+    /// Recording with the prompter also films with the camera.
+    pub record_camera: bool,
+    /// Microphone for recording (an audio device id); `None`: the system's.
+    pub microphone: Option<String>,
+    /// Camera for filming (a device id); `None`: the first one.
+    pub camera: Option<String>,
 }
 
 /// Ollama's OpenAI-compatible endpoint.
@@ -152,6 +158,9 @@ impl Default for Settings {
             notifications: true,
             local_url: DEFAULT_LOCAL_URL.to_owned(),
             local_model: String::new(),
+            record_camera: false,
+            microphone: None,
+            camera: None,
         }
     }
 }
@@ -245,6 +254,9 @@ mod tests {
             notifications: false,
             local_url: "http://box:8080/v1".into(),
             local_model: "qwen".into(),
+            record_camera: true,
+            microphone: Some("pulseaudio:mic".into()),
+            camera: Some("/dev/video2".into()),
         };
         settings.save_to(&path).unwrap();
         assert_eq!(Settings::load_from(&path).unwrap(), Some(settings));
@@ -255,5 +267,7 @@ mod tests {
         assert_eq!(partial.local_url, DEFAULT_LOCAL_URL);
         assert!(!partial.onboarded);
         assert!(partial.notifications);
+        assert!(!partial.record_camera);
+        assert_eq!(partial.microphone, None);
     }
 }

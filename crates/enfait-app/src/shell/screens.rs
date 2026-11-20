@@ -127,7 +127,14 @@ impl Shell {
             .map(|dir| {
                 dir.filter_map(Result::ok)
                     .map(|e| e.path())
-                    .filter(|p| p.extension().is_some_and(|e| e == "wav"))
+                    // Takes only: not the `.voice.wav` and `.camera.mkv` of a
+                    // filmed take being written.
+                    .filter(|p| {
+                        p.extension().is_some_and(|e| e == "wav" || e == "mp4")
+                            && p.file_stem()
+                                .and_then(|s| s.to_str())
+                                .is_some_and(|s| !s.contains('.'))
+                    })
                     .collect()
             })
             .unwrap_or_default();
@@ -157,6 +164,15 @@ impl Shell {
             (super::STEP_CUT, tr!("voice.see_cut"))
         } else {
             (super::STEP_STORYBOARD, tr!("voice.to_storyboard"))
+        };
+        let devices = record.then(|| self.devices_panel(cx));
+        let filming = crate::prefs::settings(cx).record_camera;
+        let busy = self.recording_busy;
+        let record_label = match busy {
+            Some(super::record::Busy::StartingCamera) => tr!("voice.camera_starting"),
+            Some(super::record::Busy::Saving) => tr!("voice.saving_take"),
+            None if filming => tr!("voice.record_camera"),
+            None => tr!("voice.record"),
         };
         let listeners: &Context<Self> = cx;
         let no_takes = recordings.is_empty();
@@ -265,6 +281,7 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .gap(px(14.))
+                    .children(devices)
                     .when(record, |d| {
                         d.child(
                             div()
@@ -280,10 +297,13 @@ impl Shell {
                                         .h(px(40.))
                                         .px(px(18.))
                                         .rounded(px(3.))
-                                        .cursor_pointer()
                                         .bg(color(tokens::SIGNAL))
                                         .text_color(color(tokens::ON_SIGNAL))
-                                        .hover(|d| d.bg(color(tokens::SIGNAL_HOVER)))
+                                        .when(busy.is_none(), |d| {
+                                            d.cursor_pointer()
+                                                .hover(|d| d.bg(color(tokens::SIGNAL_HOVER)))
+                                        })
+                                        .when(busy.is_some(), |d| d.opacity(0.6))
                                         .font_weight(FontWeight::MEDIUM)
                                         .child(
                                             div()
@@ -291,7 +311,7 @@ impl Shell {
                                                 .rounded(px(5.))
                                                 .bg(color(tokens::ERROR)),
                                         )
-                                        .child(tr!("voice.record"))
+                                        .child(record_label)
                                         .on_click(cx.listener(
                                             |shell, _: &ClickEvent, window, cx| {
                                                 shell.start_recording(window, cx);

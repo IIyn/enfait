@@ -2,16 +2,18 @@
 //!
 //! Fills the window, light text on black whatever the theme, reading line
 //! at the upper third. Space: scroll or stop; ↑ ↓: speed; + −: text size;
-//! wheel: forward or back; Home: back to the top; Esc: close.
+//! wheel: forward or back; Home: back to the top; Esc: close. While
+//! filming, the camera picture shows in a corner, mirrored.
 
 use crate::fonts;
 use crate::theme::{color, tokens};
 use crate::tr;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    Context, EventEmitter, FocusHandle, FontWeight, KeyBinding, ScrollEvent, SharedString, Window,
-    actions, div, px, relative, rgb,
+    Context, EventEmitter, FocusHandle, FontWeight, KeyBinding, ObjectFit, RenderImage,
+    ScrollEvent, SharedString, Window, actions, div, img, px, relative, rgb,
 };
+use std::sync::Arc;
 use std::time::Instant;
 
 actions!(
@@ -56,6 +58,11 @@ pub struct Prompter {
     focus: FocusHandle,
     /// Voice being recorded while reading.
     recording: Option<enfait_media::record::Meter>,
+    /// Camera filming while reading.
+    camera: Option<enfait_media::camera::Preview>,
+    /// Camera picture shown, with its frame index and size.
+    image: Option<(i64, Arc<RenderImage>)>,
+    image_size: (u32, u32),
 }
 
 impl EventEmitter<Closed> for Prompter {}
@@ -73,21 +80,43 @@ impl Prompter {
             last_frame: None,
             focus,
             recording: None,
+            camera: None,
+            image: None,
+            image_size: (16, 9),
         }
     }
 
     /// The prompter while the voice is recorded: the scrolling starts at
     /// once, a meter shows the level and Escape ends the recording.
+    /// The camera preview, when filming.
     pub fn recording(
         paragraphs: Vec<String>,
         meter: enfait_media::record::Meter,
+        camera: Option<enfait_media::camera::Preview>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
         let mut prompter = Self::new(paragraphs, window, cx);
         prompter.recording = Some(meter);
+        prompter.camera = camera;
         prompter.running = true;
         prompter
+    }
+
+    /// Takes the camera's last frame; the replaced image leaves the atlas.
+    fn update_image(&mut self, window: &mut Window) {
+        let Some(frame) = self.camera.as_ref().and_then(|c| c.latest()) else {
+            return;
+        };
+        if self.image.as_ref().map(|(i, _)| *i) == Some(frame.index) {
+            return;
+        }
+        self.image_size = (frame.width, frame.height);
+        if let Some(image) = crate::player::render_image(&frame)
+            && let Some((_, old)) = self.image.replace((frame.index, image))
+        {
+            let _ = window.drop_image(old);
+        }
     }
 
     fn toggle(&mut self, cx: &mut Context<Self>) {
@@ -129,6 +158,17 @@ impl Render for Prompter {
         if meter.is_some() {
             window.request_animation_frame();
         }
+        self.update_image(window);
+        // The box takes the format of the frames (the project's).
+        let picture = self.image.as_ref().map(|(_, i)| {
+            #[allow(clippy::cast_precision_loss)]
+            let (w, h) = (
+                self.image_size.0.max(1) as f32,
+                self.image_size.1.max(1) as f32,
+            );
+            let scale = 256.0 / w.max(h);
+            (Arc::clone(i), w * scale, h * scale)
+        });
         let line = self.size * 1.45;
         let status = tr!(
             "prompter.status",
@@ -214,6 +254,21 @@ impl Render for Prompter {
                     .text_color(rgb(DIM))
                     .child(status),
             )
+            .when_some(picture, |d, (picture, w, h)| {
+                d.child(
+                    div()
+                        .absolute()
+                        .top(px(16.))
+                        .right(px(16.))
+                        .w(px(w))
+                        .h(px(h))
+                        .rounded(px(3.))
+                        .overflow_hidden()
+                        .border_1()
+                        .border_color(rgb(0x2B3230))
+                        .child(img(picture).size_full().object_fit(ObjectFit::Contain)),
+                )
+            })
             .when_some(meter, |d, (seconds, level)| {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let secs = seconds as u64;

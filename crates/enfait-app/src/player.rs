@@ -696,7 +696,7 @@ fn decoder_for(
 }
 
 /// gpui image (BGRA) from a decoded frame.
-fn render_image(frame: &enfait_media::Frame) -> Option<Arc<RenderImage>> {
+pub(crate) fn render_image(frame: &enfait_media::Frame) -> Option<Arc<RenderImage>> {
     let buffer = image::RgbaImage::from_raw(frame.width, frame.height, frame.data.clone())?;
     Some(Arc::new(RenderImage::new(vec![image::Frame::new(buffer)])))
 }

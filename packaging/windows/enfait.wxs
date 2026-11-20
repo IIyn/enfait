@@ -1,0 +1,44 @@
+<!--
+  MSI built by .github/workflows/release.yml (WiX 5), from the repository root:
+    wix build packaging\windows\enfait.wxs -arch x64 -d Version=0.1.0 -d SourceDir=dist -o enfait.msi
+  Machine-wide install in Program Files; enfait-cli is added to the system PATH.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="enfait"
+           Manufacturer="enfait"
+           Version="$(var.Version)"
+           UpgradeCode="3D4F2A86-7C1B-4E59-A0D2-6B8E1F94C537"
+           Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of enfait is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="enfait.ico" SourceFile="assets\icon\enfait.ico" />
+    <Property Id="ARPPRODUCTICON" Value="enfait.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/IIyn/enfait" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="enfait" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="Files" Directory="INSTALLFOLDER">
+      <Component>
+        <File Source="$(var.SourceDir)\enfait.exe" KeyPath="yes">
+          <Shortcut Name="enfait"
+                    Directory="ProgramMenuFolder"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="enfait.ico"
+                    Advertise="yes" />
+        </File>
+      </Component>
+      <Component>
+        <File Source="$(var.SourceDir)\enfait-cli.exe" KeyPath="yes" />
+        <Environment Id="PATH" Name="PATH" Value="[INSTALLFOLDER]"
+                     Action="set" Part="last" System="yes" Permanent="no" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Files" />
+    </Feature>
+  </Package>
+</Wix>

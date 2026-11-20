@@ -9,10 +9,12 @@
 //! - [`audio`] and [`waveform`]: samples in memory and peaks;
 //! - [`video`]: decoding proxy frames, as the clock asks;
 //! - [`transport`]: shared playback clock and J/K/L commands;
-//! - [`output`]: audio output (cpal) driving the clock.
+//! - [`output`]: audio output (cpal) driving the clock;
+//! - [`record`] and [`camera`]: recording the voice and filming.
 
 pub mod audio;
 pub mod cache;
+pub mod camera;
 pub mod edl;
 mod error;
 mod ffmpeg;
