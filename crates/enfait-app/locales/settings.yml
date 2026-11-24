@@ -26,12 +26,6 @@ _version: 2
 "settings.banks_help":
   en: "Wikimedia Commons and Openverse work without a key. These banks add more videos, photos and sounds."
   fr: "Wikimedia Commons et Openverse fonctionnent sans clé. Ces banques ajoutent des vidéos, des photos et des sons."
-"settings.claude_help":
-  en: "Uses your Claude subscription through the `claude` command."
-  fr: "Utilise ton abonnement Claude par la commande `claude`."
-"settings.claude_missing":
-  en: "Not found. Install Claude Code from claude.com/claude-code, then reopen this page."
-  fr: "Introuvable. Installe Claude Code depuis claude.com/claude-code, puis rouvre cette page."
 "settings.close":
   en: "Close  Esc"
   fr: "Fermer  Échap"
@@ -104,9 +98,6 @@ _version: 2
 "settings.language":
   en: "Language"
   fr: "Langue"
-"settings.local":
-  en: "Local model"
-  fr: "Modèle local"
 "settings.local_help":
   en: "Replaces Opus and Sonnet. Critiques send images: choose a model that reads them."
   fr: "Remplace Opus et Sonnet. Les critiques envoient des images : choisis un modèle qui les lit."

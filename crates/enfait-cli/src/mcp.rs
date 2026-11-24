@@ -37,7 +37,7 @@ pub async fn run(args: McpArgs) -> Result<()> {
 }
 
 fn install(dir: &std::path::Path) -> Result<()> {
-    let claude = enfait_config::process::which("claude")
+    let claude = enfait_config::process::find_claude()
         .context("Claude Code (`claude`) not found in the PATH")?;
     let exe = std::env::current_exe().context("chemin de enfait-cli")?;
     let mut cmd = enfait_config::process::command(claude);

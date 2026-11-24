@@ -26,6 +26,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+mod connect;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Section {
     General,
@@ -123,6 +125,7 @@ pub(super) struct SettingsUi {
     update: UpdateState,
     /// The update file being downloaded (or downloaded) and where it goes.
     update_file: Option<(Download, PathBuf, Package)>,
+    connect: connect::ConnectGuide,
 }
 
 /// Where the update check stands.
@@ -145,7 +148,8 @@ fn key_input(window: &mut Window, cx: &mut Context<Shell>) -> Entity<InputState>
 }
 
 impl SettingsUi {
-    /// `ENFAIT_OPEN=settings/models` or `onboarding/3` opens a page directly
+    /// `ENFAIT_OPEN=settings/models`, `settings/models/local` (connection
+    /// guide on the local model) or `onboarding/3` opens a page directly
     /// (screenshots, tests by hand).
     pub(super) fn open_from_env(&mut self) {
         let Ok(target) = std::env::var("ENFAIT_OPEN") else {
@@ -158,6 +162,10 @@ impl SettingsUi {
                 self.section = match rest {
                     "appearance" => Section::Appearance,
                     "models" => Section::Models,
+                    "models/local" => {
+                        self.connect.show_local();
+                        Section::Models
+                    }
                     "banks" => Section::Banks,
                     "tools" => Section::Tools,
                     _ => Section::General,
@@ -231,6 +239,7 @@ impl SettingsUi {
                 downloads: BTreeMap::new(),
                 update: UpdateState::Idle,
                 update_file: None,
+                connect: connect::ConnectGuide::default(),
             },
             subscriptions,
         )
@@ -755,6 +764,7 @@ impl Shell {
 
     /// The settings page: sections on the left, the chosen one on the right.
     pub(super) fn settings_page(&mut self, _: &mut Window, cx: &mut Context<Self>) -> Div {
+        self.poll_connect(cx);
         let current = self.settings.section;
         let content = self.section_content(current, cx);
         let nav = SECTIONS.iter().enumerate().map(|(i, &section)| {
@@ -1089,21 +1099,31 @@ impl Shell {
     fn models_section(&self, cx: &mut Context<Self>) -> Div {
         let provider = self.session.data.provider;
         let quality = self.session.data.quality;
-        let providers = ProviderChoice::ALL.iter().enumerate().map(|(i, &p)| {
-            chip(
-                ("settings-provider", i),
-                provider_name(p),
-                p == provider,
-                true,
-            )
-            .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_provider(p, cx)))
-        });
-        let qualities = QUALITIES.iter().enumerate().map(|(i, &q)| {
-            chip(("settings-quality", i), quality_name(q), q == quality, true)
-                .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_quality(q, cx)))
-        });
+        let providers = ProviderChoice::ALL
+            .iter()
+            .enumerate()
+            .map(|(i, &p)| {
+                chip(
+                    ("settings-provider", i),
+                    provider_name(p),
+                    p == provider,
+                    true,
+                )
+                .on_click(
+                    cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_provider(p, cx)),
+                )
+            })
+            .collect::<Vec<_>>();
+        let qualities = QUALITIES
+            .iter()
+            .enumerate()
+            .map(|(i, &q)| {
+                chip(("settings-quality", i), quality_name(q), q == quality, true).on_click(
+                    cx.listener(move |shell, _: &ClickEvent, _, cx| shell.set_quality(q, cx)),
+                )
+            })
+            .collect::<Vec<_>>();
         let missing = super::studio::provider_hint(provider, prefs::settings(cx));
-        let claude = enfait_config::process::which("claude");
         div()
             .flex()
             .flex_col()
@@ -1115,28 +1135,12 @@ impl Shell {
                 .child(div().flex().flex_wrap().gap(px(6.)).children(providers))
                 .when_some(missing, |d, m| d.child(small(m, tokens::MIXED))),
             )
+            .child(self.connect_field(cx))
             .child(
                 field(tr!("settings.quality"), Some(tr!("settings.quality_help")))
                     .child(div().flex().gap(px(6.)).children(qualities)),
             )
             .children(self.key_field(Secret::Anthropic, cx))
-            .child(
-                field("Claude Code", Some(tr!("settings.claude_help"))).child(match claude {
-                    Some(path) => small(
-                        tr!("settings.found_at", path = path.display().to_string()),
-                        tokens::OK,
-                    ),
-                    None => small(tr!("settings.claude_missing"), tokens::MUTE),
-                }),
-            )
-            .child(
-                field(tr!("settings.local"), Some(tr!("settings.local_help")))
-                    .child(small(tr!("settings.local_url"), tokens::FG2))
-                    .child(Input::new(&self.settings.local_url))
-                    .child(small(tr!("settings.local_model"), tokens::FG2))
-                    .child(Input::new(&self.settings.local_model)),
-            )
-            .children(self.key_field(Secret::Local, cx))
     }
 
     fn banks_section(&self, cx: &mut Context<Self>) -> Div {
@@ -1254,6 +1258,7 @@ impl Shell {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement + use<> {
+        self.poll_connect(cx);
         let step = self.settings.step.min(STEPS - 1);
         let (title, help, content): (SharedString, SharedString, Div) = match step {
             0 => (

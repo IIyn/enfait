@@ -1,0 +1,199 @@
+_version: 2
+"connect.auto":
+  en: "Checked automatically: each step ticks itself off as soon as it is done, no need to reopen this page."
+  fr: "Vérifié automatiquement : chaque étape se coche dès qu'elle est faite, inutile de rouvrir cette page."
+"connect.checking":
+  en: "Checking…"
+  fr: "Vérification…"
+"connect.claude.account":
+  en: "Needs a Claude subscription (Pro, Max, Team, Enterprise) or an Anthropic Console account."
+  fr: "Demande un abonnement Claude (Pro, Max, Team, Enterprise) ou un compte Anthropic Console."
+"connect.claude.api_first":
+  en: "An Anthropic key is set: in \"Auto\", enfait uses the API first. Choose \"Claude Code\" above to use your subscription."
+  fr: "Une clé Anthropic existe : en « Auto », enfait passe d'abord par l'API. Choisis « Claude Code » plus haut pour utiliser ton abonnement."
+"connect.claude.in_use":
+  en: "enfait uses Claude Code."
+  fr: "enfait utilise Claude Code."
+"connect.claude.install":
+  en: "Install Claude Code"
+  fr: "Installer Claude Code"
+"connect.claude.logged_in":
+  en: "Signed in"
+  fr: "Connecté"
+"connect.claude.logged_in_with":
+  en: "Signed in (%{method})"
+  fr: "Connecté (%{method})"
+"connect.claude.login":
+  en: "Sign in"
+  fr: "Se connecter"
+"connect.claude.login_alt":
+  en: "Or start `claude` and type /login. If it still does not show up here, update Claude Code:"
+  fr: "Ou lance `claude` et tape /login. Si rien ne change ici, mets Claude Code à jour :"
+"connect.claude.login_how":
+  en: "In a terminal, this opens the browser to sign in to your Claude account:"
+  fr: "Dans un terminal, ceci ouvre le navigateur pour te connecter à ton compte Claude :"
+"connect.claude.page":
+  en: "Claude Code website ↗"
+  fr: "Site de Claude Code ↗"
+"connect.claude.unknown":
+  en: "Could not check the sign-in (older version of Claude Code?)."
+  fr: "Impossible de vérifier la connexion (ancienne version de Claude Code ?)."
+"connect.claude.use":
+  en: "Use it in enfait"
+  fr: "L'utiliser dans enfait"
+"connect.claude.use_button":
+  en: "Use Claude Code"
+  fr: "Utiliser Claude Code"
+"connect.copied":
+  en: "Copied"
+  fr: "Copié"
+"connect.copy":
+  en: "Copy"
+  fr: "Copier"
+"connect.download_from":
+  en: "Download from %{site} ↗"
+  fr: "Télécharger sur %{site} ↗"
+"connect.help":
+  en: "Step by step, for %{os}."
+  fr: "Étape par étape, pour %{os}."
+"connect.in_powershell":
+  en: "In PowerShell:"
+  fr: "Dans PowerShell :"
+"connect.in_terminal":
+  en: "In a terminal:"
+  fr: "Dans un terminal :"
+"connect.llamacpp.linux":
+  en: "From your distribution's packages when available, with Homebrew, or the ready-made builds:"
+  fr: "Avec les paquets de ta distribution s'il existe, avec Homebrew, ou les versions prêtes à l'emploi :"
+"connect.llamacpp.releases":
+  en: "llama.cpp builds ↗"
+  fr: "Versions de llama.cpp ↗"
+"connect.llamacpp.start":
+  en: "Start the server with a model"
+  fr: "Démarrer le serveur avec un modèle"
+"connect.llamacpp.start_how":
+  en: "This model reads images; it is downloaded at the first start (about 8 GB), then served on port 8080. Leave the terminal open."
+  fr: "Ce modèle lit les images ; il est téléchargé au premier lancement (environ 8 Go), puis servi sur le port 8080. Laisse le terminal ouvert."
+"connect.lmstudio.appimage":
+  en: "On Linux it is an AppImage: make it executable (chmod +x), then start it."
+  fr: "Sous Linux, c'est une AppImage : rends-la exécutable (chmod +x), puis lance-la."
+"connect.lmstudio.download":
+  en: "In the Discover tab, search a model that reads images (Qwen3-VL, Gemma 3) and download it."
+  fr: "Dans l'onglet Discover, cherche un modèle qui lit les images (Qwen3-VL, Gemma 3) et télécharge-le."
+"connect.lmstudio.install":
+  en: "Install LM Studio, then open it once."
+  fr: "Installe LM Studio, puis ouvre-le une fois."
+"connect.lmstudio.start":
+  en: "In LM Studio, Developer tab: turn on \"Start server\" (port 1234)."
+  fr: "Dans LM Studio, onglet Developer : active « Start server » (port 1234)."
+"connect.local.answers":
+  en: "Answers at %{url}"
+  fr: "Répond à %{url}"
+"connect.local.choose":
+  en: "Choose the model"
+  fr: "Choisir le modèle"
+"connect.local.choose_how":
+  en: "Click a model: enfait switches to it. Critiques send images: prefer a model that reads them."
+  fr: "Clique sur un modèle : enfait passe dessus. Les critiques envoient des images : préfère un modèle qui les lit."
+"connect.local.chosen":
+  en: "enfait uses %{model}."
+  fr: "enfait utilise %{model}."
+"connect.local.count":
+  en: "%{count} model(s) available"
+  fr: "%{count} modèle(s) disponible(s)"
+"connect.local.download":
+  en: "Download a model"
+  fr: "Télécharger un modèle"
+"connect.local.error":
+  en: "The server answers with an error: %{error}"
+  fr: "Le serveur répond par une erreur : %{error}"
+"connect.local.help":
+  en: "A model running on this computer (or on your network): free and private, but slower, and less careful than Claude on animations."
+  fr: "Un modèle qui tourne sur cet ordinateur (ou sur ton réseau) : gratuit et privé, mais plus lent, et moins soigneux que Claude sur les animations."
+"connect.local.images":
+  en: "images"
+  fr: "images"
+"connect.local.install":
+  en: "Install %{server}"
+  fr: "Installer %{server}"
+"connect.local.key_needed":
+  en: "The server refuses the request: it probably needs a key (field below)."
+  fr: "Le serveur refuse la requête : il demande sans doute une clé (champ plus bas)."
+"connect.local.no_vision":
+  en: "This model does not read images: critiques on renders will fail."
+  fr: "Ce modèle ne lit pas les images : les critiques sur les rendus échoueront."
+"connect.local.ollama":
+  en: "Ollama (simplest)"
+  fr: "Ollama (le plus simple)"
+"connect.local.other":
+  en: "Other server"
+  fr: "Autre serveur"
+"connect.local.running":
+  en: "The server is running."
+  fr: "Le serveur tourne."
+"connect.local.start":
+  en: "Start the server"
+  fr: "Démarrer le serveur"
+"connect.local.text_only":
+  en: "text only"
+  fr: "texte seul"
+"connect.local.unreachable":
+  en: "Nothing answers at %{url} yet."
+  fr: "Rien ne répond encore à %{url}."
+"connect.local.use_button":
+  en: "Use this local model"
+  fr: "Utiliser ce modèle local"
+"connect.local.wait_download":
+  en: "The download weighs several GB: this page sees it as soon as it is over."
+  fr: "Le téléchargement pèse plusieurs Go : cette page le voit dès qu'il est fini."
+"connect.manual":
+  en: "Manual settings"
+  fr: "Réglages manuels"
+"connect.ollama.app":
+  en: "Download the app and install it."
+  fr: "Télécharge l'application et installe-la."
+"connect.ollama.big":
+  en: "32 GB of memory or more, better results:"
+  fr: "32 Go de mémoire ou plus, de meilleurs résultats :"
+"connect.ollama.pull":
+  en: "In a terminal, a model that reads images, depending on the memory of the computer:"
+  fr: "Dans un terminal, un modèle qui lit les images, selon la mémoire de l'ordinateur :"
+"connect.ollama.small":
+  en: "16 GB of memory:"
+  fr: "16 Go de mémoire :"
+"connect.ollama.start_linux":
+  en: "The installer starts it as a service. If nothing answers, start it by hand and leave the terminal open."
+  fr: "L'installeur le démarre comme service. Si rien ne répond, lance-le à la main et laisse le terminal ouvert."
+"connect.ollama.start_macos":
+  en: "Open the Ollama app: its icon shows up in the menu bar."
+  fr: "Ouvre l'application Ollama : son icône apparaît dans la barre des menus."
+"connect.ollama.start_windows":
+  en: "Open Ollama from the Start menu: its icon shows up in the notification area."
+  fr: "Ouvre Ollama depuis le menu Démarrer : son icône apparaît dans la zone de notification."
+"connect.or_command":
+  en: "Or in a terminal:"
+  fr: "Ou dans un terminal :"
+"connect.or_homebrew":
+  en: "Or with Homebrew:"
+  fr: "Ou avec Homebrew :"
+"connect.or_winget":
+  en: "Or with winget:"
+  fr: "Ou avec winget :"
+"connect.other.how":
+  en: "Any server speaking the OpenAI API (vLLM, LocalAI, Jan, another computer…): type its address in \"Server address\" below, ending in /v1."
+  fr: "Tout serveur qui parle l'API OpenAI (vLLM, LocalAI, Jan, un autre ordinateur…) : tape son adresse dans « Adresse du serveur » plus bas, terminée par /v1."
+"connect.other.start":
+  en: "Reach the server"
+  fr: "Joindre le serveur"
+"connect.ready":
+  en: "All set: enfait can write storyboards and animations."
+  fr: "Tout est prêt : enfait peut écrire storyboards et animations."
+"connect.tab.claude":
+  en: "Claude Code"
+  fr: "Claude Code"
+"connect.tab.local":
+  en: "Local model"
+  fr: "Modèle local"
+"connect.title":
+  en: "Connection guide"
+  fr: "Guide de connexion"

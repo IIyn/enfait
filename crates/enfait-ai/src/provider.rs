@@ -84,7 +84,7 @@ impl ProviderChoice {
     pub fn make(self, work: &std::path::Path) -> Result<Provider, AiError> {
         let api = || AnthropicClient::from_config().map(Provider::Anthropic);
         let claude = || {
-            enfait_config::process::which("claude")
+            enfait_config::process::find_claude()
                 .map(|program| Provider::ClaudeCode(ClaudeCodeClient::new(program, work)))
                 .ok_or_else(|| {
                     AiError::ClaudeCode(

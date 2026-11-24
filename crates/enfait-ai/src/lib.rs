@@ -11,6 +11,7 @@
 pub mod animate;
 pub mod anthropic;
 pub mod claude_code;
+pub mod connect;
 pub mod direction;
 pub mod editor;
 pub mod llm;

@@ -20,6 +20,60 @@ pub fn which(name: &str) -> Option<PathBuf> {
     })
 }
 
+/// Looks for `name` in `PATH`, then in `dirs`. A graphical app often
+/// does not get the `PATH` of the user's shell (macOS above all), so
+/// programs installed in the home folder are missed by [`which`] alone.
+pub fn find(name: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
+    which(name).or_else(|| {
+        let extensions = extensions();
+        dirs.iter().find_map(|dir| {
+            extensions
+                .iter()
+                .map(|ext| dir.join(format!("{name}{ext}")))
+                .find(|candidate| candidate.is_file())
+        })
+    })
+}
+
+/// The user's home folder.
+pub fn home() -> Option<PathBuf> {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .filter(|h| !h.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Folders where installers put programs, beyond `PATH`.
+pub fn usual_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(home) = home() {
+        dirs.push(home.join(".local").join("bin"));
+        dirs.push(home.join("bin"));
+    }
+    if cfg!(windows) {
+        if let Some(app_data) = std::env::var_os("APPDATA") {
+            dirs.push(PathBuf::from(app_data).join("npm"));
+        }
+    } else {
+        dirs.extend(
+            ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+                .into_iter()
+                .map(PathBuf::from),
+        );
+    }
+    dirs
+}
+
+/// The `claude` command (Claude Code): `PATH`, then where its installers
+/// put it.
+pub fn find_claude() -> Option<PathBuf> {
+    let mut dirs = usual_dirs();
+    if let Some(home) = home() {
+        dirs.push(home.join(".claude").join("local"));
+        dirs.push(home.join(".npm-global").join("bin"));
+    }
+    find("claude", &dirs)
+}
+
 #[cfg(windows)]
 fn extensions() -> Vec<String> {
     let mut list = vec![String::new()];

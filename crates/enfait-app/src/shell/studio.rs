@@ -138,7 +138,7 @@ pub(super) fn provider_hint(
         ProviderChoice::Api if !secrets::is_set(Secret::Anthropic) => {
             Some(tr!("studio.missing.api"))
         }
-        ProviderChoice::ClaudeCode if enfait_config::process::which("claude").is_none() => {
+        ProviderChoice::ClaudeCode if enfait_config::process::find_claude().is_none() => {
             Some(tr!("studio.missing.claude"))
         }
         ProviderChoice::Local if settings.local_model().is_none() => {
