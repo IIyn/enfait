@@ -147,6 +147,9 @@ pub struct Settings {
     /// The player decodes the original file at its own size rather than
     /// the proxy.
     pub player_native: bool,
+    /// Most animations sent to the engine at once (magic mode, montage
+    /// dialog): each one costs model credits. 0: no limit.
+    pub max_blocks: u32,
 }
 
 /// Sizes of the panels the user resizes with the mouse.
@@ -215,11 +218,19 @@ impl Default for Settings {
             camera: None,
             panels: PanelSizes::default(),
             player_native: false,
+            max_blocks: Self::DEFAULT_MAX_BLOCKS,
         }
     }
 }
 
 impl Settings {
+    pub const DEFAULT_MAX_BLOCKS: u32 = 4;
+
+    /// How many animations one sending may hold (`None`: no limit).
+    pub fn block_limit(&self) -> Option<usize> {
+        usize::try_from(self.max_blocks).ok().filter(|n| *n > 0)
+    }
+
     /// Settings of the user (defaults if the file is missing or unreadable).
     pub fn load() -> Self {
         let path = paths::settings_file();
@@ -318,9 +329,19 @@ mod tests {
                 description: 260,
             },
             player_native: true,
+            max_blocks: 0,
         };
         settings.save_to(&path).unwrap();
         assert_eq!(Settings::load_from(&path).unwrap(), Some(settings));
+        assert_eq!(Settings::default().block_limit(), Some(4));
+        assert_eq!(
+            Settings {
+                max_blocks: 0,
+                ..Settings::default()
+            }
+            .block_limit(),
+            None
+        );
 
         std::fs::write(&path, r#"{ "theme": "nord" }"#).unwrap();
         let partial = Settings::load_from(&path).unwrap().unwrap();

@@ -166,11 +166,23 @@ impl Shell {
                     shell.poll_events(cx);
                     shell.poll_bridge(cx);
                     if shell.worker.take_changed() {
+                        shell.clips.borrow_mut().invalidate();
                         shell.poll_written(cx);
                         shell.refresh_preview(cx);
                         cx.notify();
                     }
                     shell.poll_magic(cx);
+                    if shell.cut.progress_moved() {
+                        if shell.cut.started.is_none() {
+                            let done = shell.cut.transcription_progress();
+                            shell.cut.started = Some((std::time::Instant::now(), done));
+                        }
+                        // The storyboard notice repeats the progress.
+                        if shell.board.is_none() {
+                            shell.refresh_board(cx);
+                        }
+                        cx.notify();
+                    }
                 });
                 if alive.is_err() {
                     break;
@@ -190,6 +202,8 @@ impl Shell {
         if events.is_empty() {
             return;
         }
+        // A job ended: a clip may have appeared.
+        self.clips.borrow_mut().invalidate();
         // In the window: a badge on the Montage step and a toast.
         for event in &events {
             if let crate::worker::Event::Job {
@@ -341,7 +355,8 @@ impl Shell {
     }
 
     fn has_clip(&self, id: BlockId) -> bool {
-        clip_path(&self.session.studio_dir(), id, &self.settings()).is_file()
+        let path = clip_path(&self.session.studio_dir(), id, &self.settings());
+        self.clips.borrow_mut().exists(&path)
     }
 
     /// State of the transition after a block (`None`: hard cut).
@@ -358,8 +373,8 @@ impl Shell {
             .lock()
             .ok()
             .and_then(|q| q.latest_transition(id).cloned());
-        let ready =
-            transition_clip_path(&self.session.studio_dir(), id, &self.settings()).is_file();
+        let path = transition_clip_path(&self.session.studio_dir(), id, &self.settings());
+        let ready = self.clips.borrow_mut().exists(&path);
         Some(match latest.map(|j| j.status) {
             Some(JobStatus::Queued) => BlockState::Queued,
             Some(JobStatus::Running) => BlockState::Running,
@@ -383,21 +398,46 @@ impl Shell {
         cx.notify();
     }
 
-    /// Queues every block to generate, then their transitions (they come
-    /// after the animations of both shots in the queue).
+    /// Keeps the first blocks of `ids` allowed by the "blocks per sending"
+    /// setting; tells the user when some are left out.
+    pub(super) fn limit_blocks(
+        &mut self,
+        mut ids: Vec<BlockId>,
+        cx: &Context<Self>,
+    ) -> Vec<BlockId> {
+        let Some(limit) = crate::prefs::settings(cx).block_limit() else {
+            return ids;
+        };
+        let asked = ids.len();
+        if asked > limit {
+            ids.truncate(limit);
+            self.toast(tr!("montage.limited", sent = limit, asked = asked));
+        }
+        ids
+    }
+
+    /// Queues the blocks to generate (within the "blocks per sending"
+    /// limit), then the transitions after them (they come after the
+    /// animations of both shots in the queue).
     pub(super) fn generate_all(&mut self, cx: &mut Context<Self>) {
         let Some(board) = &self.board else { return };
-        let blocks = board.project.blocks();
-        let ids: Vec<BlockId> = blocks
+        let ids: Vec<BlockId> = board
+            .project
+            .blocks()
             .iter()
             .filter(|b| self.block_state(b) == BlockState::ToGenerate)
             .map(|b| b.id)
             .collect();
+        let ids = self.limit_blocks(ids, cx);
+        let Some(board) = &self.board else { return };
+        let blocks = board.project.blocks();
         let transitions: Vec<BlockId> = blocks
             .iter()
             .take(blocks.len().saturating_sub(1))
             .filter(|b| {
-                self.transition_state(b.id, &b.transition_after) == Some(BlockState::ToGenerate)
+                ids.contains(&b.id)
+                    && self.transition_state(b.id, &b.transition_after)
+                        == Some(BlockState::ToGenerate)
             })
             .map(|b| b.id)
             .collect();

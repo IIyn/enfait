@@ -423,7 +423,7 @@ impl Shell {
             CutStatus::NoRush => {
                 Some((tr!("cut.no_rush", key = crate::shortcut("I")), tokens::MUTE))
             }
-            CutStatus::Transcribing => Some((tr!("cut.transcribing"), tokens::FG2)),
+            CutStatus::Transcribing => Some((self.cut.transcribing_label(), tokens::FG2)),
             CutStatus::Failed(e) => Some((e.clone(), tokens::ERROR)),
             CutStatus::Ready
                 if self
@@ -438,124 +438,14 @@ impl Shell {
             CutStatus::Ready => None,
         };
 
-        // Shared reference: the row closures only create listeners.
-        let listeners: &Context<Self> = cx;
-        let rows: Vec<Div> = self
-            .cut
-            .analysis
-            .as_ref()
-            .map(|analysis| {
-                analysis
-                    .sentences
-                    .iter()
-                    .enumerate()
-                    .map(|(s, sentence)| {
-                        let chosen = self.cut.choice.get(s).copied().flatten();
-                        let takes: Vec<(usize, bool)> =
-                            analysis.takes_of(s).map(|(i, t)| (i, t.complete)).collect();
-                        let missing = takes.is_empty();
-                        let chips = takes
-                            .into_iter()
-                            .enumerate()
-                            .map(move |(n, (i, complete))| {
-                                let selected = chosen == Some(i);
-                                div()
-                                    .id(("take", i))
-                                    .flex_none()
-                                    .px(px(7.))
-                                    .h(px(22.))
-                                    .flex()
-                                    .items_center()
-                                    .rounded(px(3.))
-                                    .cursor_pointer()
-                                    .font_family(crate::fonts::MONO)
-                                    .text_size(px(11.))
-                                    .map(|d| {
-                                        if selected {
-                                            d.bg(color(tokens::SIGNAL))
-                                                .text_color(color(tokens::ON_SIGNAL))
-                                        } else {
-                                            d.border_1()
-                                                .border_color(color(tokens::LINE_STRONG))
-                                                .text_color(color(if complete {
-                                                    tokens::FG2
-                                                } else {
-                                                    tokens::MUTE
-                                                }))
-                                                .hover(|d| d.bg(color(tokens::HOVER)))
-                                        }
-                                    })
-                                    .child(SharedString::from(format!(
-                                        "{}{}",
-                                        tr!("cut.take_chip", n = n.saturating_add(1)),
-                                        if complete {
-                                            SharedString::default()
-                                        } else {
-                                            tr!("cut.incomplete")
-                                        }
-                                    )))
-                                    .on_click(listeners.listener(
-                                        move |shell, _: &ClickEvent, _, cx| {
-                                            shell.choose_take(s, i, cx);
-                                        },
-                                    ))
-                            });
-                        let active = current == Some(s);
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(12.))
-                            .px(px(20.))
-                            .py(px(8.))
-                            .border_b_1()
-                            .border_color(color(tokens::LINE))
-                            .when(active, |d| d.bg(color(tokens::RAISED)))
-                            .child(
-                                mono(format!("{:02}", s.saturating_add(1)))
-                                    .flex_none()
-                                    .w(px(24.))
-                                    .text_size(px(12.))
-                                    .text_color(color(if active {
-                                        tokens::SIGNAL
-                                    } else {
-                                        tokens::MUTE
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .id(("sentence", s))
-                                    .flex_1()
-                                    .min_w(px(0.))
-                                    .when(!missing, |d| {
-                                        d.cursor_pointer().on_click(listeners.listener(
-                                            move |shell, _: &ClickEvent, _, cx| {
-                                                shell.seek_sentence(s, cx);
-                                            },
-                                        ))
-                                    })
-                                    .text_color(color(if missing {
-                                        tokens::MUTE
-                                    } else {
-                                        tokens::FG
-                                    }))
-                                    .child(SharedString::from(sentence.text.clone())),
-                            )
-                            .child(
-                                div()
-                                    .flex_none()
-                                    .flex()
-                                    .gap(px(4.))
-                                    .when(missing, |d| {
-                                        d.text_size(px(11.))
-                                            .text_color(color(tokens::ERROR))
-                                            .child(tr!("cut.not_found"))
-                                    })
-                                    .children(chips),
-                            )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let count = self.cut.analysis.as_ref().map_or(0, |a| a.sentences.len());
+        self.lists.cut_current = current;
+        let rows = super::lazy::lazy_list(
+            &self.lists.sentences,
+            count,
+            |shell, s, _, cx| shell.cut_row(s, cx),
+            cx,
+        );
 
         div()
             .flex_1()
@@ -595,11 +485,119 @@ impl Shell {
             })
             .child(
                 div()
-                    .id("sentences")
                     .flex_1()
                     .min_h(px(0.))
-                    .overflow_y_scroll()
-                    .children(rows),
+                    .flex()
+                    .flex_col()
+                    .child(rows.flex_1()),
             )
+    }
+}
+
+impl Shell {
+    /// Row of sentence `s` on the cut screen (built only while in view).
+    fn cut_row(&mut self, s: usize, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let Some(analysis) = self.cut.analysis.as_ref() else {
+            return div().into_any_element();
+        };
+        let Some(sentence) = analysis.sentences.get(s) else {
+            return div().into_any_element();
+        };
+        let current = self.lists.cut_current;
+        let listeners: &Context<Self> = cx;
+
+        let chosen = self.cut.choice.get(s).copied().flatten();
+        let takes: Vec<(usize, bool)> =
+            analysis.takes_of(s).map(|(i, t)| (i, t.complete)).collect();
+        let missing = takes.is_empty();
+        let chips = takes
+            .into_iter()
+            .enumerate()
+            .map(move |(n, (i, complete))| {
+                let selected = chosen == Some(i);
+                div()
+                    .id(("take", i))
+                    .flex_none()
+                    .px(px(7.))
+                    .h(px(22.))
+                    .flex()
+                    .items_center()
+                    .rounded(px(3.))
+                    .cursor_pointer()
+                    .font_family(crate::fonts::MONO)
+                    .text_size(px(11.))
+                    .map(|d| {
+                        if selected {
+                            d.bg(color(tokens::SIGNAL))
+                                .text_color(color(tokens::ON_SIGNAL))
+                        } else {
+                            d.border_1()
+                                .border_color(color(tokens::LINE_STRONG))
+                                .text_color(color(if complete {
+                                    tokens::FG2
+                                } else {
+                                    tokens::MUTE
+                                }))
+                                .hover(|d| d.bg(color(tokens::HOVER)))
+                        }
+                    })
+                    .child(SharedString::from(format!(
+                        "{}{}",
+                        tr!("cut.take_chip", n = n.saturating_add(1)),
+                        if complete {
+                            SharedString::default()
+                        } else {
+                            tr!("cut.incomplete")
+                        }
+                    )))
+                    .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                        shell.choose_take(s, i, cx);
+                    }))
+            });
+        let active = current == Some(s);
+        div()
+            .flex()
+            .items_center()
+            .gap(px(12.))
+            .px(px(20.))
+            .py(px(8.))
+            .border_b_1()
+            .border_color(color(tokens::LINE))
+            .when(active, |d| d.bg(color(tokens::RAISED)))
+            .child(
+                mono(format!("{:02}", s.saturating_add(1)))
+                    .flex_none()
+                    .w(px(24.))
+                    .text_size(px(12.))
+                    .text_color(color(if active { tokens::SIGNAL } else { tokens::MUTE })),
+            )
+            .child(
+                div()
+                    .id(("sentence", s))
+                    .flex_1()
+                    .min_w(px(0.))
+                    .when(!missing, |d| {
+                        d.cursor_pointer().on_click(listeners.listener(
+                            move |shell, _: &ClickEvent, _, cx| {
+                                shell.seek_sentence(s, cx);
+                            },
+                        ))
+                    })
+                    .text_color(color(if missing { tokens::MUTE } else { tokens::FG }))
+                    .child(SharedString::from(sentence.text.clone())),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .gap(px(4.))
+                    .when(missing, |d| {
+                        d.text_size(px(11.))
+                            .text_color(color(tokens::ERROR))
+                            .child(tr!("cut.not_found"))
+                    })
+                    .children(chips),
+            )
+            .into_any_element()
     }
 }

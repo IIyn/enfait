@@ -274,6 +274,13 @@ impl Shell {
     pub(super) fn magic_banner(&self, cx: &mut Context<Self>) -> Option<Div> {
         let stage = self.magic.as_ref()?;
         let detail: String = match stage {
+            MagicStage::Preparing if self.cut.status == crate::cut::CutStatus::Transcribing => {
+                format!(
+                    "{} · {}",
+                    tr!("magic.preparing"),
+                    self.cut.transcribing_label()
+                )
+            }
             MagicStage::Preparing => tr!("magic.preparing").to_string(),
             MagicStage::Writing => self
                 .worker

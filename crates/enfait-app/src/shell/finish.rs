@@ -440,28 +440,45 @@ impl Shell {
         };
         let track = || div().flex_1().relative().h_full().overflow_hidden();
 
-        let blocks = board.project.blocks().iter().enumerate().map(|(i, b)| {
-            let start = b.range.start().as_secs_f64();
-            div()
-                .id(("finish-block", i))
-                .absolute()
-                .top(px(5.))
-                .bottom(px(5.))
-                .left(relative(frac(start, total)))
-                .w(relative(frac(b.range.duration().as_secs_f64(), total)))
-                .pr(px(1.))
-                .cursor_pointer()
-                .child(
-                    div()
-                        .size_full()
-                        .rounded(px(2.))
-                        .bg(color(super::kind_color(b.kind)))
-                        .opacity(0.55),
-                )
-                .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
-                    shell.command(Command::Seek(start), cx);
-                }))
-        });
+        // Painted in one pass: a long take gives thousands of blocks.
+        let marks = board
+            .project
+            .blocks()
+            .iter()
+            .map(|b| super::lazy::Mark {
+                start: frac(b.range.start().as_secs_f64(), total),
+                width: frac(b.range.duration().as_secs_f64(), total),
+                tone: super::kind_color(b.kind),
+            })
+            .collect();
+        let starts: Vec<f64> = board
+            .project
+            .blocks()
+            .iter()
+            .map(|b| b.range.start().as_secs_f64())
+            .collect();
+        let shell = cx.entity().downgrade();
+        let blocks = div()
+            .absolute()
+            .top(px(5.))
+            .bottom(px(5.))
+            .left_0()
+            .right_0()
+            .cursor_pointer()
+            .child(super::lazy::painted_track(
+                marks,
+                0.55,
+                1.0,
+                move |share, _, cx| {
+                    // Start of the block clicked.
+                    let t = f64::from(share) * total;
+                    let i = starts.partition_point(|s| *s <= t).saturating_sub(1);
+                    let start = starts.get(i).copied().unwrap_or(0.0);
+                    let _ = shell.update(cx, |shell, cx| {
+                        shell.command(Command::Seek(start), cx);
+                    });
+                },
+            ));
         let music_bars = placed.music.iter().map(|m| {
             let id = m.id;
             let on = selected == Some(id);
@@ -523,9 +540,7 @@ impl Shell {
             .flex_col()
             .border_b_1()
             .border_color(color(tokens::LINE))
-            .child(
-                lane(tr!("finish.lane.blocks")).child(track().children(blocks).child(playhead())),
-            )
+            .child(lane(tr!("finish.lane.blocks")).child(track().child(blocks).child(playhead())))
             .child(
                 lane(tr!("finish.lane.music"))
                     .child(track().children(music_bars).child(playhead())),

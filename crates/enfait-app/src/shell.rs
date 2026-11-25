@@ -12,6 +12,7 @@ mod board;
 mod bridge;
 mod finish;
 mod home;
+mod lazy;
 mod magic;
 mod mention;
 mod montage;
@@ -233,6 +234,10 @@ pub struct Shell {
     /// Fingerprint of the b-roll shots sent to the engine: when it changes,
     /// the preview is rebuilt (and the shots edited again).
     broll_sig: std::cell::Cell<Option<blake3::Hash>>,
+    /// Scroll states of the long lists.
+    lists: lazy::Lists,
+    /// Clips on disk, listed at most twice a second.
+    clips: std::cell::RefCell<lazy::ClipIndex>,
     /// Finish: history, selected music or SFX, sliders, audition.
     finish_history: enfait_core::FinishHistory,
     selected_cue: Option<enfait_core::CueId>,
@@ -488,6 +493,8 @@ impl Shell {
             cutting: None,
             credits_copied: false,
             broll_sig: std::cell::Cell::new(None),
+            lists: lazy::Lists::default(),
+            clips: std::cell::RefCell::default(),
             finish_history: enfait_core::FinishHistory::default(),
             selected_cue: None,
             knobs,
@@ -675,6 +682,8 @@ impl Shell {
         self.cutting = None;
         self.credits_copied = false;
         self.broll_sig = std::cell::Cell::new(None);
+        self.lists = lazy::Lists::default();
+        self.clips = std::cell::RefCell::default();
         self.finish_history = enfait_core::FinishHistory::default();
         self.selected_cue = None;
         self.audition = None;
@@ -891,10 +900,23 @@ impl Shell {
             return;
         }
         self.cut.status = CutStatus::Transcribing;
+        // Pieces done by an interrupted run are not transcribed again.
+        let partial_path = dir.join("transcript.partial.json");
+        let partial = enfait_speech::Partial::load(&partial_path);
+        let progress = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        self.cut.progress = progress.clone();
+        self.cut.shown = 0;
+        self.cut.started = None;
         let source = rush.clone();
         let work = cx.background_spawn(async move {
             let pcm = enfait_speech::decode_pcm(&source).map_err(|e| e.to_string())?;
             let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+            let checkpoint = |p: &enfait_speech::Partial| {
+                let saved = std::fs::create_dir_all(&dir).and_then(|()| p.save(&partial_path));
+                if let Err(e) = saved {
+                    tracing::warn!("partial transcript not saved: {e}");
+                }
+            };
             let options = enfait_speech::TranscribeOptions {
                 language: None,
                 // No script as prompt: it pushes whisper to merge the
@@ -902,11 +924,17 @@ impl Shell {
                 prompt: None,
                 threads: u16::try_from(threads).unwrap_or(4),
                 takes: true,
+                progress: Some(Arc::new(move |done: f32| {
+                    progress.store(done.to_bits(), std::sync::atomic::Ordering::Relaxed);
+                })),
+                resume: partial.as_ref(),
+                checkpoint: Some(&checkpoint),
             };
             let transcript =
                 enfait_speech::transcribe(&model, &pcm, &options).map_err(|e| e.to_string())?;
             if let Ok(json) = serde_json::to_vec_pretty(&transcript) {
                 let _ = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&cached, json));
+                let _ = std::fs::remove_file(&partial_path);
             }
             Ok::<_, String>(transcript)
         });

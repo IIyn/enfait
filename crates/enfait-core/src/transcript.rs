@@ -32,11 +32,16 @@ pub struct Transcript {
 }
 
 impl Transcript {
-    /// Words starting in `range`.
+    /// Words starting in `range` (binary search: the words are in order).
     pub fn words_in(&self, range: TimeRange) -> impl Iterator<Item = &Word> {
+        let from = self
+            .words
+            .partition_point(|w| w.range.start() < range.start());
         self.words
+            .get(from..)
+            .unwrap_or_default()
             .iter()
-            .filter(move |w| range.contains(w.range.start()))
+            .take_while(move |w| w.range.start() < range.end())
     }
 
     /// Text of `range`, words separated by a space.

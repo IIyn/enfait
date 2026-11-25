@@ -134,6 +134,15 @@ _version: 2
 "settings.provider_help":
   en: "Auto: the Anthropic API if a key is set, otherwise Claude Code (your subscription). Local: an OpenAI-compatible server (Ollama, llama.cpp, LM Studio, vLLM)."
   fr: "Auto : l'API Anthropic si une clé existe, sinon Claude Code (ton abonnement). Local : un serveur compatible OpenAI (Ollama, llama.cpp, LM Studio, vLLM)."
+"settings.max_blocks":
+  en: "Blocks per sending"
+  fr: "Blocs par envoi"
+"settings.max_blocks_help":
+  en: "Most animations sent at once, in magic mode or from the montage: each one uses model credits. The first blocks of the edit go first."
+  fr: "Nombre maximal d'animations envoyées d'un coup, en mode magique ou depuis le montage : chacune consomme des crédits. Les premiers blocs du montage passent en premier."
+"settings.max_blocks_none":
+  en: "No limit"
+  fr: "Sans limite"
 "settings.quality":
   en: "Default animation quality"
   fr: "Soin des animations par défaut"

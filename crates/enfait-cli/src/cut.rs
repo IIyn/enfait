@@ -111,8 +111,19 @@ async fn transcript(dirs: &Dirs, rush: &Path, language: Option<&str>) -> Result<
     tracing::info!("transcription…");
     let rush = rush.to_path_buf();
     let language = language.map(str::to_owned);
+    let partial_path = dir.join("transcript.partial.json");
+    let partial = enfait_speech::Partial::load(&partial_path);
+    let checkpoint_dir = dir.clone();
     let transcript = tokio::task::spawn_blocking(move || -> Result<Transcript> {
         let pcm = enfait_speech::decode_pcm(&rush)?;
+        let checkpoint = |p: &enfait_speech::Partial| {
+            let saved =
+                std::fs::create_dir_all(&checkpoint_dir).and_then(|()| p.save(&partial_path));
+            if let Err(e) = saved {
+                tracing::warn!("partial transcript not saved: {e}");
+            }
+            tracing::info!("transcription: {:.0} s done", p.done);
+        };
         let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
         let options = enfait_speech::TranscribeOptions {
             language: language.as_deref(),
@@ -121,12 +132,16 @@ async fn transcript(dirs: &Dirs, rush: &Path, language: Option<&str>) -> Result<
             prompt: None,
             threads: u16::try_from(threads).unwrap_or(4),
             takes: true,
+            resume: partial.as_ref(),
+            checkpoint: Some(&checkpoint),
+            ..Default::default()
         };
         Ok(enfait_speech::transcribe(&model, &pcm, &options)?)
     })
     .await??;
     tokio::fs::create_dir_all(&dir).await?;
     tokio::fs::write(&cached, serde_json::to_vec_pretty(&transcript)?).await?;
+    let _ = tokio::fs::remove_file(dir.join("transcript.partial.json")).await;
     Ok(transcript)
 }
 

@@ -1,11 +1,14 @@
 //! Cut screen: takes of each sentence, "last take" rule, manual choices
 //! and the resulting edit.
 
+use crate::tr;
 use enfait_core::Transcript;
 use enfait_speech::takes::{self, Analysis};
 use gpui_kit::SharedString;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CutStatus {
@@ -26,6 +29,13 @@ pub struct CutState {
     pub analyzed: Option<String>,
     /// Play the edit (else the whole take).
     pub montage: bool,
+    /// Transcription progress, from 0 to 1 (bits of an `f32`), written by
+    /// the background task.
+    pub progress: Arc<AtomicU32>,
+    /// When the running transcription started, and from which share.
+    pub started: Option<(Instant, f32)>,
+    /// Progress last drawn, in tenths of a percent.
+    pub shown: u32,
 }
 
 impl Default for CutState {
@@ -37,11 +47,51 @@ impl Default for CutState {
             choice: Vec::new(),
             analyzed: None,
             montage: true,
+            progress: Arc::new(AtomicU32::new(0)),
+            started: None,
+            shown: 0,
         }
     }
 }
 
 impl CutState {
+    pub fn transcription_progress(&self) -> f32 {
+        f32::from_bits(self.progress.load(Ordering::Relaxed))
+    }
+
+    /// True when the progress moved enough to be drawn again.
+    pub fn progress_moved(&mut self) -> bool {
+        if self.status != CutStatus::Transcribing {
+            return false;
+        }
+        // In [0, 1]: truncation intended.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let now = (self.transcription_progress() * 1000.0) as u32;
+        let moved = now != self.shown;
+        self.shown = now;
+        moved
+    }
+
+    /// "Transcribing… 42 % · about 12 min left".
+    pub fn transcribing_label(&self) -> SharedString {
+        let done = self.transcription_progress();
+        let pct = format!("{:.0}", done * 100.0);
+        let left = self.started.and_then(|(at, from)| {
+            let span = done - from;
+            // Too early for an honest estimate.
+            if span < 0.02 || done >= 1.0 {
+                return None;
+            }
+            let elapsed = at.elapsed().as_secs_f32();
+            let minutes = (elapsed * (1.0 - done) / span / 60.0).ceil().max(1.0);
+            Some(format!("{minutes:.0}"))
+        });
+        match left {
+            Some(minutes) => tr!("cut.transcribing_left", pct = pct, minutes = minutes),
+            None => tr!("cut.transcribing_pct", pct = pct),
+        }
+    }
+
     /// Aligns the transcript on `script` (without a script, sentences and
     /// retakes are found in the take), applies the "last take" rule, then
     /// the saved choices.

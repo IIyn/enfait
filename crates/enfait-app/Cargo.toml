@@ -11,6 +11,10 @@ publish.workspace = true
 name = "enfait"
 path = "src/main.rs"
 
+[features]
+# whisper on the GPU (needs the Vulkan SDK at build time).
+vulkan = ["enfait-speech/vulkan"]
+
 [dependencies]
 enfait-config.workspace = true
 enfait-ai.workspace = true

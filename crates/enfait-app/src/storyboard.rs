@@ -251,10 +251,12 @@ impl Storyboard {
 
     /// Block containing time `t` (edit seconds).
     pub fn block_at(&self, t: f64) -> Option<BlockId> {
-        self.project
-            .blocks()
-            .iter()
-            .find(|b| t >= b.range.start().as_secs_f64() && t < b.range.end().as_secs_f64())
+        // Blocks follow each other: binary search on their ends.
+        let blocks = self.project.blocks();
+        let i = blocks.partition_point(|b| b.range.end().as_secs_f64() <= t);
+        blocks
+            .get(i)
+            .filter(|b| t >= b.range.start().as_secs_f64())
             .or_else(|| {
                 self.project
                     .blocks()

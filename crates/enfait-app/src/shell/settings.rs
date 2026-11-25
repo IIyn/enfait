@@ -1140,7 +1140,37 @@ impl Shell {
                 field(tr!("settings.quality"), Some(tr!("settings.quality_help")))
                     .child(div().flex().gap(px(6.)).children(qualities)),
             )
+            .child(self.max_blocks_field(cx))
             .children(self.key_field(Secret::Anthropic, cx))
+    }
+
+    /// Most animations per sending: a long take would spend all the credits.
+    fn max_blocks_field(&self, cx: &mut Context<Self>) -> Div {
+        let current = prefs::settings(cx).max_blocks;
+        let choices = [1_u32, 2, 4, 8, 16, 0]
+            .into_iter()
+            .map(|n| {
+                let name = if n == 0 {
+                    tr!("settings.max_blocks_none")
+                } else {
+                    SharedString::from(n.to_string())
+                };
+                chip(
+                    ("settings-max-blocks", n as usize),
+                    name,
+                    n == current,
+                    true,
+                )
+                .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                    prefs::update(cx, |s| s.max_blocks = n);
+                }))
+            })
+            .collect::<Vec<_>>();
+        field(
+            tr!("settings.max_blocks"),
+            Some(tr!("settings.max_blocks_help")),
+        )
+        .child(div().flex().flex_wrap().gap(px(6.)).children(choices))
     }
 
     fn banks_section(&self, cx: &mut Context<Self>) -> Div {

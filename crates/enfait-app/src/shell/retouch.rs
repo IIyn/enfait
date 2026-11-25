@@ -34,6 +34,98 @@ impl Shell {
         }
     }
 
+    /// Row of block `i` on the retouch screen (built only while in view).
+    fn retouch_row(&mut self, i: usize, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let Some(board) = &self.board else {
+            return div().into_any_element();
+        };
+        let Some(b) = board.project.blocks().get(i) else {
+            return div().into_any_element();
+        };
+        let rate = board.project.settings().frame_rate;
+        let selected = board.selected;
+        let playing = self.lists.playing;
+        let listeners: &Context<Self> = cx;
+        let state = self.block_state(b);
+        let id = b.id;
+        let chosen = selected == Some(id);
+        let tag = match &state {
+            BlockState::NotAnimated => Some((tr!("montage.no_edit"), tokens::MUTE)),
+            other => other.label().map(|l| (l, other.tone())),
+        };
+        div()
+            .child(
+                div()
+                    .id(("retouch-row", i))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .px(px(20.))
+                    .py(px(8.))
+                    .border_b_1()
+                    .border_color(color(tokens::LINE))
+                    .cursor_pointer()
+                    .when(chosen, |d| d.bg(color(tokens::RAISED)))
+                    .when(!chosen, |d| d.hover(|d| d.bg(color(tokens::PANEL))))
+                    .child(div().flex_none().size(px(8.)).bg(color(kind_color(b.kind))))
+                    .child(
+                        mono(tr!(
+                            "board.scene",
+                            n = format!("{:02}", i.saturating_add(1))
+                        ))
+                        .flex_none()
+                        .w(px(80.))
+                        .text_color(color(if playing == Some(id) {
+                            tokens::SIGNAL
+                        } else {
+                            tokens::FG
+                        })),
+                    )
+                    .child(
+                        mono(format!(
+                            "{} → {}",
+                            short_time(b.range.start(), rate),
+                            short_time(b.range.end(), rate)
+                        ))
+                        .flex_none()
+                        .w(px(110.))
+                        .text_size(px(11.))
+                        .text_color(color(tokens::MUTE)),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_size(px(12.))
+                            .text_color(color(tokens::FG2))
+                            .child(SharedString::from(if b.description.trim().is_empty() {
+                                board.text_of(b)
+                            } else {
+                                b.description.clone()
+                            })),
+                    )
+                    .children(tag.map(|(text, tone)| {
+                        div()
+                            .px(px(5.))
+                            .rounded(px(3.))
+                            .border_1()
+                            .border_color(color(tone))
+                            .text_size(px(11.))
+                            .text_color(color(tone))
+                            .child(text)
+                    }))
+                    .on_click(
+                        listeners.listener(move |shell, _: &ClickEvent, window, cx| {
+                            shell.retouches.clear();
+                            shell.select_block(Some(id), true, window, cx);
+                        }),
+                    ),
+            )
+            .into_any_element()
+    }
+
     /// Player, then the blocks to check.
     pub(super) fn retouch_screen(
         &mut self,
@@ -52,100 +144,21 @@ impl Shell {
                     .child(tr!("montage.no_board")),
             );
         };
-        let rate = board.project.settings().frame_rate;
         let playing = playing.and_then(|t| board.block_at(t));
-        let selected = board.selected;
-        let listeners: &Context<Self> = cx;
-        let mut ready = 0;
-        let rows: Vec<Div> = board
+        let ready = board
             .project
             .blocks()
             .iter()
-            .enumerate()
-            .map(|(i, b)| {
-                let state = self.block_state(b);
-                if matches!(state, BlockState::Ready | BlockState::Mounted) {
-                    ready += 1;
-                }
-                let id = b.id;
-                let chosen = selected == Some(id);
-                let tag = match &state {
-                    BlockState::NotAnimated => Some((tr!("montage.no_edit"), tokens::MUTE)),
-                    other => other.label().map(|l| (l, other.tone())),
-                };
-                div().child(
-                    div()
-                        .id(("retouch-row", i))
-                        .flex()
-                        .items_center()
-                        .gap(px(12.))
-                        .px(px(20.))
-                        .py(px(8.))
-                        .border_b_1()
-                        .border_color(color(tokens::LINE))
-                        .cursor_pointer()
-                        .when(chosen, |d| d.bg(color(tokens::RAISED)))
-                        .when(!chosen, |d| d.hover(|d| d.bg(color(tokens::PANEL))))
-                        .child(div().flex_none().size(px(8.)).bg(color(kind_color(b.kind))))
-                        .child(
-                            mono(tr!(
-                                "board.scene",
-                                n = format!("{:02}", i.saturating_add(1))
-                            ))
-                            .flex_none()
-                            .w(px(80.))
-                            .text_color(color(
-                                if playing == Some(id) {
-                                    tokens::SIGNAL
-                                } else {
-                                    tokens::FG
-                                },
-                            )),
-                        )
-                        .child(
-                            mono(format!(
-                                "{} → {}",
-                                short_time(b.range.start(), rate),
-                                short_time(b.range.end(), rate)
-                            ))
-                            .flex_none()
-                            .w(px(110.))
-                            .text_size(px(11.))
-                            .text_color(color(tokens::MUTE)),
-                        )
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w(px(0.))
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_size(px(12.))
-                                .text_color(color(tokens::FG2))
-                                .child(SharedString::from(if b.description.trim().is_empty() {
-                                    board.text_of(b)
-                                } else {
-                                    b.description.clone()
-                                })),
-                        )
-                        .children(tag.map(|(text, tone)| {
-                            div()
-                                .px(px(5.))
-                                .rounded(px(3.))
-                                .border_1()
-                                .border_color(color(tone))
-                                .text_size(px(11.))
-                                .text_color(color(tone))
-                                .child(text)
-                        }))
-                        .on_click(
-                            listeners.listener(move |shell, _: &ClickEvent, window, cx| {
-                                shell.retouches.clear();
-                                shell.select_block(Some(id), true, window, cx);
-                            }),
-                        ),
-                )
-            })
-            .collect();
+            .filter(|b| matches!(self.block_state(b), BlockState::Ready | BlockState::Mounted))
+            .count();
+        let count = board.project.blocks().len();
+        self.lists.playing = playing;
+        let rows = super::lazy::lazy_list(
+            &self.lists.retouch,
+            count,
+            |shell, i, _, cx| shell.retouch_row(i, cx),
+            cx,
+        );
         screen
             .child(
                 div()
@@ -184,11 +197,11 @@ impl Shell {
             )
             .child(
                 div()
-                    .id("retouch-list")
                     .flex_1()
                     .min_h(px(0.))
-                    .overflow_y_scroll()
-                    .children(rows),
+                    .flex()
+                    .flex_col()
+                    .child(rows.flex_1()),
             )
             .when_some(below, |d, panel| {
                 d.child(

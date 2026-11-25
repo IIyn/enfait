@@ -144,7 +144,7 @@ impl Shell {
         let analysed = self.cut.analysis.is_some() || !self.uses_cut();
         let (Some(transcript), true) = (self.cut.transcript.clone(), analysed) else {
             self.board_notice = Some(match &self.cut.status {
-                CutStatus::Transcribing => tr!("board.transcribing"),
+                CutStatus::Transcribing => self.cut.transcribing_label(),
                 CutStatus::Failed(e) => e.clone(),
                 _ => tr!("board.import_first"),
             });
@@ -519,48 +519,14 @@ impl Shell {
         let can_undo = board.history.undo_label();
         let can_redo = board.history.redo_label();
         let studio_bar = self.studio_toolbar(cx);
-        let states: Vec<super::studio::BlockState> = board
-            .project
-            .blocks()
-            .iter()
-            .map(|b| self.block_state(b))
-            .collect();
-        let listeners: &Context<Self> = cx;
-        let rows: Vec<Div> = board
-            .project
-            .blocks()
-            .iter()
-            .enumerate()
-            .map(|(i, block)| {
-                let id = block.id;
-                block_row(
-                    i,
-                    block,
-                    board,
-                    board.selected == Some(block.id),
-                    board.marked.len() > 1 && board.marked.contains(&block.id),
-                    playing == Some(block.id),
-                    rate,
-                    states.get(i),
-                    listeners,
-                )
-                .on_click(
-                    listeners.listener(move |shell, event: &ClickEvent, window, cx| {
-                        shell.click_block(id, event.modifiers(), window, cx);
-                    }),
-                )
-                .drag_over::<gpui_kit::ExternalPaths>(|style, _, _, _| {
-                    style.bg(color(tokens::HOVER))
-                })
-                .on_drop(listeners.listener(
-                    move |shell, paths: &gpui_kit::ExternalPaths, window, cx| {
-                        cx.stop_propagation();
-                        shell.drop_on_block(id, paths.paths(), window, cx);
-                    },
-                ))
-            })
-            .map(|row| div().child(row))
-            .collect();
+        let count = board.project.blocks().len();
+        self.lists.playing = playing;
+        let rows = super::lazy::lazy_list(
+            &self.lists.blocks,
+            count,
+            |shell, i, _, cx| shell.board_row(i, cx),
+            cx,
+        );
         div()
             .flex_1()
             .min_w(px(0.))
@@ -613,11 +579,11 @@ impl Shell {
             .child(studio_bar)
             .child(
                 div()
-                    .id("blocks")
                     .flex_1()
                     .min_h(px(0.))
-                    .overflow_y_scroll()
-                    .children(rows),
+                    .flex()
+                    .flex_col()
+                    .child(rows.flex_1()),
             )
             .when_some(below, |d, inspector| {
                 d.child(
@@ -627,6 +593,44 @@ impl Shell {
                         .border_color(color(tokens::LINE_STRONG)),
                 )
             })
+    }
+
+    /// Row `i` of the storyboard (built only while in view).
+    fn board_row(&mut self, i: usize, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let Some(board) = &self.board else {
+            return div().into_any_element();
+        };
+        let Some(block) = board.project.blocks().get(i) else {
+            return div().into_any_element();
+        };
+        let rate = board.project.settings().frame_rate;
+        let id = block.id;
+        let state = self.block_state(block);
+        let listeners: &Context<Self> = cx;
+        let row = block_row(
+            i,
+            block,
+            board,
+            board.selected == Some(id),
+            board.marked.len() > 1 && board.marked.contains(&id),
+            self.lists.playing == Some(id),
+            rate,
+            Some(&state),
+            listeners,
+        )
+        .on_click(
+            listeners.listener(move |shell, event: &ClickEvent, window, cx| {
+                shell.click_block(id, event.modifiers(), window, cx);
+            }),
+        )
+        .drag_over::<gpui_kit::ExternalPaths>(|style, _, _, _| style.bg(color(tokens::HOVER)))
+        .on_drop(listeners.listener(
+            move |shell, paths: &gpui_kit::ExternalPaths, window, cx| {
+                cx.stop_propagation();
+                shell.drop_on_block(id, paths.paths(), window, cx);
+            },
+        ));
+        div().child(row).into_any_element()
     }
 
     /// Inspector of the selected block: right panel (`side`) or strip under

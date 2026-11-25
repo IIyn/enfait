@@ -1,12 +1,21 @@
 //! Word-by-word transcription with whisper.cpp.
+//!
+//! Long media are cut into pieces of about [`CHUNK`] at a silence: each
+//! piece reports its progress and leaves a [`Partial`] that a later run
+//! can resume from.
 
 use crate::SpeechError;
 use crate::audio::Pcm;
 use enfait_core::{Flicks, TimeRange, Transcript, Word};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 use whisper_rs::{
     DtwMode, DtwModelPreset, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters,
 };
+
+/// Called with the share of the media done, from 0 to 1.
+pub type Progress = Arc<dyn Fn(f32) + Send + Sync>;
 
 pub struct TranscribeOptions<'a> {
     /// Language code (`fr`) or `None` for automatic detection.
@@ -17,7 +26,60 @@ pub struct TranscribeOptions<'a> {
     /// Take with retakes: each passage is transcribed without the previous
     /// text, so that whisper does not squash the repetitions.
     pub takes: bool,
+    pub progress: Option<Progress>,
+    /// Work left by an interrupted run: transcription goes on after it.
+    pub resume: Option<&'a Partial>,
+    /// Called after each piece with everything transcribed so far.
+    pub checkpoint: Option<&'a dyn Fn(&Partial)>,
 }
+
+impl Default for TranscribeOptions<'_> {
+    fn default() -> Self {
+        Self {
+            language: None,
+            prompt: None,
+            threads: 4,
+            takes: false,
+            progress: None,
+            resume: None,
+            checkpoint: None,
+        }
+    }
+}
+
+/// Transcription stopped after a piece: the words of `0..done` seconds.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Partial {
+    pub language: Option<String>,
+    /// Raw words, sorted by start.
+    pub words: Vec<Word>,
+    /// Seconds of media transcribed.
+    pub done: f64,
+}
+
+impl Partial {
+    /// `None` when the file is missing or unreadable.
+    pub fn load(path: &Path) -> Option<Self> {
+        let data = std::fs::read(path).ok()?;
+        serde_json::from_slice(&data).ok()
+    }
+
+    pub fn save(&self, path: &Path) -> std::io::Result<()> {
+        let json = serde_json::to_vec(self).map_err(std::io::Error::other)?;
+        // Written aside then renamed: a crash never leaves half a file.
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, json)?;
+        std::fs::rename(tmp, path)
+    }
+}
+
+/// Target length of a piece, in seconds.
+const CHUNK: f64 = 600.0;
+/// A piece ends at the longest silence this close to its target end.
+const CUT_WINDOW: f64 = 60.0;
+/// Beyond this length (seconds), greedy decoding instead of beam search:
+/// about twice faster, at a small cost in precision.
+const LONG_MEDIA: f64 = 1200.0;
 
 /// DTW preset deduced from the model name, for more precise word times.
 fn dtw_preset(model: &Path) -> Option<DtwModelPreset> {
@@ -71,41 +133,94 @@ pub fn transcribe(
     let ctx = WhisperContext::new_with_params(model, ctx_params)?;
     let mut state = ctx.create_state()?;
     let media_duration = pcm.duration()?;
+    let total = media_duration.as_secs_f64();
+    let greedy = total > LONG_MEDIA;
 
-    let mut language = None;
-    let mut words = run(&mut state, &pcm.samples, 0.0, options, &mut language)?;
-    if options.takes {
-        // whisper avoids repeating words within a window: the start of a
-        // retake can disappear. Spoken passages that nothing covers are
-        // transcribed again on their own.
-        let gaps = uncovered(&speech_regions(pcm), &words);
-        for (a, b) in gaps {
-            let start = (a - RESCUE_PAD).max(0.0);
-            let end = b + RESCUE_PAD;
-            let slice = sample_range(pcm, start, end);
-            let Some(samples) = pcm.samples.get(slice) else {
-                continue;
-            };
-            let found = run(&mut state, samples, start, options, &mut language)?;
-            // Only the words starting in the gap: the margin may take back a
-            // word already transcribed.
-            let found: Vec<Word> = found
-                .into_iter()
-                .filter(|w| {
-                    let t = w.range.start().as_secs_f64();
-                    t >= a - 0.15 && t < b + 0.05
-                })
+    let mut partial = options.resume.cloned().unwrap_or_default();
+    partial.done = partial.done.clamp(0.0, total);
+    if partial.done > 0.0 {
+        tracing::info!("transcription resumed at {:.0} s", partial.done);
+    }
+    let regions = if options.takes {
+        speech_regions(pcm)
+    } else {
+        Vec::new()
+    };
+    let report = |done: f64| {
+        if let Some(progress) = &options.progress {
+            #[allow(clippy::cast_possible_truncation)]
+            progress((done / total.max(f64::EPSILON)).clamp(0.0, 1.0) as f32);
+        }
+    };
+    report(partial.done);
+
+    for (a, b) in pieces(&regions, partial.done, total) {
+        let Some(samples) = pcm.samples.get(sample_range(pcm, a, b)) else {
+            continue;
+        };
+        let on_pct = options.progress.clone().map(|progress| {
+            Box::new(move |pct: i32| {
+                let done = a + (b - a) * f64::from(pct.clamp(0, 100)) / 100.0;
+                #[allow(clippy::cast_possible_truncation)]
+                progress((done / total.max(f64::EPSILON)).clamp(0.0, 1.0) as f32);
+            }) as Box<dyn FnMut(i32)>
+        });
+        let pass = Pass { greedy, on_pct };
+        let mut words = run(&mut state, samples, a, options, &mut partial.language, pass)?;
+        if options.takes {
+            // whisper avoids repeating words within a window: the start of a
+            // retake can disappear. Spoken passages that nothing covers are
+            // transcribed again on their own.
+            let local: Vec<(f64, f64)> = regions
+                .iter()
+                .filter(|(s, e)| *e > a && *s < b)
+                .map(|(s, e)| (s.max(a), e.min(b)))
                 .collect();
-            tracing::debug!(
-                "{} word(s) recovered between {a:.2} and {b:.2} s",
-                found.len()
-            );
-            words.extend(found);
+            for (ga, gb) in uncovered(&local, &words) {
+                let start = (ga - RESCUE_PAD).max(0.0);
+                let end = gb + RESCUE_PAD;
+                let Some(samples) = pcm.samples.get(sample_range(pcm, start, end)) else {
+                    continue;
+                };
+                let pass = Pass {
+                    greedy,
+                    on_pct: None,
+                };
+                let found = run(
+                    &mut state,
+                    samples,
+                    start,
+                    options,
+                    &mut partial.language,
+                    pass,
+                )?;
+                // Only the words starting in the gap: the margin may take back a
+                // word already transcribed.
+                let found: Vec<Word> = found
+                    .into_iter()
+                    .filter(|w| {
+                        let t = w.range.start().as_secs_f64();
+                        t >= ga - 0.15 && t < gb + 0.05
+                    })
+                    .collect();
+                tracing::debug!(
+                    "{} word(s) recovered between {ga:.2} and {gb:.2} s",
+                    found.len()
+                );
+                words.extend(found);
+            }
         }
         words.sort_by_key(|w| w.range.start());
+        partial.words.extend(words);
+        partial.done = b;
+        report(b);
+        if let Some(checkpoint) = options.checkpoint {
+            checkpoint(&partial);
+        }
     }
-    let words = tidy(words, media_duration)?;
-    let language = language.unwrap_or_else(|| "?".to_owned());
+    partial.words.sort_by_key(|w| w.range.start());
+    let words = tidy(partial.words, media_duration)?;
+    let language = partial.language.unwrap_or_else(|| "?".to_owned());
     if words.is_empty() {
         return Err(SpeechError::NoSpeech);
     }
@@ -114,6 +229,42 @@ pub fn transcribe(
         words,
         media_duration,
     })
+}
+
+/// Pieces `(start, end)` in seconds covering `from..total`, of about
+/// [`CHUNK`] each. Each one ends in the longest silence between `regions`
+/// near its target end, so that no word is cut in two.
+fn pieces(regions: &[(f64, f64)], from: f64, total: f64) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    let mut cursor = from;
+    while total - cursor > CHUNK * 1.5 {
+        let ideal = cursor + CHUNK;
+        let cut = regions
+            .windows(2)
+            .filter_map(|w| match w {
+                [(_, end), (next, _)] => Some((*end, *next)),
+                _ => None,
+            })
+            .filter(|(s, e)| {
+                let mid = (s + e) / 2.0;
+                (mid - ideal).abs() <= CUT_WINDOW
+            })
+            .max_by(|x, y| (x.1 - x.0).total_cmp(&(y.1 - y.0)))
+            .map_or(ideal, |(s, e)| (s + e) / 2.0);
+        out.push((cursor, cut));
+        cursor = cut;
+    }
+    if total > cursor {
+        out.push((cursor, total));
+    }
+    out
+}
+
+/// How one whisper pass decodes.
+struct Pass {
+    greedy: bool,
+    /// whisper's progress of the pass, in percent.
+    on_pct: Option<Box<dyn FnMut(i32)>>,
 }
 
 /// Margin around a passage transcribed on its own.
@@ -129,11 +280,19 @@ fn run(
     offset: f64,
     options: &TranscribeOptions<'_>,
     language: &mut Option<String>,
+    pass: Pass,
 ) -> Result<Vec<Word>, SpeechError> {
-    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
-        beam_size: 5,
-        patience: -1.0,
+    let mut params = FullParams::new(if pass.greedy {
+        SamplingStrategy::Greedy { best_of: 5 }
+    } else {
+        SamplingStrategy::BeamSearch {
+            beam_size: 5,
+            patience: -1.0,
+        }
     });
+    if let Some(on_pct) = pass.on_pct {
+        params.set_progress_callback_safe::<_, Box<dyn FnMut(i32)>>(Some(on_pct));
+    }
     params.set_n_threads(i32::from(options.threads.max(1)));
     params.set_language(Some(
         language.as_deref().or(options.language).unwrap_or("auto"),
@@ -346,5 +505,41 @@ mod tests {
         let regions = speech_regions(&Pcm { samples, rate });
         assert_eq!(regions.len(), 1, "{regions:?}");
         assert!((regions[0].0 - 1.0).abs() < 0.03 && (regions[0].1 - 3.1).abs() < 0.03);
+    }
+
+    #[test]
+    fn short_media_is_one_piece() {
+        assert_eq!(pieces(&[], 0.0, 120.0), vec![(0.0, 120.0)]);
+        assert!(pieces(&[], 120.0, 120.0).is_empty());
+    }
+
+    #[test]
+    fn long_media_is_cut_in_the_longest_nearby_silence() {
+        // Speech everywhere but two silences near 600 s: a short one at
+        // 590-591 s and a longer one at 620-623 s.
+        let regions = [(0.0, 590.0), (591.0, 620.0), (623.0, 2000.0)];
+        let p = pieces(&regions, 0.0, 2000.0);
+        assert_eq!(p[0], (0.0, 621.5));
+        assert_eq!(p[1].0, 621.5);
+        // Without a silence nearby: cut at the target.
+        assert_eq!(p[1].1, 1221.5);
+        assert_eq!(p.last().map(|x| x.1), Some(2000.0));
+        // Resuming starts from what is done.
+        assert_eq!(pieces(&regions, 1800.0, 2000.0), vec![(1800.0, 2000.0)]);
+    }
+
+    #[test]
+    fn partial_round_trips() {
+        let dir = std::env::temp_dir().join(format!("enfait-partial-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("p.json");
+        let p = Partial {
+            language: Some("fr".into()),
+            words: vec![word(1.0, 1.5)],
+            done: 600.0,
+        };
+        p.save(&path).unwrap();
+        assert_eq!(Partial::load(&path), Some(p));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

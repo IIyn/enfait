@@ -418,6 +418,7 @@ async fn transcribe(
             prompt: prompt.as_deref(),
             threads: u16::try_from(threads).unwrap_or(4),
             takes: false,
+            ..Default::default()
         };
         Ok(enfait_speech::transcribe(&model, &pcm, &options)?)
     })

@@ -5,6 +5,10 @@
 //! Retouch step once a block is ready. A badge on the step counts the
 //! blocks finished meanwhile.
 
+/// Up to this many blocks, the strip shows each one with its number and
+/// progress; beyond, it is painted in one pass.
+const STRIP_DETAIL: usize = 150;
+
 use super::studio::{BlockState, QUALITIES, chip, provider_hint, provider_name, quality_name};
 use super::{STEP_RETOUCH, STEP_STORYBOARD, Shell, label, mono};
 use crate::jobs::{Job, JobKind, JobStatus};
@@ -214,12 +218,22 @@ impl Shell {
             return;
         };
         let Some(board) = &self.board else { return };
+        // In timeline order, so that the limit keeps the first ones.
+        let chosen: Vec<BlockId> = board
+            .project
+            .blocks()
+            .iter()
+            .map(|b| b.id)
+            .filter(|id| dialog.blocks.contains(id))
+            .collect();
+        let chosen = self.limit_blocks(chosen, cx);
+        let Some(board) = &self.board else { return };
         let blocks = board.project.blocks();
         let transitions: Vec<BlockId> = if dialog.transitions {
             blocks
                 .iter()
                 .take(blocks.len().saturating_sub(1))
-                .filter(|b| b.transition_after != Transition::Cut && dialog.blocks.contains(&b.id))
+                .filter(|b| b.transition_after != Transition::Cut && chosen.contains(&b.id))
                 .map(|b| b.id)
                 .collect()
         } else {
@@ -227,14 +241,14 @@ impl Shell {
         };
         self.session.data.quality = dialog.quality;
         self.session.save_data();
-        for id in &dialog.blocks {
+        for id in &chosen {
             self.enqueue(*id, JobKind::Create, cx);
         }
         for id in transitions {
             self.enqueue(id, JobKind::Transition, cx);
         }
-        if !dialog.blocks.is_empty() {
-            self.toast(tr!("montage.sent", count = dialog.blocks.len()));
+        if !chosen.is_empty() {
+            self.toast(tr!("montage.sent", count = chosen.len()));
         }
         cx.notify();
     }
@@ -485,6 +499,209 @@ impl Shell {
 
     /// The Montage screen.
     #[allow(clippy::too_many_lines)]
+    /// Row of block `i` and of its transition on the montage screen (built
+    /// only while in view).
+    fn montage_row(&mut self, i: usize, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let Some(board) = &self.board else {
+            return div().into_any_element();
+        };
+        let blocks = board.project.blocks();
+        let Some(b) = blocks.get(i) else {
+            return div().into_any_element();
+        };
+        let selected = board.selected;
+        let listeners: &Context<Self> = cx;
+        let mut rows: Vec<gpui_kit::AnyElement> = Vec::new();
+        let id = b.id;
+        let state = self.block_state(b);
+        let text = if b.description.trim().is_empty() {
+            board.text_of(b)
+        } else {
+            b.description.clone()
+        };
+        let (dot, action): (crate::theme::Token, Option<gpui_kit::AnyElement>) = match &state {
+            BlockState::Ready | BlockState::Mounted => (
+                tokens::SIGNAL,
+                Some(
+                    div()
+                        .id(("check", i))
+                        .cursor_pointer()
+                        .text_size(px(12.))
+                        .text_color(color(tokens::SIGNAL))
+                        .hover(|d| d.underline())
+                        .child(tr!("montage.check"))
+                        .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                            shell.check_block(id, cx);
+                        }))
+                        .into_any_element(),
+                ),
+            ),
+            BlockState::Running => (
+                tokens::MIXED,
+                Some(small_tag(tr!("studio.state.running")).into_any_element()),
+            ),
+            BlockState::Queued => (
+                tokens::FG2,
+                Some(small_tag(tr!("studio.state.queued")).into_any_element()),
+            ),
+            BlockState::Failed(e) => (
+                tokens::ERROR,
+                Some(
+                    div()
+                        .id(("retry", i))
+                        .cursor_pointer()
+                        .text_size(px(12.))
+                        .text_color(color(tokens::ERROR))
+                        .hover(|d| d.underline())
+                        .child(tr!("montage.retry"))
+                        .tooltip({
+                            let e = SharedString::from(e.clone());
+                            move |window, cx| {
+                                gpui_kit::component::tooltip::Tooltip::new(e.clone())
+                                    .build(window, cx)
+                            }
+                        })
+                        .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                            if let Some(board) = &mut shell.board {
+                                board.select(Some(id));
+                            }
+                            shell.open_care(cx);
+                        }))
+                        .into_any_element(),
+                ),
+            ),
+            BlockState::ToGenerate => (
+                tokens::LINE_STRONG,
+                Some(
+                    div()
+                        .id(("send", i))
+                        .cursor_pointer()
+                        .text_size(px(12.))
+                        .text_color(color(tokens::FG2))
+                        .hover(|d| d.underline())
+                        .child(tr!("montage.send_one"))
+                        .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                            if let Some(board) = &mut shell.board {
+                                board.select(Some(id));
+                            }
+                            shell.open_care(cx);
+                        }))
+                        .into_any_element(),
+                ),
+            ),
+            BlockState::NotAnimated => (
+                tokens::RUSH,
+                Some(small_tag(tr!("montage.no_edit")).into_any_element()),
+            ),
+            BlockState::NeedsBroll | BlockState::Mounting => (
+                tokens::FG2,
+                state.label().map(|l| small_tag(l).into_any_element()),
+            ),
+        };
+        let chosen = selected == Some(id);
+        rows.push(
+            div()
+                .id(("montage-row", i))
+                .flex()
+                .items_center()
+                .gap(px(12.))
+                .px(px(14.))
+                .py(px(10.))
+                .rounded(px(3.))
+                .bg(color(if chosen {
+                    tokens::RAISED
+                } else {
+                    tokens::PANEL
+                }))
+                .border_1()
+                .border_color(color(if chosen {
+                    tokens::LINE_STRONG
+                } else {
+                    tokens::LINE
+                }))
+                .child(
+                    div()
+                        .flex_none()
+                        .size(px(8.))
+                        .rounded(px(4.))
+                        .bg(color(dot)),
+                )
+                .child(
+                    div()
+                        .flex_none()
+                        .w(px(60.))
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(tr!("montage.block", n = i.saturating_add(1))),
+                )
+                .child(
+                    mono(span(
+                        b.range.start().as_secs_f64(),
+                        b.range.end().as_secs_f64(),
+                    ))
+                    .flex_none()
+                    .w(px(100.))
+                    .text_size(px(11.))
+                    .text_color(color(tokens::MUTE)),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.))
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_size(px(12.))
+                        .text_color(color(tokens::FG2))
+                        .child(SharedString::from(text)),
+                )
+                .children(action)
+                .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
+                    if let Some(board) = &mut shell.board {
+                        board.select(Some(id));
+                    }
+                    cx.notify();
+                }))
+                .into_any_element(),
+        );
+        let last = i.saturating_add(1) == blocks.len();
+        if !last && let Some(t) = self.transition_state(id, &b.transition_after) {
+            let end = b.range.end().as_secs_f64();
+            rows.push(
+                div()
+                    .ml(px(18.))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .px(px(14.))
+                    .py(px(6.))
+                    .rounded(px(3.))
+                    .bg(color(tokens::PANEL))
+                    .border_1()
+                    .border_color(color(tokens::LINE))
+                    .child(div().size(px(6.)).rounded(px(3.)).bg(color(t.tone())))
+                    .child(div().text_size(px(12.)).child(tr!(
+                        "montage.transition",
+                        from = i.saturating_add(1),
+                        to = i.saturating_add(2)
+                    )))
+                    .child(
+                        mono(span(end - 0.4, end + 0.6))
+                            .flex_1()
+                            .text_size(px(11.))
+                            .text_color(color(tokens::MUTE)),
+                    )
+                    .children(t.label().map(small_tag))
+                    .into_any_element(),
+            );
+        }
+        div()
+            .pb(px(6.))
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .children(rows)
+            .into_any_element()
+    }
+
     pub(super) fn montage_screen(&mut self, cx: &mut Context<Self>) -> Div {
         let screen = div().flex_1().min_w(px(0.)).flex().flex_col();
         let Some(board) = &self.board else {
@@ -519,7 +736,7 @@ impl Shell {
 
         // Strip of the blocks, the one being edited fills up.
         #[allow(clippy::cast_possible_truncation)]
-        let strip = blocks.iter().enumerate().map(|(i, b)| {
+        let detailed = blocks.iter().enumerate().map(|(i, b)| {
             let id = b.id;
             let state = states.get(i).cloned().unwrap_or(BlockState::NotAnimated);
             let progress = running
@@ -571,6 +788,41 @@ impl Shell {
                     cx.notify();
                 }))
         });
+        let strip = if blocks.len() <= STRIP_DETAIL {
+            div()
+                .size_full()
+                .flex()
+                .children(detailed)
+                .into_any_element()
+        } else {
+            let marks = blocks
+                .iter()
+                .zip(&states)
+                .map(|(b, state)| super::lazy::Mark {
+                    start: (b.range.start().as_secs_f64() / total) as f32,
+                    width: (b.range.duration().as_secs_f64() / total) as f32,
+                    tone: match state {
+                        BlockState::Ready | BlockState::Mounted => tokens::SIGNAL,
+                        BlockState::Failed(_) => tokens::ERROR,
+                        BlockState::Queued | BlockState::Running => tokens::MIXED,
+                        BlockState::NotAnimated => tokens::RUSH,
+                        _ => tokens::LINE_STRONG,
+                    },
+                })
+                .collect();
+            let shell = cx.entity().downgrade();
+            super::lazy::painted_track(marks, 0.7, 1.0, move |share, _, cx| {
+                let _ = shell.update(cx, |shell, cx| {
+                    if let Some(board) = &mut shell.board {
+                        let t = f64::from(share) * board.project.duration().as_secs_f64();
+                        let id = board.block_at(t);
+                        board.select(id);
+                    }
+                    cx.notify();
+                });
+            })
+            .into_any_element()
+        };
 
         let selected = board.selected;
         let current = running
@@ -726,191 +978,12 @@ impl Shell {
             );
 
         // List of the blocks and their transitions.
-        let listeners: &Context<Self> = cx;
-        let mut rows: Vec<gpui_kit::AnyElement> = Vec::new();
-        for (i, b) in blocks.iter().enumerate() {
-            let id = b.id;
-            let state = states.get(i).cloned().unwrap_or(BlockState::NotAnimated);
-            let text = if b.description.trim().is_empty() {
-                board.text_of(b)
-            } else {
-                b.description.clone()
-            };
-            let (dot, action): (crate::theme::Token, Option<gpui_kit::AnyElement>) = match &state {
-                BlockState::Ready | BlockState::Mounted => (
-                    tokens::SIGNAL,
-                    Some(
-                        div()
-                            .id(("check", i))
-                            .cursor_pointer()
-                            .text_size(px(12.))
-                            .text_color(color(tokens::SIGNAL))
-                            .hover(|d| d.underline())
-                            .child(tr!("montage.check"))
-                            .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
-                                shell.check_block(id, cx);
-                            }))
-                            .into_any_element(),
-                    ),
-                ),
-                BlockState::Running => (
-                    tokens::MIXED,
-                    Some(small_tag(tr!("studio.state.running")).into_any_element()),
-                ),
-                BlockState::Queued => (
-                    tokens::FG2,
-                    Some(small_tag(tr!("studio.state.queued")).into_any_element()),
-                ),
-                BlockState::Failed(e) => (
-                    tokens::ERROR,
-                    Some(
-                        div()
-                            .id(("retry", i))
-                            .cursor_pointer()
-                            .text_size(px(12.))
-                            .text_color(color(tokens::ERROR))
-                            .hover(|d| d.underline())
-                            .child(tr!("montage.retry"))
-                            .tooltip({
-                                let e = SharedString::from(e.clone());
-                                move |window, cx| {
-                                    gpui_kit::component::tooltip::Tooltip::new(e.clone())
-                                        .build(window, cx)
-                                }
-                            })
-                            .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
-                                if let Some(board) = &mut shell.board {
-                                    board.select(Some(id));
-                                }
-                                shell.open_care(cx);
-                            }))
-                            .into_any_element(),
-                    ),
-                ),
-                BlockState::ToGenerate => (
-                    tokens::LINE_STRONG,
-                    Some(
-                        div()
-                            .id(("send", i))
-                            .cursor_pointer()
-                            .text_size(px(12.))
-                            .text_color(color(tokens::FG2))
-                            .hover(|d| d.underline())
-                            .child(tr!("montage.send_one"))
-                            .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
-                                if let Some(board) = &mut shell.board {
-                                    board.select(Some(id));
-                                }
-                                shell.open_care(cx);
-                            }))
-                            .into_any_element(),
-                    ),
-                ),
-                BlockState::NotAnimated => (
-                    tokens::RUSH,
-                    Some(small_tag(tr!("montage.no_edit")).into_any_element()),
-                ),
-                BlockState::NeedsBroll | BlockState::Mounting => (
-                    tokens::FG2,
-                    state.label().map(|l| small_tag(l).into_any_element()),
-                ),
-            };
-            let chosen = selected == Some(id);
-            rows.push(
-                div()
-                    .id(("montage-row", i))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .px(px(14.))
-                    .py(px(10.))
-                    .rounded(px(3.))
-                    .bg(color(if chosen {
-                        tokens::RAISED
-                    } else {
-                        tokens::PANEL
-                    }))
-                    .border_1()
-                    .border_color(color(if chosen {
-                        tokens::LINE_STRONG
-                    } else {
-                        tokens::LINE
-                    }))
-                    .child(
-                        div()
-                            .flex_none()
-                            .size(px(8.))
-                            .rounded(px(4.))
-                            .bg(color(dot)),
-                    )
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(60.))
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(tr!("montage.block", n = i.saturating_add(1))),
-                    )
-                    .child(
-                        mono(span(
-                            b.range.start().as_secs_f64(),
-                            b.range.end().as_secs_f64(),
-                        ))
-                        .flex_none()
-                        .w(px(100.))
-                        .text_size(px(11.))
-                        .text_color(color(tokens::MUTE)),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_size(px(12.))
-                            .text_color(color(tokens::FG2))
-                            .child(SharedString::from(text)),
-                    )
-                    .children(action)
-                    .on_click(listeners.listener(move |shell, _: &ClickEvent, _, cx| {
-                        if let Some(board) = &mut shell.board {
-                            board.select(Some(id));
-                        }
-                        cx.notify();
-                    }))
-                    .into_any_element(),
-            );
-            let last = i.saturating_add(1) == blocks.len();
-            if !last && let Some(t) = self.transition_state(id, &b.transition_after) {
-                let end = b.range.end().as_secs_f64();
-                rows.push(
-                    div()
-                        .ml(px(18.))
-                        .flex()
-                        .items_center()
-                        .gap(px(12.))
-                        .px(px(14.))
-                        .py(px(6.))
-                        .rounded(px(3.))
-                        .bg(color(tokens::PANEL))
-                        .border_1()
-                        .border_color(color(tokens::LINE))
-                        .child(div().size(px(6.)).rounded(px(3.)).bg(color(t.tone())))
-                        .child(div().text_size(px(12.)).child(tr!(
-                            "montage.transition",
-                            from = i.saturating_add(1),
-                            to = i.saturating_add(2)
-                        )))
-                        .child(
-                            mono(span(end - 0.4, end + 0.6))
-                                .flex_1()
-                                .text_size(px(11.))
-                                .text_color(color(tokens::MUTE)),
-                        )
-                        .children(t.label().map(small_tag))
-                        .into_any_element(),
-                );
-            }
-        }
+        let rows = super::lazy::lazy_list(
+            &self.lists.montage,
+            blocks.len(),
+            |shell, i, _, cx| shell.montage_row(i, cx),
+            cx,
+        );
 
         let legend = |tone: crate::theme::Token, text: SharedString| {
             div()
@@ -1011,7 +1084,7 @@ impl Shell {
                             .flex()
                             .rounded(px(2.))
                             .overflow_hidden()
-                            .children(strip),
+                            .child(strip),
                     ),
             )
             .child(
@@ -1046,14 +1119,11 @@ impl Shell {
                             )
                             .child(
                                 div()
-                                    .id("montage-list")
                                     .flex_1()
                                     .min_h(px(0.))
-                                    .overflow_y_scroll()
                                     .flex()
                                     .flex_col()
-                                    .gap(px(6.))
-                                    .children(rows),
+                                    .child(rows.flex_1()),
                             ),
                     ),
             )

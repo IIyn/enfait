@@ -32,9 +32,12 @@ _version: 2
 "cut.title":
   en: "Cut"
   fr: "Découpe"
-"cut.transcribing":
-  en: "Transcribing the take… (one to two minutes for ten minutes of sound)"
-  fr: "Transcription de la prise… (une à deux minutes pour dix minutes de son)"
+"cut.transcribing_left":
+  en: "Transcribing the take… %{pct} % · about %{minutes} min left"
+  fr: "Transcription de la prise… %{pct} % · environ %{minutes} min restantes"
+"cut.transcribing_pct":
+  en: "Transcribing the take… %{pct} %"
+  fr: "Transcription de la prise… %{pct} %"
 "cut.transcription_failed":
   en: "Transcription failed: %{error}"
   fr: "Transcription impossible : %{error}"

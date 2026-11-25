@@ -71,9 +71,6 @@ _version: 2
 "board.title":
   en: "Storyboard"
   fr: "Storyboard"
-"board.transcribing":
-  en: "Transcribing the take…"
-  fr: "Transcription de la prise en cours…"
 "board.transition.auto":
   en: "Auto"
   fr: "Auto"

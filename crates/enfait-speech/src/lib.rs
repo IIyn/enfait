@@ -16,7 +16,7 @@ pub const MODEL_FILE: &str = "ggml-large-v3-turbo-q5_0.bin";
 pub const MODEL_URL: &str =
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin";
 pub use segment::{SegmentParams, segment};
-pub use transcribe::{TranscribeOptions, transcribe};
+pub use transcribe::{Partial, Progress, TranscribeOptions, transcribe};
 
 #[derive(Debug, thiserror::Error)]
 pub enum SpeechError {
