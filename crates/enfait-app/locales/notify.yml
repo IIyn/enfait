@@ -20,3 +20,6 @@ _version: 2
 "notify.written":
   en: "Storyboard written."
   fr: "Storyboard écrit."
+"notify.thumbnail":
+  en: "YouTube thumbnail ready."
+  fr: "Miniature YouTube prête."

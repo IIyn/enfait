@@ -62,6 +62,20 @@ pub struct SessionData {
     pub quality: enfait_ai::Quality,
     /// Model provider (API, Claude Code, local model).
     pub provider: enfait_ai::ProviderChoice,
+    /// Publishing on YouTube: title, description, chosen thumbnail.
+    pub youtube: Youtube,
+}
+
+/// What the author says about the published video, for its thumbnail.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Youtube {
+    /// Title of the video, as published.
+    pub title: String,
+    /// Description and wishes for the thumbnail.
+    pub notes: String,
+    /// Thumbnail proposal validated by the author.
+    pub accepted: Option<u32>,
 }
 
 impl Default for SessionData {
@@ -78,6 +92,7 @@ impl Default for SessionData {
             choices: BTreeMap::new(),
             quality: enfait_ai::Quality::default(),
             provider: enfait_ai::ProviderChoice::default(),
+            youtube: Youtube::default(),
         }
     }
 }

@@ -18,7 +18,9 @@ pub mod magic;
 pub mod mix;
 pub mod premiere;
 pub mod preview;
+pub mod psd;
 pub mod session;
+pub mod thumbnail;
 pub mod userlib;
 
 use anyhow::{Context as _, Result};

@@ -95,3 +95,33 @@ _version: 2
 "worker.what_transition":
   en: "Transition %{from}→%{to}"
   fr: "Transition %{from}→%{to}"
+"worker.thumb_cutout":
+  en: "cutting the person out…"
+  fr: "détourage de la personne…"
+"worker.thumb_designing":
+  en: "the model designs the thumbnail…"
+  fr: "le modèle conçoit la miniature…"
+"worker.thumb_exporting":
+  en: "writing the picture…"
+  fr: "écriture de l'image…"
+"worker.thumb_fixing":
+  en: "the page had errors, the model fixes it…"
+  fr: "la page avait des erreurs, le modèle la corrige…"
+"worker.thumb_image_done":
+  en: "Thumbnail written (%{kb} KB, under the 2 MB YouTube accepts)."
+  fr: "Miniature écrite (%{kb} Ko, sous les 2 Mo acceptés par YouTube)."
+"worker.thumb_layers":
+  en: "rendering the layers…"
+  fr: "rendu des calques…"
+"worker.thumb_psd_done":
+  en: "Photoshop file written: %{count} layers."
+  fr: "Fichier Photoshop écrit : %{count} calques."
+"worker.thumb_rendering":
+  en: "rendering…"
+  fr: "rendu…"
+"worker.thumb_starting":
+  en: "starting…"
+  fr: "démarrage…"
+"worker.thumb_stills":
+  en: "frames of the video…"
+  fr: "images de la vidéo…"

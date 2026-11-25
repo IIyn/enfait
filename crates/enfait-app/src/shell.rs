@@ -249,6 +249,10 @@ pub struct Shell {
     finish_notice: Option<SharedString>,
     /// Export: keep the sound effects.
     export_sfx: bool,
+    /// YouTube thumbnail: title and description of the video, panel state.
+    yt_title: Entity<InputState>,
+    yt_notes: Entity<TextareaState>,
+    thumb: finish::ThumbUi,
     /// Bridge with agents (files changed by the MCP server).
     watch: bridge::Watch,
     /// Left column opened over the content (narrow window).
@@ -430,6 +434,17 @@ impl Shell {
         subscriptions.extend(knob_subscriptions);
         let retouch =
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("board.retouch_placeholder")));
+        let youtube = session.data.youtube.clone();
+        let yt_title = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder(tr!("finish.thumb.title_placeholder"))
+                .default_value(youtube.title)
+        });
+        let yt_notes = cx.new(|cx| {
+            TextareaState::new(window, cx)
+                .placeholder(tr!("finish.thumb.notes_placeholder"))
+                .default_value(youtube.notes)
+        });
         // Not bound to the window: the shell survives it when enfait keeps
         // running in the tray.
         subscriptions.push(cx.subscribe(
@@ -441,6 +456,34 @@ impl Shell {
                 }
             },
         ));
+        // YouTube fields: saved when leaving them; the buttons follow the
+        // title as it is typed.
+        for subscription in [
+            cx.subscribe(
+                &yt_title,
+                |shell: &mut Self, _, event: &InputEvent, cx| match event {
+                    InputEvent::Blur | InputEvent::PressEnter { .. } => shell.commit_youtube(cx),
+                    InputEvent::Change => cx.notify(),
+                    _ => {}
+                },
+            ),
+            cx.subscribe(
+                &yt_notes,
+                |shell: &mut Self, state, event: &InputEvent, cx| match event {
+                    InputEvent::Blur => shell.commit_youtube(cx),
+                    InputEvent::Change => {
+                        let (text, cursor) = {
+                            let s = state.read(cx);
+                            (s.value().to_string(), s.cursor())
+                        };
+                        shell.update_mention(mention::Field::Thumbnail, &text, cursor, cx);
+                    }
+                    _ => {}
+                },
+            ),
+        ] {
+            subscriptions.push(subscription);
+        }
         let (mut settings, settings_subscriptions) = settings::SettingsUi::new(window, cx);
         settings.open_from_env();
         subscriptions.extend(settings_subscriptions);
@@ -501,6 +544,9 @@ impl Shell {
             audition: None,
             finish_notice: None,
             export_sfx: true,
+            yt_title,
+            yt_notes,
+            thumb: finish::ThumbUi::default(),
             watch: bridge::Watch::default(),
             sidebar_open: false,
             panels: None,
@@ -528,6 +574,7 @@ impl Shell {
             relocalize: false,
             _subscriptions: subscriptions,
         };
+        shell.reload_thumbnails();
         match media {
             // `enfait <file>`: a new project on that take.
             Some(path) => shell.create_from_file(path, cx),
@@ -567,6 +614,7 @@ impl Shell {
             (&self.search_input, tr!("assets.search_placeholder")),
             (&self.retouch, tr!("board.retouch_placeholder")),
             (&self.style_name, tr!("side.style_name_placeholder")),
+            (&self.yt_title, tr!("finish.thumb.title_placeholder")),
         ];
         for (input, text) in inputs {
             input.update(cx, |s, cx| s.set_placeholder(text, window, cx));
@@ -575,6 +623,7 @@ impl Shell {
             (&self.script, tr!("voice.script_placeholder")),
             (&self.description, tr!("board.description_placeholder")),
             (&self.style_rules, tr!("side.rules_placeholder")),
+            (&self.yt_notes, tr!("finish.thumb.notes_placeholder")),
         ];
         for (area, text) in areas {
             area.update(cx, |s, cx| s.set_placeholder(text, window, cx));
@@ -723,6 +772,13 @@ impl Shell {
         self.reload_look_inputs(window, cx);
         self.sync_knobs(window, cx);
         self.sync_inputs(window, cx);
+        let youtube = self.session.data.youtube.clone();
+        self.yt_title
+            .update(cx, |s, cx| s.set_value(youtube.title, window, cx));
+        self.yt_notes
+            .update(cx, |s, cx| s.set_value(youtube.notes, window, cx));
+        self.thumb = finish::ThumbUi::default();
+        self.reload_thumbnails();
     }
 
     /// Style rules and effect sliders from the look.

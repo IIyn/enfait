@@ -268,6 +268,10 @@ impl Shell {
                 }
                 crate::worker::Event::Export(_) => continue,
                 crate::worker::Event::Written { error: None } => tr!("notify.written"),
+                crate::worker::Event::Thumbnail { error: None } => tr!("notify.thumbnail"),
+                crate::worker::Event::Thumbnail { error: Some(e) } => {
+                    tr!("finish.thumb.failed", error = e)
+                }
                 crate::worker::Event::Written { error: Some(e) } => {
                     tr!("magic.board_failed", error = e)
                 }

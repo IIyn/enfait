@@ -6,7 +6,8 @@
 //!   [`Provider`];
 //! - [`editor`]: the "editor" pass (storyboard written by the model);
 //! - [`direction`]: the "director" pass;
-//! - [`animate`]: the animators (creation, fix, critique).
+//! - [`animate`]: the animators (creation, fix, critique);
+//! - [`thumbnail`]: the YouTube thumbnail designer.
 
 pub mod animate;
 pub mod anthropic;
@@ -20,6 +21,7 @@ pub mod provider;
 pub mod quality;
 pub mod styles;
 mod text;
+pub mod thumbnail;
 
 pub use llm::{AiError, Effort, Part, Reply, Request, Usage};
 pub use provider::{Provider, ProviderChoice};

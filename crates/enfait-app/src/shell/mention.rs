@@ -6,8 +6,12 @@ use super::{Shell, mono};
 use crate::theme::{color, tokens};
 use crate::tr;
 use enfait_core::{AssetKind, BlockId, Edit};
+use gpui_kit::component::input::{Textarea, TextareaState};
 use gpui_kit::prelude::*;
-use gpui_kit::{ClickEvent, Context, Div, PathPromptOptions, SharedString, Window, div, px};
+use gpui_kit::{
+    ClickEvent, Context, Div, Entity, PathPromptOptions, Pixels, SharedString, Stateful, Window,
+    anchored, deferred, div, px,
+};
 use std::path::PathBuf;
 
 /// Suggestions shown at most.
@@ -20,6 +24,43 @@ pub(super) enum Field {
     Description,
     /// Rules of the global style.
     Style,
+    /// Description and wishes for the YouTube thumbnail.
+    Thumbnail,
+}
+
+/// A text field for the models where library files are named with `@`:
+/// the storyboard description, the thumbnail wishes.
+pub(super) struct PromptField<'a> {
+    pub field: Field,
+    pub area: &'a Entity<TextareaState>,
+    /// Its current text (for the files named).
+    pub text: &'a str,
+    pub height: Pixels,
+    /// Width of the list of files floating under the field.
+    pub suggestions_width: Pixels,
+    pub hint: SharedString,
+}
+
+/// The "+" button adding files to the library and naming them in a field.
+pub(super) fn add_files_button(id: &'static str) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .size(px(22.))
+        .rounded(px(3.))
+        .border_1()
+        .border_color(color(tokens::LINE_STRONG))
+        .text_size(px(15.))
+        .text_color(color(tokens::FG))
+        .cursor_pointer()
+        .hover(|d| d.bg(color(tokens::HOVER)))
+        .child("+")
+        .tooltip(|window, cx| {
+            gpui_kit::component::tooltip::Tooltip::new(tr!("board.add_files")).build(window, cx)
+        })
 }
 
 /// A mention being typed.
@@ -82,7 +123,7 @@ impl Shell {
         // With an empty library, the description still opens the list: it
         // says how to add files.
         let found = typed_mention(text, cursor)
-            .filter(|_| field == Field::Description || !self.session.look.assets.is_empty());
+            .filter(|_| field != Field::Style || !self.session.look.assets.is_empty());
         let next = found.map(|(start, query)| Mention {
             field,
             start,
@@ -129,7 +170,11 @@ impl Shell {
                 suggestion_box()
                     .px(px(8.))
                     .text_color(color(tokens::FG2))
-                    .child(tr!("board.mention_empty")),
+                    .child(if field == Field::Thumbnail {
+                        tr!("finish.thumb.mention_empty")
+                    } else {
+                        tr!("board.mention_empty")
+                    }),
             );
         }
         let rows = matches
@@ -190,8 +235,127 @@ impl Shell {
                 s.replace(text, window, cx);
                 s.focus(window, cx);
             }),
+            Field::Thumbnail => self.yt_notes.update(cx, |s, cx| {
+                s.set_selected_range(range, cx);
+                s.replace(text, window, cx);
+                s.focus(window, cx);
+            }),
         }
         cx.notify();
+    }
+
+    /// A prompt field: the text area (`decorate` applies to its frame), the
+    /// files typed after `@` floating under it, an optional `grip` under
+    /// it, the files named, and a hint.
+    pub(super) fn prompt_field(
+        &self,
+        prompt: PromptField<'_>,
+        decorate: impl FnOnce(Div) -> Div,
+        grip: Option<Div>,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let suggestions = self.mention_suggestions(prompt.field, cx);
+        let mentioned = self.mentioned_files(prompt.text);
+        let width = prompt.suggestions_width;
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .child(
+                        decorate(div().relative().h(prompt.height))
+                            .child(Textarea::new(prompt.area).h_full())
+                            .when_some(suggestions, |d, s| {
+                                d.child(
+                                    div().absolute().left_0().top_full().mt(px(2.)).child(
+                                        deferred(
+                                            anchored()
+                                                .snap_to_window_with_margin(px(8.))
+                                                .child(s.w(width)),
+                                        )
+                                        .with_priority(1),
+                                    ),
+                                )
+                            }),
+                    )
+                    .when_some(grip, |d, g| d.child(g)),
+            )
+            .when(!mentioned.is_empty(), |d| {
+                d.child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap(px(4.))
+                        .text_size(px(11.))
+                        .text_color(color(tokens::FG2))
+                        .child(tr!("board.mentioned"))
+                        .children(mentioned.into_iter().map(|name| {
+                            mono(format!("@{name}"))
+                                .px(px(4.))
+                                .rounded(px(2.))
+                                .bg(color(tokens::RAISED))
+                                .text_color(color(tokens::SIGNAL))
+                        })),
+                )
+            })
+            .child(
+                div()
+                    .text_size(px(11.))
+                    .text_color(color(tokens::MUTE))
+                    .child(prompt.hint),
+            )
+    }
+
+    /// Files added to the library from the thumbnail field (dropped or
+    /// picked with +): named at the end of the wishes.
+    pub(super) fn add_to_thumbnail(
+        &mut self,
+        paths: &[PathBuf],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.commit_youtube(cx);
+        let files = self.import_paths(paths, cx);
+        if files.is_empty() {
+            return;
+        }
+        let mut notes = self.session.data.youtube.notes.trim_end().to_owned();
+        for file in files {
+            if !notes.is_empty() {
+                notes.push(' ');
+            }
+            notes.push('@');
+            notes.push_str(&file);
+        }
+        notes.push(' ');
+        self.yt_notes.update(cx, |s, cx| {
+            s.set_value(notes, window, cx);
+            s.focus(window, cx);
+        });
+        self.commit_youtube(cx);
+        cx.notify();
+    }
+
+    /// "+" of the thumbnail field.
+    pub(super) fn pick_for_thumbnail(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.mention = None;
+        let paths = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some(tr!("side.add_to_library")),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = paths.await {
+                let _ = this.update_in(cx, |shell, window, cx| {
+                    shell.add_to_thumbnail(&paths, window, cx);
+                });
+            }
+        })
+        .detach();
     }
 
     /// Library files named in a text (`@file`).

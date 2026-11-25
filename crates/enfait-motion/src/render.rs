@@ -124,6 +124,18 @@ impl Renderer {
         width: u32,
         height: u32,
     ) -> Result<OpenStage, MotionError> {
+        self.open_scaled(html, width, height, 1.0).await
+    }
+
+    /// Like [`Renderer::open`], with `scale` device pixels per CSS pixel:
+    /// the captures measure `width × scale` by `height × scale`.
+    pub async fn open_scaled(
+        &self,
+        html: &Path,
+        width: u32,
+        height: u32,
+        scale: f64,
+    ) -> Result<OpenStage, MotionError> {
         let html = std::path::absolute(html)?;
         let url = file_url(&html)?;
         let mut target = CreateTargetParams::new("about:blank");
@@ -132,7 +144,11 @@ impl Renderer {
         page.execute(SetDeviceMetricsOverrideParams::new(
             i64::from(width),
             i64::from(height),
-            1.0,
+            if scale.is_finite() && scale > 0.0 {
+                scale
+            } else {
+                1.0
+            },
             false,
         ))
         .await?;
@@ -257,12 +273,28 @@ impl OpenStage {
     /// Captures the current frame as JPEG quality 95: the PNG of a textured
     /// frame (grain, noise) costs up to 400 ms of compression.
     pub async fn capture_jpeg(&self) -> Result<Vec<u8>, MotionError> {
+        self.capture(
+            HeadlessScreenshot::builder()
+                .format(ScreenshotParamsFormat::Jpeg)
+                .quality(95)
+                .build(),
+        )
+        .await
+    }
+
+    /// Captures the current frame as PNG (lossless: stills, layers).
+    pub async fn capture_png(&self) -> Result<Vec<u8>, MotionError> {
+        self.capture(
+            HeadlessScreenshot::builder()
+                .format(ScreenshotParamsFormat::Png)
+                .build(),
+        )
+        .await
+    }
+
+    async fn capture(&self, screenshot: HeadlessScreenshot) -> Result<Vec<u8>, MotionError> {
         // "Frame control" mode: we trigger the frame ourselves and the capture
         // comes out directly, without waiting for Chromium's pace.
-        let screenshot = HeadlessScreenshot::builder()
-            .format(ScreenshotParamsFormat::Jpeg)
-            .quality(95)
-            .build();
         for _ in 0..3 {
             let frame = self
                 .stage
@@ -291,6 +323,14 @@ impl OpenStage {
         Err(MotionError::Browser(
             "no frame produced by beginFrame".into(),
         ))
+    }
+
+    /// Evaluates a JavaScript expression in the page and returns its value.
+    pub async fn eval<T: for<'de> Deserialize<'de>>(
+        &self,
+        expression: &str,
+    ) -> Result<T, MotionError> {
+        self.stage.eval(expression).await
     }
 
     /// JavaScript errors gathered since opening.

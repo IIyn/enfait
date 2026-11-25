@@ -14,6 +14,7 @@ pub mod job;
 pub mod library;
 pub mod pool;
 pub mod render;
+pub mod still;
 pub mod user;
 
 pub use browser::{ensure_browser, installed_browser};
@@ -21,3 +22,4 @@ pub use error::MotionError;
 pub use job::{CheckJob, FrameJob, FrameOutcome, Report, Sample, frame_name};
 pub use pool::{Lease, RendererPool};
 pub use render::{Gpu, Renderer};
+pub use still::{Still, StillLayer, render_still};

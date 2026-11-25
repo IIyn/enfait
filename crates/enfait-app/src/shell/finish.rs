@@ -8,17 +8,32 @@
 use super::{Shell, label, mono};
 use crate::theme::{color, tokens};
 use crate::tr;
-use crate::worker::{ExportKind, ExportRequest, ExportState};
+use crate::worker::{ExportKind, ExportRequest, ExportState, ThumbnailRequest, ThumbnailState};
 use enfait_core::finish::Placed;
 use enfait_core::{AssetKind, BlockId, CueId, Finish, Transition};
 use enfait_media::{AudioBuffer, Clock, Command, Edl, Playback};
+use enfait_studio::thumbnail::{self, Version};
+use gpui_kit::component::input::Input;
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState, SliderValue};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    ClickEvent, Context, Div, ElementId, Entity, FontWeight, SharedString, Stateful, Subscription,
-    Window, div, px, relative,
+    ClickEvent, Context, Div, ElementId, Entity, FontWeight, ObjectFit, SharedString, Stateful,
+    Subscription, Window, div, img, px, relative,
 };
 use std::sync::Arc;
+
+/// State of the YouTube thumbnail panel.
+#[derive(Debug, Default)]
+pub(super) struct ThumbUi {
+    /// The panel is unfolded.
+    pub open: bool,
+    /// Proposal shown.
+    pub shown: Option<u32>,
+    /// Proposals on disk, oldest first.
+    pub versions: Vec<Version>,
+    /// Last proposal announced by the engine, already taken into account.
+    seen: Option<u32>,
+}
 
 /// Lead of a SFX placed on a transition (the "whoosh" peaks on the cut), in
 /// seconds.
@@ -770,7 +785,9 @@ impl Shell {
         let selection = self.selection_section(cx);
         let sounds = self.sounds_section(cx);
         let ducking = self.ducking_section(cx);
+        self.poll_thumbnail();
         let export = self.export_section(cx);
+        let youtube = self.youtube_section(cx);
         let notice = self.finish_notice.clone();
         panel.child(
             div()
@@ -785,17 +802,14 @@ impl Shell {
                 .when_some(notice, |d, n| d.child(small(n, tokens::MIXED)))
                 .when_some(selection, |d, s| d.child(s))
                 .child(export)
+                .when_some(youtube, |d, y| d.child(y))
                 .child(sounds)
                 .child(ducking),
         )
     }
 
-    /// Asks where to write the export, then starts it.
-    fn prompt_export(&mut self, kind: ExportKind, cx: &mut Context<Self>) {
-        let dir = directories::UserDirs::new()
-            .and_then(|d| d.video_dir().map(std::path::Path::to_path_buf))
-            .or_else(|| directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf()))
-            .unwrap_or_else(std::env::temp_dir);
+    /// File name of an export, from the title of the project.
+    fn export_stem(&self) -> String {
         let stem: String = self
             .title()
             .chars()
@@ -807,11 +821,17 @@ impl Shell {
                 }
             })
             .collect();
-        let stem = if stem.trim().is_empty() {
+        if stem.trim().is_empty() {
             "enfait".to_owned()
         } else {
             stem.trim().to_owned()
-        };
+        }
+    }
+
+    /// Asks where to write the export, then starts it.
+    fn prompt_export(&mut self, kind: ExportKind, cx: &mut Context<Self>) {
+        let dir = export_dir();
+        let stem = self.export_stem();
         let name = match kind {
             ExportKind::Video => format!("{stem}.mp4"),
             ExportKind::Premiere => format!("{stem}.xml"),
@@ -1262,6 +1282,384 @@ impl Shell {
 }
 
 /// `M:SS.d`.
+/// Folder offered for exports: Videos, else the home folder.
+fn export_dir() -> std::path::PathBuf {
+    directories::UserDirs::new()
+        .and_then(|d| d.video_dir().map(std::path::Path::to_path_buf))
+        .or_else(|| directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf()))
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+/// What a thumbnail export writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ThumbExport {
+    /// JPEG for YouTube.
+    Image,
+    /// Layered Photoshop document.
+    Psd,
+}
+
+impl Shell {
+    fn thumb_dir(&self) -> std::path::PathBuf {
+        thumbnail::dir(&self.session.studio_dir())
+    }
+
+    /// Lists the proposals on disk again; keeps the shown one if it is
+    /// still there, else the validated one, else the last one.
+    pub(super) fn reload_thumbnails(&mut self) {
+        self.thumb.versions = thumbnail::versions(&self.thumb_dir());
+        let has = |n: Option<u32>| n.filter(|n| self.thumb.versions.iter().any(|v| v.number == *n));
+        self.thumb.shown = has(self.thumb.shown)
+            .or_else(|| has(self.session.data.youtube.accepted))
+            .or_else(|| self.thumb.versions.last().map(|v| v.number));
+    }
+
+    /// A new proposal from the engine: show it.
+    fn poll_thumbnail(&mut self) {
+        if let ThumbnailState::Generated(n) = self.worker.thumbnail_state()
+            && self.thumb.seen != Some(n)
+        {
+            self.thumb.seen = Some(n);
+            self.reload_thumbnails();
+            if self.thumb.versions.iter().any(|v| v.number == n) {
+                self.thumb.shown = Some(n);
+            }
+            self.thumb.open = true;
+        }
+    }
+
+    /// Saves the title and description typed for YouTube.
+    pub(super) fn commit_youtube(&mut self, cx: &Context<Self>) {
+        let title = self.yt_title.read(cx).value().trim().to_owned();
+        let notes = self.yt_notes.read(cx).value().trim().to_owned();
+        let youtube = &mut self.session.data.youtube;
+        if youtube.title != title || youtube.notes != notes {
+            youtube.title = title;
+            youtube.notes = notes;
+            self.session.save_data();
+        }
+    }
+
+    /// Asks the model for a new proposal (different from the previous ones).
+    fn generate_thumbnail(&mut self, cx: &mut Context<Self>) {
+        self.commit_youtube(cx);
+        let youtube = self.session.data.youtube.clone();
+        if youtube.title.is_empty() {
+            return;
+        }
+        self.push_snapshot();
+        self.worker.thumbnail(ThumbnailRequest::Generate {
+            title: youtube.title,
+            notes: youtube.notes,
+            quality: self.session.data.quality,
+        });
+        cx.notify();
+    }
+
+    fn accept_thumbnail(&mut self, number: Option<u32>, cx: &mut Context<Self>) {
+        self.session.data.youtube.accepted = number;
+        self.session.save_data();
+        cx.notify();
+    }
+
+    /// Asks where to write the thumbnail, then writes it.
+    fn prompt_thumbnail_export(&mut self, number: u32, what: ThumbExport, cx: &mut Context<Self>) {
+        let ext = match what {
+            ThumbExport::Image => "jpg",
+            ThumbExport::Psd => "psd",
+        };
+        let name = format!(
+            "{} - {}.{ext}",
+            self.export_stem(),
+            tr!("finish.thumb.file_name")
+        );
+        let path = cx.prompt_for_new_path(&export_dir(), Some(&name));
+        cx.spawn(async move |this, cx| {
+            if let Ok(Ok(Some(mut path))) = path.await {
+                let keep_png = what == ThumbExport::Image
+                    && path
+                        .extension()
+                        .is_some_and(|e| e.eq_ignore_ascii_case("png"));
+                if !keep_png
+                    && path.extension().is_none_or(|e| {
+                        !e.eq_ignore_ascii_case(ext) && !e.eq_ignore_ascii_case("jpeg")
+                    })
+                {
+                    path.set_extension(ext);
+                }
+                let _ = this.update(cx, |shell, cx| {
+                    shell.worker.thumbnail(match what {
+                        ThumbExport::Image => ThumbnailRequest::Image {
+                            version: number,
+                            path,
+                        },
+                        ThumbExport::Psd => ThumbnailRequest::Psd {
+                            version: number,
+                            path,
+                        },
+                    });
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
+    }
+
+    /// YouTube (16:9 only): title and description of the video, then
+    /// thumbnail proposals to validate or redo, and their exports.
+    fn youtube_section(&self, cx: &mut Context<Self>) -> Option<Div> {
+        if self.settings().aspect != enfait_core::AspectRatio::Landscape16x9 || self.board.is_none()
+        {
+            return None;
+        }
+        let open = self.thumb.open;
+        let head = div()
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(label(tr!("finish.label.youtube")))
+            .child(
+                chip(
+                    "thumb-open",
+                    if open {
+                        tr!("finish.thumb.close")
+                    } else {
+                        tr!("finish.thumb.open")
+                    },
+                    open,
+                    true,
+                )
+                .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                    shell.thumb.open = !shell.thumb.open;
+                    cx.notify();
+                })),
+            );
+        if !open {
+            return Some(head);
+        }
+        let state = self.worker.thumbnail_state();
+        let running = matches!(state, ThumbnailState::Running(_));
+        let title_set = !self.yt_title.read(cx).value().trim().is_empty();
+        let accepted = self.session.data.youtube.accepted;
+        let shown = self
+            .thumb
+            .shown
+            .and_then(|n| self.thumb.versions.iter().position(|v| v.number == n));
+        let count = self.thumb.versions.len();
+        let notes_text = self.yt_notes.read(cx).value().to_string();
+        let form = div()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .child(small(tr!("finish.thumb.title"), tokens::FG2))
+            .child(Input::new(&self.yt_title))
+            .child(
+                div()
+                    .flex()
+                    .items_end()
+                    .justify_between()
+                    .child(small(tr!("finish.thumb.notes"), tokens::FG2))
+                    .child(
+                        super::mention::add_files_button("thumb-add-files").on_click(cx.listener(
+                            |shell, _: &ClickEvent, window, cx| {
+                                shell.pick_for_thumbnail(window, cx);
+                            },
+                        )),
+                    ),
+            )
+            .child(
+                self.prompt_field(
+                    super::mention::PromptField {
+                        field: super::mention::Field::Thumbnail,
+                        area: &self.yt_notes,
+                        text: &notes_text,
+                        height: px(96.),
+                        suggestions_width: px(280.),
+                        hint: tr!("finish.thumb.mention_hint"),
+                    },
+                    |d| d,
+                    None,
+                    cx,
+                )
+                .id("thumb-notes")
+                .drag_over::<gpui_kit::ExternalPaths>(|style, _, _, _| {
+                    style.bg(color(tokens::HOVER))
+                })
+                .on_drop(cx.listener(
+                    |shell, paths: &gpui_kit::ExternalPaths, window, cx| {
+                        cx.stop_propagation();
+                        shell.add_to_thumbnail(paths.paths(), window, cx);
+                    },
+                )),
+            );
+        let can_generate = title_set && !running;
+        let generate = chip(
+            "thumb-generate",
+            if count == 0 {
+                tr!("finish.thumb.generate")
+            } else {
+                tr!("finish.thumb.another")
+            },
+            false,
+            can_generate,
+        )
+        .when(can_generate, |d| {
+            d.on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                shell.generate_thumbnail(cx);
+            }))
+        });
+        let status: Option<Div> = match &state {
+            ThumbnailState::Idle | ThumbnailState::Generated(_) => {
+                (!title_set).then(|| small(tr!("finish.thumb.need_title"), tokens::MUTE))
+            }
+            ThumbnailState::Running(text) => Some(small(text.clone(), tokens::FG2)),
+            ThumbnailState::Exported { path, message } => {
+                let path = path.clone();
+                Some(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(6.))
+                        .child(small(message.clone(), tokens::FG2))
+                        .child(
+                            div()
+                                .flex()
+                                .gap(px(6.))
+                                .child(
+                                    chip("thumb-reveal", tr!("finish.reveal"), false, true)
+                                        .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                                            cx.reveal_path(&path)
+                                        })),
+                                )
+                                .child(
+                                    chip("thumb-clear", tr!("finish.ok"), false, true).on_click(
+                                        cx.listener(|shell, _: &ClickEvent, _, cx| {
+                                            shell.worker.clear_thumbnail();
+                                            cx.notify();
+                                        }),
+                                    ),
+                                ),
+                        ),
+                )
+            }
+            ThumbnailState::Failed(e) => Some(small(
+                tr!("finish.thumb.failed", error = e.clone()),
+                tokens::ERROR,
+            )),
+        };
+        let proposal = shown
+            .and_then(|i| self.thumb.versions.get(i))
+            .map(|version| {
+                let number = version.number;
+                let png = thumbnail::png_path(&self.thumb_dir(), number);
+                let index = shown.unwrap_or(0);
+                let is_accepted = accepted == Some(number);
+                let step = |id: &'static str, text: &'static str, to: Option<usize>| {
+                    let target = to
+                        .and_then(|i| self.thumb.versions.get(i))
+                        .map(|v| v.number);
+                    chip(id, text, false, target.is_some()).when_some(target, |d, n| {
+                        d.on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                            shell.thumb.shown = Some(n);
+                            cx.notify();
+                        }))
+                    })
+                };
+                let nav = div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .child(step("thumb-prev", "‹", index.checked_sub(1)))
+                    .child(
+                        mono(format!("{} / {count}", index.saturating_add(1))).text_size(px(11.)),
+                    )
+                    .child(step("thumb-next", "›", Some(index.saturating_add(1))))
+                    .when(is_accepted, |d| {
+                        d.child(small(tr!("finish.thumb.accepted"), tokens::SIGNAL))
+                    });
+                let actions = if is_accepted {
+                    let export = |id: &'static str, text: SharedString, what: ThumbExport| {
+                        chip(id, text, false, !running).when(!running, |d| {
+                            d.on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                                shell.prompt_thumbnail_export(number, what, cx);
+                            }))
+                        })
+                    };
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap(px(6.))
+                        .child(export(
+                            "thumb-jpg",
+                            tr!("finish.thumb.export_jpg"),
+                            ThumbExport::Image,
+                        ))
+                        .child(export(
+                            "thumb-psd",
+                            tr!("finish.thumb.export_psd"),
+                            ThumbExport::Psd,
+                        ))
+                        .child(
+                            chip("thumb-unaccept", tr!("finish.thumb.unaccept"), false, true)
+                                .on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+                                    shell.accept_thumbnail(None, cx)
+                                })),
+                        )
+                } else {
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap(px(6.))
+                        .child(
+                            chip("thumb-accept", tr!("finish.thumb.accept"), true, true).on_click(
+                                cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                                    shell.accept_thumbnail(Some(number), cx);
+                                }),
+                            ),
+                        )
+                        .child(generate_again(cx, can_generate))
+                };
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .child(
+                        div()
+                            .w_full()
+                            .rounded(px(3.))
+                            .overflow_hidden()
+                            .border_1()
+                            .border_color(color(if is_accepted {
+                                tokens::SIGNAL
+                            } else {
+                                tokens::LINE
+                            }))
+                            .child(img(png).w_full().h(px(168.)).object_fit(ObjectFit::Contain)),
+                    )
+                    .child(nav)
+                    .when(!version.concept.is_empty(), |d| {
+                        d.child(small(version.concept.clone(), tokens::MUTE))
+                    })
+                    .child(actions)
+            });
+        Some(
+            head.child(form)
+                .when_some(proposal, |d, p| d.child(p))
+                .when(shown.is_none(), |d| d.child(generate))
+                .when_some(status, |d, s| d.child(s)),
+        )
+    }
+}
+
+/// "Another one" next to "Validate".
+fn generate_again(cx: &mut Context<Shell>, enabled: bool) -> Stateful<Div> {
+    chip("thumb-again", tr!("finish.thumb.another"), false, enabled).when(enabled, |d| {
+        d.on_click(cx.listener(|shell, _: &ClickEvent, _, cx| {
+            shell.generate_thumbnail(cx);
+        }))
+    })
+}
+
 fn seconds(t: f64) -> String {
     let t = t.max(0.0);
     format!("{}:{:04.1}", (t / 60.0).floor(), t % 60.0)

@@ -2117,6 +2117,7 @@ dependencies = [
  "enfait-media",
  "enfait-motion",
  "futures",
+ "image",
  "reqwest",
  "serde",
  "serde_json",

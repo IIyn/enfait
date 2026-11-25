@@ -73,6 +73,9 @@ struct Shared {
     /// Storyboard to write (editor pass), not started yet.
     write_request: Mutex<Option<WriteRequest>>,
     write_state: Mutex<WriteState>,
+    /// Thumbnail work requested, not started yet.
+    thumbnail_request: Mutex<Option<ThumbnailRequest>>,
+    thumbnail_state: Mutex<ThumbnailState>,
     /// Finished work, for notifications.
     events: Mutex<Vec<Event>>,
 }
@@ -108,6 +111,10 @@ pub enum Event {
     },
     Export(ExportState),
     Written {
+        error: Option<String>,
+    },
+    /// A thumbnail proposal is ready or failed.
+    Thumbnail {
         error: Option<String>,
     },
 }
@@ -182,6 +189,37 @@ pub enum ExportState {
     Failed(String),
 }
 
+/// YouTube thumbnail work (see `enfait_studio::thumbnail`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ThumbnailRequest {
+    /// A new proposal for `title`, following `notes`.
+    Generate {
+        title: String,
+        notes: String,
+        quality: enfait_ai::Quality,
+    },
+    /// Proposal `version` as a picture for YouTube.
+    Image { version: u32, path: PathBuf },
+    /// Proposal `version` as a layered Photoshop document.
+    Psd { version: u32, path: PathBuf },
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum ThumbnailState {
+    #[default]
+    Idle,
+    /// What is happening right now.
+    Running(String),
+    /// A new proposal is ready.
+    Generated(u32),
+    /// An export is written.
+    Exported {
+        path: PathBuf,
+        message: String,
+    },
+    Failed(String),
+}
+
 pub struct Worker {
     shared: Arc<Shared>,
     thread: Option<JoinHandle<()>>,
@@ -246,6 +284,8 @@ impl Worker {
             export_state: Mutex::new(ExportState::Idle),
             write_request: Mutex::new(None),
             write_state: Mutex::new(WriteState::Idle),
+            thumbnail_request: Mutex::new(None),
+            thumbnail_state: Mutex::new(ThumbnailState::Idle),
             events: Mutex::new(Vec::new()),
         });
         let thread = {
@@ -319,6 +359,37 @@ impl Worker {
             && !matches!(*state, ExportState::Running { .. })
         {
             *state = ExportState::Idle;
+        }
+    }
+
+    /// Starts thumbnail work (ignored if some is running).
+    pub fn thumbnail(&self, request: ThumbnailRequest) {
+        if let Ok(mut state) = self.shared.thumbnail_state.lock() {
+            if matches!(*state, ThumbnailState::Running(_)) {
+                return;
+            }
+            *state = ThumbnailState::Running(t!("worker.thumb_starting").into_owned());
+        }
+        if let Ok(mut slot) = self.shared.thumbnail_request.lock() {
+            *slot = Some(request);
+        }
+        self.wake();
+    }
+
+    pub fn thumbnail_state(&self) -> ThumbnailState {
+        self.shared
+            .thumbnail_state
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_default()
+    }
+
+    /// Forgets the result of the last thumbnail work.
+    pub fn clear_thumbnail(&self) {
+        if let Ok(mut state) = self.shared.thumbnail_state.lock()
+            && !matches!(*state, ThumbnailState::Running(_))
+        {
+            *state = ThumbnailState::Idle;
         }
     }
 
@@ -551,6 +622,42 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                     },
                 );
                 if let Ok(mut s) = shared.write_state.lock() {
+                    *s = state;
+                }
+                shared.changed.store(true, Ordering::Release);
+            });
+            continue;
+        }
+        if let Some(request) = shared
+            .thumbnail_request
+            .lock()
+            .ok()
+            .and_then(|mut r| r.take())
+        {
+            let snapshot = shared.snapshot.lock().ok().and_then(|s| s.clone());
+            let (engine, shared) = (Arc::clone(&engine), Arc::clone(shared));
+            runtime.spawn(async move {
+                let state = match snapshot {
+                    Some(snapshot) => run_thumbnail(&engine, &shared, &snapshot, &request)
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("thumbnail: {e:#}");
+                            ThumbnailState::Failed(format!("{e:#}"))
+                        }),
+                    None => ThumbnailState::Failed("storyboard unavailable".into()),
+                };
+                if matches!(request, ThumbnailRequest::Generate { .. }) {
+                    push_event(
+                        &shared,
+                        Event::Thumbnail {
+                            error: match &state {
+                                ThumbnailState::Failed(e) => Some(e.clone()),
+                                _ => None,
+                            },
+                        },
+                    );
+                }
+                if let Ok(mut s) = shared.thumbnail_state.lock() {
                     *s = state;
                 }
                 shared.changed.store(true, Ordering::Release);
@@ -872,6 +979,112 @@ fn cache_dir() -> PathBuf {
     )
 }
 
+/// The Chromium instances, started when first needed.
+async fn renderers_for<'a>(
+    engine: &'a Engine,
+    say: &(dyn Fn(&str) + Sync),
+) -> Result<&'a RendererPool> {
+    engine
+        .renderers
+        .get_or_try_init(|| async {
+            say(&t!("worker.preparing_render"));
+            let cache = cache_dir();
+            let chrome = enfait_motion::ensure_browser(&cache.join("chromium")).await?;
+            let gpu = if enfait_config::process::which("nvidia-smi").is_some() {
+                Gpu::Vulkan {
+                    nvidia_offload: true,
+                }
+            } else {
+                Gpu::Software
+            };
+            anyhow::Ok(RendererPool::launch(&chrome, &cache.join("profile"), gpu, MAX_JOBS).await?)
+        })
+        .await
+}
+
+/// YouTube thumbnail: a new proposal, or an export.
+async fn run_thumbnail(
+    engine: &Engine,
+    shared: &Shared,
+    snap: &Snapshot,
+    request: &ThumbnailRequest,
+) -> Result<ThumbnailState> {
+    use enfait_studio::thumbnail::{self, Step};
+    let say = |text: &str| {
+        if let Ok(mut s) = shared.thumbnail_state.lock() {
+            *s = ThumbnailState::Running(text.to_owned());
+        }
+        shared.changed.store(true, Ordering::Release);
+    };
+    let dir = thumbnail::dir(&engine.dir);
+    match request {
+        ThumbnailRequest::Generate {
+            title,
+            notes,
+            quality,
+        } => {
+            let provider = provider_for(engine, snap.provider).await?;
+            let renderers = renderers_for(engine, &say).await?;
+            let mut fonts = enfait_studio::fonts_list();
+            fonts.push_str(&enfait_studio::userlib::font_lines(&snap.look));
+            let preset = snap
+                .look
+                .style
+                .preset
+                .as_deref()
+                .and_then(enfait_ai::styles::find);
+            let settings = quality.settings();
+            let input = thumbnail::Input {
+                sources: snap.sources(&engine.dir),
+                has_video: snap.rush_has_video,
+                title,
+                notes,
+                model: settings.model,
+                effort: settings.effort,
+                fonts,
+                user_style: enfait_ai::styles::combine(preset, snap.look.rules().as_deref()),
+            };
+            let step = |step: Step| {
+                say(&match step {
+                    Step::Stills => t!("worker.thumb_stills"),
+                    Step::Cutout => t!("worker.thumb_cutout"),
+                    Step::Designing => t!("worker.thumb_designing"),
+                    Step::Rendering => t!("worker.thumb_rendering"),
+                    Step::Fixing => t!("worker.thumb_fixing"),
+                });
+            };
+            let version =
+                thumbnail::generate(&provider, renderers, &engine.usage, &dir, &input, &step)
+                    .await?;
+            enfait_studio::log_usage(&engine.usage);
+            Ok(ThumbnailState::Generated(version.number))
+        }
+        ThumbnailRequest::Image { version, path } => {
+            say(&t!("worker.thumb_exporting"));
+            let (dir, version, out) = (dir.clone(), *version, path.clone());
+            let bytes =
+                tokio::task::spawn_blocking(move || thumbnail::export_image(&dir, version, &out))
+                    .await??;
+            #[allow(clippy::cast_precision_loss)]
+            let kb = bytes as f64 / 1024.0;
+            Ok(ThumbnailState::Exported {
+                path: path.clone(),
+                message: t!("worker.thumb_image_done", kb = format!("{kb:.0}")).into_owned(),
+            })
+        }
+        ThumbnailRequest::Psd { version, path } => {
+            let renderers = renderers_for(engine, &say).await?;
+            say(&t!("worker.thumb_layers"));
+            let renderer = renderers.acquire().await?;
+            let layers = thumbnail::export_psd(&renderer, &dir, *version, path).await?;
+            Ok(ThumbnailState::Exported {
+                path: path.clone(),
+                message: t!("worker.thumb_psd_done", count = layers).into_owned(),
+            })
+        }
+    }
+}
+
 /// Chosen model provider, recreated when the choice changes.
 async fn provider_for(engine: &Engine, choice: ProviderChoice) -> Result<Arc<Provider>> {
     let key = (choice, enfait_config::generation());
@@ -997,22 +1210,7 @@ async fn run_job(engine: &Engine, shared: &Shared, job: &Job, snap: &Snapshot) -
 
     let provider = provider_for(engine, snap.provider).await?;
     let provider = &*provider;
-    let renderers = engine
-        .renderers
-        .get_or_try_init(|| async {
-            say(&t!("worker.preparing_render"));
-            let cache = cache_dir();
-            let chrome = enfait_motion::ensure_browser(&cache.join("chromium")).await?;
-            let gpu = if enfait_config::process::which("nvidia-smi").is_some() {
-                Gpu::Vulkan {
-                    nvidia_offload: true,
-                }
-            } else {
-                Gpu::Software
-            };
-            anyhow::Ok(RendererPool::launch(&chrome, &cache.join("profile"), gpu, MAX_JOBS).await?)
-        })
-        .await?;
+    let renderers = renderers_for(engine, &say).await?;
 
     let settings = snap.project.settings();
     let (width, height) = (settings.resolution.width, settings.resolution.height);

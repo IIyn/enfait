@@ -152,3 +152,60 @@ _version: 2
 "finish.with_sfx":
   en: "With the sound effects"
   fr: "Avec les effets sonores"
+"finish.label.youtube":
+  en: "YOUTUBE"
+  fr: "YOUTUBE"
+"finish.thumb.accept":
+  en: "Validate"
+  fr: "Valider"
+"finish.thumb.accepted":
+  en: "validated"
+  fr: "validée"
+"finish.thumb.another":
+  en: "Another one"
+  fr: "Une autre"
+"finish.thumb.close":
+  en: "Thumbnail"
+  fr: "Miniature"
+"finish.thumb.export_jpg":
+  en: "Picture for YouTube…"
+  fr: "Image pour YouTube…"
+"finish.thumb.export_psd":
+  en: "Photoshop (PSD)…"
+  fr: "Photoshop (PSD)…"
+"finish.thumb.failed":
+  en: "Thumbnail failed: %{error}"
+  fr: "Miniature impossible : %{error}"
+"finish.thumb.file_name":
+  en: "thumbnail"
+  fr: "miniature"
+"finish.thumb.generate":
+  en: "Generate a thumbnail"
+  fr: "Générer une miniature"
+"finish.thumb.need_title":
+  en: "Enter the real title of the video first: the thumbnail completes it."
+  fr: "Entre d'abord le vrai titre de la vidéo : la miniature le complète."
+"finish.thumb.notes":
+  en: "Description, wishes (optional)"
+  fr: "Description, envies (facultatif)"
+"finish.thumb.notes_placeholder":
+  en: "What the video is about, the tone, what to show…"
+  fr: "De quoi parle la vidéo, le ton, ce qu'il faut montrer…"
+"finish.thumb.open":
+  en: "Thumbnail…"
+  fr: "Miniature…"
+"finish.thumb.title":
+  en: "Title of the video, as published"
+  fr: "Titre de la vidéo, tel que publié"
+"finish.thumb.title_placeholder":
+  en: "Title on YouTube"
+  fr: "Titre sur YouTube"
+"finish.thumb.unaccept":
+  en: "Change"
+  fr: "Changer"
+"finish.thumb.mention_hint":
+  en: "Type @ to name a library file (logo, photo…), + to add files, or drop them here."
+  fr: "Tape @ pour citer un fichier de la bibliothèque (logo, photo…), + pour ajouter des fichiers, ou dépose-les ici."
+"finish.thumb.mention_empty":
+  en: "The library is empty: add files with +, or drop them on this field."
+  fr: "La bibliothèque est vide : ajoute des fichiers avec +, ou dépose-les sur ce champ."
