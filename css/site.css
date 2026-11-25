@@ -225,23 +225,41 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .foot .small { font-size: 14px; color: var(--tx-3); }
 .foot-brand { display: flex; align-items: center; gap: 8px; color: var(--tx); font: 600 18px/1 "Plex Cond", sans-serif; margin-bottom: 12px; }
 
-/* Scene 1: footage + pointer ---------------------------------------- */
-.s1-video { inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.35) brightness(.72); transition: filter .5s; }
-.is-on .s1-video { filter: saturate(1.1) brightness(1); }
-.s1-fx { inset: 0; width: 100%; height: 100%; overflow: visible; }
-.s1-rings circle { fill: none; stroke: #F5B53D; opacity: 0; }
-.s1-arcs path { fill: none; stroke: #F5B53D; stroke-width: 7; stroke-linecap: round; }
-.s1-cursor { left: 1400px; top: 0; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45)); }
+/* Scene 1: footage, pause, cut-out, subscribe ------------------------ */
+.s1-shot, .s1-video, .s1-still, .s1-dim, .s1-cut, .s1-fx { position: absolute; inset: 0; width: 100%; height: 100%; }
+.s1-still { opacity: 0; }
+.is-frozen .s1-still { opacity: 1; }
+.s1-video { object-fit: cover; }
+.s1-dim { background: #050706; opacity: 0; }
+.s1-cut { opacity: 0; }
+.is-cut .s1-cut { opacity: 1; filter: brightness(1.08) saturate(1.1); }
+.s1-fx { overflow: visible; }
+.s1-line, .s1-glow { fill: none; stroke: #F5B53D; stroke-linejoin: round; stroke-linecap: round; }
+.s1-line { stroke-width: 5; }
+.s1-glow { stroke-width: 22; opacity: .28; filter: blur(8px); }
+.s1-ring { fill: none; stroke: #F5B53D; opacity: 0; }
+.s1-paused { left: 580px; top: 300px; width: 120px; height: 120px; border-radius: 50%; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; gap: 16px; opacity: 0; }
+.s1-paused i { width: 14px; height: 46px; background: #fff; border-radius: 2px; }
+.s1-cursor { left: -100px; top: 690px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45)); }
 .s1-cursor svg { display: block; transform-origin: 9px 6px; }
-.s1-meter { left: 48px; bottom: 44px; display: flex; gap: 5px; align-items: flex-end; height: 80px; opacity: 0; }
-.s1-meter i { width: 8px; height: 100%; background: #F5B53D; transform-origin: bottom; transform: scaleY(.1); transition: transform 90ms linear; }
-.s1-rec {
-  left: 48px; top: 44px; opacity: 0;
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; background: #0E1110; color: #E6ECE9;
-  font: 400 26px/1 "Plex Mono", monospace; letter-spacing: .12em; border-radius: 3px;
+.s1-sub {
+  left: 40px; top: 44px; opacity: 0;
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 18px 14px 14px; border-radius: 16px;
+  background: rgba(14,17,16,.82); color: #fff;
+  font: 500 24px/1.15 "Plex", sans-serif;
 }
-.s1-rec span { width: 16px; height: 16px; border-radius: 50%; background: #F5B53D; }
+.s1-avatar { width: 56px; height: 56px; border-radius: 50%; background: #F5B53D url(../icon.svg) center / 34px no-repeat; }
+.s1-chan { display: flex; flex-direction: column; width: 170px; }
+.s1-chan b { font-weight: 600; }
+.s1-chan small { font-size: 17px; color: #AEB6B2; }
+.s1-btn { position: relative; display: grid; width: 168px; padding: 12px 0; border-radius: 999px; background: #E5262A; color: #fff; font-weight: 600; }
+.s1-btn > span { grid-area: 1 / 1; text-align: center; }
+.s1-done { visibility: hidden; }
+.is-sub .s1-btn { background: #3A403E; color: #E6ECE9; }
+.is-sub .s1-label { visibility: hidden; }
+.is-sub .s1-done { visibility: visible; }
+.s1-bell { flex: none; fill: #fff; opacity: 0; transform-origin: 50% 12%; margin-left: -4px; }
 
 /* Scene 2: pixel art */
 .stage[data-scene="1"] { background: #000; }

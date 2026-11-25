@@ -33,25 +33,44 @@
     };
   }
 
-  /* 1. Live footage, a pointer clicks the singer's microphone. ---------- */
-  function footage(root) {
+  /* 1. Facecam: pause, a pointer cuts the creator out, subscribe. ------ */
+  // Outline of the creator at the pause frame (1.6 s), traced from the
+  // cut-out in media/facecam-cut.webp. Left open along the frame border.
+  const S1_OUTLINE = 'M1202 719 L1214 700 L1223 672 L1229 667 L1252 660 L1258 653 L1263 636 L1263 591 L1257 562 L1251 547 L1215 511 L1201 478 L1162 419 L1144 395 L1086 337 L1068 324 L1049 302 L999 269 L935 246 L912 243 L870 230 L837 206 L850 189 L862 152 L861 133 L850 125 L854 89 L858 77 L858 54 L854 40 L845 24 L824 0 M670 0 L630 37 L627 44 L627 59 L633 73 L637 112 L645 133 L645 172 L648 195 L663 250 L612 277 L582 284 L568 291 L521 353 L510 384 L488 405 L480 409 L476 407 L472 411 L462 412 L456 417 L456 421 L452 425 L440 428 L436 433 L426 430 L405 455 L392 466 L377 473 L348 480 L338 487 L339 538 L344 562 L344 588 L339 595 L329 601 L317 613 L313 624 L320 642 L321 655 L333 698 L342 719';
+  const S1_PAUSE = 1.6;
+  // Point the camera pushes in towards after the cut-out (the face).
+  const S1_FOCUS = [745, 165];
+
+  function footage(root, lang) {
     const b = bag();
-    // Microphone head in the clip at about 2 s (frame coordinates).
-    const mx = 695;
-    const my = 500;
-    const arcs = [70, 110, 150]
-      .map((r) => `<path d="M ${mx - r * 0.5} ${my - r * 0.87} A ${r} ${r} 0 0 0 ${mx - r * 0.5} ${my + r * 0.87}"/>` +
-        `<path d="M ${mx + r * 0.5} ${my - r * 0.87} A ${r} ${r} 0 0 1 ${mx + r * 0.5} ${my + r * 0.87}"/>`)
-      .join('');
-    const bars = Array.from({ length: 28 }, () => '<i></i>').join('');
+    const fr = lang === 'fr';
+    // State classes live on the frame, which outlives the scene: start clean
+    // and clear them on stop, or a rerun (language switch, next loop) would
+    // open already cut out and subscribed.
+    const states = ['is-frozen', 'is-cut', 'is-sub'];
+    root.classList.remove(...states);
+    // Click lands on the chest (frame coordinates).
+    const cx = 770;
+    const cy = 470;
     const $ = html(root, `
-      <video class="s1-video" src="media/singer.mp4" poster="media/singer.jpg" muted playsinline loop preload="auto"></video>
+      <div class="s1-shot" style="transform-origin: ${S1_FOCUS[0]}px ${S1_FOCUS[1]}px">
+      <video class="s1-video" src="media/facecam.mp4" poster="media/facecam.jpg" muted playsinline preload="auto"></video>
+      <img class="s1-still" src="media/facecam-pause.jpg" alt="">
+      <div class="s1-dim"></div>
+      <img class="s1-cut" src="media/facecam-cut.webp" alt="">
       <svg class="s1-fx" viewBox="0 0 ${W} ${H}">
-        <g class="s1-rings">${[0, 1, 2].map(() => `<circle cx="${mx}" cy="${my}" r="18"/>`).join('')}</g>
-        <g class="s1-arcs">${arcs}</g>
+        <path class="s1-glow" d="${S1_OUTLINE}"/>
+        <path class="s1-line" d="${S1_OUTLINE}"/>
+        <circle class="s1-ring" cx="${cx}" cy="${cy}" r="14"/>
       </svg>
-      <div class="s1-meter">${bars}</div>
-      <div class="s1-rec"><span></span>ON</div>
+      </div>
+      <div class="s1-paused"><i></i><i></i></div>
+      <div class="s1-sub">
+        <span class="s1-avatar"></span>
+        <span class="s1-chan"><b>enfait</b><small>${fr ? '12,4 k abonnés' : '12.4K subscribers'}</small></span>
+        <span class="s1-btn"><span class="s1-label">${fr ? 'S’abonner' : 'Subscribe'}</span><span class="s1-done">${fr ? 'Abonné' : 'Subscribed'}</span></span>
+        <svg class="s1-bell" viewBox="0 0 24 24" width="40" height="40"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2.5 15a2.5 2.5 0 0 0 5 0z"/></svg>
+      </div>
       <div class="s1-cursor"><svg viewBox="0 0 24 24" width="54" height="54">
         <path d="M4 2.5v17.2l4.3-4.1 3 6.7 3.1-1.4-3-6.6h6z" fill="#fff" stroke="#0E1110" stroke-width="1.5" stroke-linejoin="round"/>
       </svg></div>`);
@@ -60,32 +79,51 @@
     video.play().catch(() => {});
 
     const cursor = $('.s1-cursor');
+    const arrow = cursor.firstElementChild;
     // Tip of the arrow is at (4, 2.5) in a 24 unit box drawn at 54 px.
-    const tipX = mx - 9;
-    const tipY = my - 5.6;
-    const drawArcs = svg.createDrawable(root.querySelectorAll('.s1-arcs path'));
-    utils.set(drawArcs, { draw: '0 0' });
+    const tip = (x, y) => ({ left: x - 9, top: y - 5.6 });
+    const outline = svg.createDrawable(root.querySelectorAll('.s1-line, .s1-glow'));
+    utils.set(outline, { draw: '0 0' });
 
+    // Freeze on the exact frame the cut-out was taken from: a still of it
+    // covers the video, since a seek can land one frame off and the camera
+    // moves, which would show a ghost behind the cut-out.
+    b.later(S1_PAUSE * 1000, () => {
+      video.pause();
+      root.classList.add('is-frozen');
+    });
+
+    const btn = $('.s1-btn');
+    // Where the pointer clicks the subscribe button. The card is left
+    // aligned and the avatar, name and button have fixed widths, so this
+    // does not depend on the font (offsets are in frame units; the stage scale does not apply).
+    const card = $('.s1-sub');
+    const bx = card.offsetLeft + btn.offsetLeft + btn.offsetWidth * 0.4;
+    const by = card.offsetTop + btn.offsetTop + btn.offsetHeight * 0.6;
     const tl = b.a(createTimeline({ defaults: { ease: 'outExpo' } }));
-    tl.add(cursor, { left: [W + 60, tipX], duration: 1300, ease: 'inOutCubic' }, 450)
-      .add(cursor, { top: [H + 80, tipY], duration: 1300, ease: 'outQuart' }, 450)
-      .add(cursor.firstElementChild, { scale: [1, 0.78, 1], duration: 260, ease: 'inOutQuad' }, 1900)
-      .call(() => root.classList.add('is-on'), 2000)
-      .add('.s1-rings circle', { r: [18, 190], opacity: [0.95, 0], strokeWidth: [6, 1], duration: 1100, delay: stagger(140), ease: 'outCubic' }, 2000)
-      .add(drawArcs, { draw: ['0 0', '0 1'], duration: 520, delay: stagger(60) }, 2050)
-      .add(video, { scale: [1, 1.045], duration: 700, ease: 'outBack(2)' }, 2000)
-      .add('.s1-rec', { opacity: [0, 1], x: [-16, 0], duration: 400 }, 2150)
-      .add('.s1-meter', { opacity: [0, 1], duration: 300 }, 2100)
-      .add(cursor, { left: tipX + 120, top: tipY + 90, duration: 1400, ease: 'inOutSine' }, 3000);
+    tl.add('.s1-paused', { opacity: [0, 0.9, 0], scale: [0.8, 1, 1.15], duration: 700, ease: 'outQuad' }, S1_PAUSE * 1000)
+      // Pointer slides in from the left edge, on a slight curve.
+      .add(cursor, { left: [-80, tip(cx, cy).left], duration: 1100, ease: 'inOutCubic' }, 1850)
+      .add(cursor, { top: [690, tip(cx, cy).top], duration: 1100, ease: 'outQuart' }, 1850)
+      .add(arrow, { scale: [1, 0.78, 1], duration: 240, ease: 'inOutQuad' }, 3000)
+      .add('.s1-ring', { r: [14, 70], opacity: [0.9, 0], strokeWidth: [5, 1], duration: 600, ease: 'outCubic' }, 3080)
+      // Cut-out: the room goes dark, the creator stays lit and gets outlined.
+      .call(() => root.classList.add('is-cut'), 3100)
+      .add('.s1-dim', { opacity: [0, 0.8], duration: 650, ease: 'outQuad' }, 3100)
+      .add(outline, { draw: ['0 0', '0 1'], duration: 850, ease: 'inOutQuad' }, 3100)
+      // Push in towards the face once the outline is drawn.
+      .add('.s1-shot', { scale: [1, 1.32], duration: 1500, ease: 'inOutCubic' }, 3500)
+      // Subscribe card, then the pointer clicks it.
+      .add('.s1-sub', { opacity: [0, 1], x: [-90, 0], duration: 600, ease: 'outBack(1.4)' }, 4000)
+      .add(cursor, { ...tip(bx, by), duration: 900, ease: 'inOutCubic' }, 4150)
+      .add(arrow, { scale: [1, 0.78, 1], duration: 240, ease: 'inOutQuad' }, 5100)
+      .add(btn, { scale: [1, 0.9, 1], duration: 300, ease: 'inOutQuad' }, 5120)
+      .call(() => root.classList.add('is-sub'), 5250)
+      .add('.s1-bell', { opacity: [0, 1], scale: [0.4, 1], duration: 300, ease: 'outBack(2)' }, 5300)
+      .add('.s1-bell', { rotate: [0, -22, 20, -14, 10, -5, 0], duration: 900, ease: 'linear' }, 5550)
+      .add(cursor, { left: tip(bx + 60, by).left, top: tip(bx, by + 140).top, opacity: 0, duration: 700, ease: 'inQuad' }, 5900);
 
-    const meter = root.querySelectorAll('.s1-meter i');
-    b.later(2100, () => b.every(95, () => {
-      meter.forEach((m, i) => {
-        const base = 0.25 + 0.55 * Math.abs(Math.sin(i * 0.5 + performance.now() / 300));
-        m.style.transform = `scaleY(${Math.min(1, base * (0.55 + Math.random() * 0.7)).toFixed(2)})`;
-      });
-    }));
-    return () => { b.stop(); video.pause(); };
+    return () => { b.stop(); video.pause(); root.classList.remove(...states); };
   }
 
   /* 2. Pixel art rocket leaving its planet. ----------------------------- */
