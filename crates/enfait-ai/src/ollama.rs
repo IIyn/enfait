@@ -130,9 +130,9 @@ pub struct Gpu {
     pub unified: bool,
 }
 
-/// The largest graphics card of the machine: NVIDIA (`nvidia-smi`), AMD on
-/// Linux (sysfs), or the unified memory of a Mac. Blocking (runs a
-/// command): call it off the interface thread.
+/// The largest graphics card of the machine: NVIDIA (`nvidia-smi`, else
+/// NVML), AMD on Linux (sysfs), or the unified memory of a Mac. Blocking
+/// (runs a command): call it off the interface thread.
 pub fn detect_gpu() -> Option<Gpu> {
     if cfg!(target_os = "macos") {
         return mac_memory();
@@ -141,6 +141,10 @@ pub fn detect_gpu() -> Option<Gpu> {
 }
 
 fn nvidia() -> Option<Gpu> {
+    nvidia_smi().or_else(nvml)
+}
+
+fn nvidia_smi() -> Option<Gpu> {
     let program = enfait_config::process::which("nvidia-smi")?;
     let output = enfait_config::process::command(program)
         .args([
@@ -169,6 +173,40 @@ fn parse_nvidia(stdout: &str) -> Option<Gpu> {
             })
         })
         .max_by_key(|g| g.memory)
+}
+
+/// NVML, the library behind `nvidia-smi`. In a Flatpak the sandbox has no
+/// `nvidia-smi`, but the NVIDIA GL extension ships `libnvidia-ml.so`.
+/// `/proc/driver/nvidia/gpus` lists the cards of the proprietary driver:
+/// without it the library is not even loaded.
+#[cfg(target_os = "linux")]
+fn nvml() -> Option<Gpu> {
+    if !std::path::Path::new("/proc/driver/nvidia/gpus").is_dir() {
+        return None;
+    }
+    let nvml = nvml_wrapper::Nvml::init()
+        .or_else(|_| {
+            nvml_wrapper::Nvml::builder()
+                .lib_path(std::ffi::OsStr::new("libnvidia-ml.so.1"))
+                .init()
+        })
+        .inspect_err(|e| tracing::debug!("NVML: {e}"))
+        .ok()?;
+    (0..nvml.device_count().ok()?)
+        .filter_map(|i| {
+            let device = nvml.device_by_index(i).ok()?;
+            Some(Gpu {
+                name: device.name().ok()?,
+                memory: device.memory_info().ok()?.total,
+                unified: false,
+            })
+        })
+        .max_by_key(|g| g.memory)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn nvml() -> Option<Gpu> {
+    None
 }
 
 fn amd() -> Option<Gpu> {
@@ -450,6 +488,18 @@ mod tests {
         assert_eq!(root("http://localhost:11434/v1/"), "http://localhost:11434");
         assert!(same_model("qwen3", "qwen3:latest"));
         assert!(!same_model("qwen3:8b", "qwen3:4b"));
+    }
+
+    /// On a machine with an NVIDIA card, both ways see the same card.
+    #[test]
+    fn nvml_agrees_with_nvidia_smi() {
+        let Some(smi) = nvidia_smi() else { return };
+        if !cfg!(target_os = "linux") {
+            return;
+        }
+        let nvml = nvml().expect("nvidia-smi sees a card, NVML must too");
+        assert_eq!(smi.name, nvml.name);
+        assert_eq!(smi.memory, nvml.memory);
     }
 
     #[test]

@@ -20,5 +20,9 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+# NVIDIA card in a Flatpak, where `nvidia-smi` is missing (see ollama.rs).
+[target.'cfg(target_os = "linux")'.dependencies]
+nvml-wrapper = { version = "0.13", default-features = false }
+
 [lints]
 workspace = true
