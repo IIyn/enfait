@@ -145,6 +145,7 @@ impl Shell {
         let (Some(transcript), true) = (self.cut.transcript.clone(), analysed) else {
             self.board_notice = Some(match &self.cut.status {
                 CutStatus::Transcribing => self.cut.transcribing_label(),
+                CutStatus::Ready if self.cut.analyzing.is_some() => tr!("cut.analyzing"),
                 CutStatus::Failed(e) => e.clone(),
                 _ => tr!("board.import_first"),
             });

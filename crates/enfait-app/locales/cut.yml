@@ -1,4 +1,7 @@
 _version: 2
+"cut.analyzing":
+  en: "Finding the takes of each sentence…"
+  fr: "Recherche des prises de chaque phrase…"
 "cut.derived":
   en: "No script: sentences and retakes found in the take. \"Write the script\" turns them into a script to correct (remove a sentence, split one in two)."
   fr: "Pas de script : phrases et reprises déduites de la prise. « Écrire le script » en fait un script à corriger (retirer une phrase, en séparer deux)."

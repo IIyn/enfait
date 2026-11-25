@@ -133,6 +133,8 @@ pub struct WriteRequest {
     /// mode: everything is written).
     pub keep_authored: bool,
     pub quality: enfait_ai::Quality,
+    /// Blocks per request of the editor (`None`: the whole video at once).
+    pub blocks_per_request: Option<usize>,
     /// Fingerprint of the edit: the result only applies to it.
     pub key: String,
 }
@@ -552,7 +554,7 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                         Event::Job {
                             number,
                             transition: job.kind == JobKind::Transition,
-                            error: result.as_ref().err().map(|e| format!("{e:#}")),
+                            error: result.as_ref().err().map(describe),
                         },
                     );
                 }
@@ -560,7 +562,7 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                     Ok(()) => JobStatus::Done,
                     Err(e) => {
                         tracing::warn!("job {}: {e:#}", job.id);
-                        JobStatus::Failed(format!("{e:#}"))
+                        JobStatus::Failed(describe(&e))
                     }
                 };
                 if status == JobStatus::Done {
@@ -606,7 +608,7 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                             })),
                             Err(e) => {
                                 tracing::warn!("storyboard: {e:#}");
-                                WriteState::Failed(format!("{e:#}"))
+                                WriteState::Failed(describe(&e))
                             }
                         }
                     }
@@ -642,7 +644,7 @@ fn run(dir: &Path, shared: &Arc<Shared>) {
                         .await
                         .unwrap_or_else(|e| {
                             tracing::warn!("thumbnail: {e:#}");
-                            ThumbnailState::Failed(format!("{e:#}"))
+                            ThumbnailState::Failed(describe(&e))
                         }),
                     None => ThumbnailState::Failed("storyboard unavailable".into()),
                 };
@@ -774,8 +776,18 @@ async fn run_write(
         library: library.as_deref(),
         max_transitions: enfait_studio::magic::max_transitions(blocks.len()),
     };
-    let plan =
-        enfait_studio::magic::write_plan(&provider, &engine.dir, &input, request.quality).await?;
+    let progress = |part: usize, parts: usize| {
+        say(&t!("worker.editor_part", part = part, count = parts));
+    };
+    let plan = enfait_studio::magic::write_plan(
+        &provider,
+        &engine.dir,
+        &input,
+        request.quality,
+        request.blocks_per_request,
+        &progress,
+    )
+    .await?;
     let gathered = enfait_studio::magic::gather(
         &plan,
         &snap.project,
@@ -1086,6 +1098,18 @@ async fn run_thumbnail(
 }
 
 /// Chosen model provider, recreated when the choice changes.
+/// An error for the interface: a local model too slow is said plainly.
+fn describe(e: &anyhow::Error) -> String {
+    let timed_out = e.chain().find_map(|c| match c.downcast_ref::<enfait_ai::AiError>() {
+        Some(enfait_ai::AiError::TimedOut { secs }) => Some(*secs),
+        _ => None,
+    });
+    match timed_out {
+        Some(secs) => t!("worker.local_timeout", min = secs.div_ceil(60)).into_owned(),
+        None => format!("{e:#}"),
+    }
+}
+
 async fn provider_for(engine: &Engine, choice: ProviderChoice) -> Result<Arc<Provider>> {
     let key = (choice, enfait_config::generation());
     let mut slot = engine.provider.lock().await;

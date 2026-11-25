@@ -377,6 +377,11 @@ impl Shell {
                                     .child(m),
                             )
                         })
+                        .when(provider == ProviderChoice::Local, |d| {
+                            d.child(label(tr!("local.title"))).child(
+                                self.local_picker(super::local_models::PickerAt::Care, cx),
+                            )
+                        })
                         .child(
                             chip(
                                 "care-transitions",

@@ -52,7 +52,9 @@ pub fn update(cx: &mut App, change: impl FnOnce(&mut Settings)) {
     if let Err(e) = after.save() {
         tracing::error!("cannot save the settings: {e}");
     }
-    if (&after.local_url, &after.local_model) != (&before.local_url, &before.local_model) {
+    if (&after.local_url, &after.local_model, after.local_thinking)
+        != (&before.local_url, &before.local_model, before.local_thinking)
+    {
         enfait_config::bump_generation();
     }
     if after.language != before.language {

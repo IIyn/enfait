@@ -103,6 +103,7 @@ impl Shell {
         let request = WriteRequest {
             keep_authored: true,
             quality: self.session.data.quality,
+            blocks_per_request: crate::prefs::settings(cx).storyboard_part(),
             key: board.key.clone(),
         };
         self.write_notice = None;
@@ -225,6 +226,7 @@ impl Shell {
                 return Some(MagicStage::Preparing.failed(tr!("magic.no_rush").to_string()));
             }
             CutStatus::Transcribing => return None,
+            CutStatus::Ready if self.cut.analyzing.is_some() => return None,
             CutStatus::Ready => {}
         }
         if self.board.is_none() {

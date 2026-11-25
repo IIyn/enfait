@@ -1,0 +1,61 @@
+_version: 2
+"local.can_think":
+  en: "can reason"
+  fr: "peut réfléchir"
+"local.chosen":
+  en: "in use"
+  fr: "utilisé"
+"local.detecting":
+  en: "Looking for the graphics card…"
+  fr: "Recherche de la carte graphique…"
+"local.downloading":
+  en: "Downloading… %{pct} % of %{size} GB"
+  fr: "Téléchargement… %{pct} % de %{size} Go"
+"local.failed":
+  en: "Cannot start this model: %{error}"
+  fr: "Impossible de lancer ce modèle : %{error}"
+"local.fits":
+  en: "fits on the card"
+  fr: "tient sur la carte"
+"local.gpu":
+  en: "Graphics card: %{name}, %{size} GB of video memory."
+  fr: "Carte graphique : %{name}, %{size} Go de mémoire vidéo."
+"local.help":
+  en: "Models known to work, sized for this machine. A click downloads the model if needed, stops the other models enfait started, and starts it. Needs Ollama (guide below)."
+  fr: "Des modèles qui fonctionnent, dimensionnés pour cette machine. Un clic télécharge le modèle si besoin, arrête les autres modèles lancés par enfait, puis le lance. Demande Ollama (guide plus bas)."
+"local.installed":
+  en: "downloaded"
+  fr: "téléchargé"
+"local.no_gpu":
+  en: "No graphics card found: the models will run on the processor, slowly."
+  fr: "Aucune carte graphique trouvée : les modèles tourneront sur le processeur, lentement."
+"local.nothing_fits":
+  en: "No model fits whole on this card: all of them will be slow. For a long video, Claude is advised."
+  fr: "Aucun modèle ne tient entièrement sur cette carte : tous seront lents. Pour une longue vidéo, Claude est conseillé."
+"local.partial":
+  en: "spills onto the processor: slow"
+  fr: "déborde sur le processeur : lent"
+"local.recommended":
+  en: "advised"
+  fr: "conseillé"
+"local.sizes":
+  en: "%{download} GB to download · about %{need} GB of memory in use"
+  fr: "%{download} Go à télécharger · environ %{need} Go de mémoire en marche"
+"local.starting":
+  en: "Starting the model…"
+  fr: "Lancement du modèle…"
+"local.thinking":
+  en: "Reasoning (thinking)"
+  fr: "Réflexion (thinking)"
+"local.thinking_help":
+  en: "A model that can reason thinks before answering. Sometimes better, always much longer: on a small machine a storyboard part can take tens of minutes. Off by default."
+  fr: "Un modèle qui peut réfléchir le fait avant de répondre. Parfois mieux, toujours beaucoup plus long : sur une petite machine, une partie du storyboard peut prendre des dizaines de minutes. Coupé par défaut."
+"local.title":
+  en: "Local model"
+  fr: "Modèle local"
+"local.unified":
+  en: "Unified memory: about %{size} GB usable by the models."
+  fr: "Mémoire unifiée : environ %{size} Go utilisables par les modèles."
+"local.unreachable":
+  en: "Ollama does not answer at %{url}: install it or start it (guide in Settings → Models)."
+  fr: "Ollama ne répond pas à %{url} : installe-le ou lance-le (guide dans Réglages → Modèles)."

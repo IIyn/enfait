@@ -13,6 +13,7 @@ mod bridge;
 mod finish;
 mod home;
 mod lazy;
+mod local_models;
 mod magic;
 mod mention;
 mod montage;
@@ -185,6 +186,8 @@ pub struct Shell {
     montage_badge: usize,
     /// "Send to the edit" dialog (care level), when open.
     care: Option<montage::CareDialog>,
+    /// Local model picker: card, models in Ollama, download in progress.
+    local_models: local_models::LocalModels,
     /// `@` typed in a text field: files of the library to mention.
     mention: Option<mention::Mention>,
     /// Voice being recorded.
@@ -511,6 +514,7 @@ impl Shell {
             toasts: Vec::new(),
             montage_badge: 0,
             care: None,
+            local_models: local_models::LocalModels::default(),
             mention: None,
             recording: None,
             recording_busy: None,
@@ -1017,19 +1021,66 @@ impl Shell {
         .detach();
     }
 
-    /// Analyses again if the script changed, then applies the edit.
+    /// Analyses again if the script changed (in the background: seconds
+    /// on a long take), then applies the edit.
     fn refresh_cut(&mut self, cx: &mut Context<Self>) {
-        if self.cut.transcript.is_none() {
+        let Some(transcript) = self.cut.transcript.clone() else {
             return;
-        }
-        if self.uses_cut() && self.cut.analyzed.as_deref() != Some(self.session.script.as_str()) {
-            self.cut
-                .analyze(&self.session.script, &self.session.data.choices);
+        };
+        let script = self.session.script.clone();
+        if self.uses_cut() && self.cut.analyzed.as_deref() != Some(script.as_str()) {
+            if self.cut.analyzing.as_deref() != Some(script.as_str()) {
+                self.analyze_cut(script, transcript, cx);
+            }
+            if self.cut.analysis.is_none() {
+                // The storyboard tells it is waiting for the analysis.
+                if board_step(self.step) {
+                    self.refresh_board(cx);
+                }
+                return;
+            }
         }
         self.apply_cut(cx);
         if board_step(self.step) {
             self.refresh_board(cx);
         }
+    }
+
+    /// Analyses the takes against `script` away from the interface; the
+    /// result is dropped if the take or the script changed meanwhile.
+    fn analyze_cut(
+        &mut self,
+        script: String,
+        transcript: Arc<enfait_core::Transcript>,
+        cx: &mut Context<Self>,
+    ) {
+        self.cut.analyzing = Some(script.clone());
+        let saved = self.session.data.choices.clone();
+        let source = Arc::clone(&transcript);
+        let work = cx.background_spawn(async move {
+            let done = crate::cut::analyze(&script, &source, &saved);
+            (script, done)
+        });
+        cx.spawn(async move |this, cx| {
+            let (script, done) = work.await;
+            let _ = this.update(cx, |shell, cx| {
+                let current = shell
+                    .cut
+                    .transcript
+                    .as_ref()
+                    .is_some_and(|t| Arc::ptr_eq(t, &transcript));
+                if !current || shell.cut.analyzing.as_deref() != Some(script.as_str()) {
+                    return;
+                }
+                shell.cut.analyzing = None;
+                shell.cut.install(script, done);
+                shell.refresh_cut(cx);
+                // The engine waited for the edit ranges.
+                shell.push_snapshot();
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// Sends the edit (or the whole take) to the player.

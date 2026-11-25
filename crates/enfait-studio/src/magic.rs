@@ -8,7 +8,9 @@
 //! non-commercial only, no ban on changes, no share-alike).
 
 use anyhow::Result;
-use enfait_ai::editor::{EditPlan, EditorInput, PlanKind, editor_request, parse_plan};
+use enfait_ai::editor::{
+    EditPlan, EditorInput, EditorPart, PlanKind, editor_request, parse_plan, part_request,
+};
 use enfait_ai::{Effort, Provider, Quality};
 use enfait_assets::search::{Hit, Media};
 use enfait_core::{
@@ -43,35 +45,173 @@ pub fn editor_model(quality: Quality) -> (&'static str, Effort) {
     }
 }
 
-/// Asks the editor for the storyboard (two tries if the answer is
-/// unreadable). Its notes go to `work/editor.notes.md`, the parsed plan to
+/// Kinds of the last blocks recalled to the next part (rhythm).
+const RECENT_KINDS: usize = 4;
+
+/// `count` blocks in parts of `size` at most, of even lengths.
+pub fn parts(count: usize, size: usize) -> Vec<std::ops::Range<usize>> {
+    let size = size.max(1);
+    let n = count.div_ceil(size).max(1);
+    let (base, extra) = (count / n, count % n);
+    let mut out = Vec::with_capacity(n);
+    let mut start = 0_usize;
+    for i in 0..n {
+        let len = base.saturating_add(usize::from(i < extra));
+        out.push(start..start.saturating_add(len));
+        start = start.saturating_add(len);
+    }
+    out
+}
+
+/// Asks the editor for the storyboard (two tries if an answer is
+/// unreadable): in a single request, or part by part past `per_request`
+/// blocks (`None`: always in a single request; a long video in a single
+/// request weighs a lot: context, attention). `progress(part, parts)`
+/// before each part. Its notes go to `work/editor.notes.md`, the parsed plan to
 /// `work/editor.json`.
 pub async fn write_plan(
     provider: &Provider,
     work: &Path,
     input: &EditorInput<'_>,
     quality: Quality,
+    per_request: Option<usize>,
+    progress: &(dyn Fn(usize, usize) + Sync),
 ) -> Result<EditPlan> {
     let (model, effort) = editor_model(quality);
-    let request = editor_request(input, model, effort);
     tokio::fs::create_dir_all(work).await?;
-    let mut last_error = None;
+    let ranges = parts(
+        input.blocks.len(),
+        per_request.unwrap_or(input.blocks.len()),
+    );
+    let plan = if ranges.len() <= 1 {
+        let request = editor_request(input, model, effort);
+        let (plan, notes) = ask(provider, &request, input).await??;
+        tokio::fs::write(work.join("editor.notes.md"), notes).await?;
+        plan
+    } else {
+        write_parts(provider, work, input, &ranges, model, effort, progress).await?
+    };
+    tokio::fs::write(work.join("editor.json"), serde_json::to_vec_pretty(&plan)?).await?;
+    Ok(plan)
+}
+
+/// One request, two tries: the plan and the notes of the editor. Outer
+/// error: the provider failed; inner error: the answer stayed unreadable
+/// or was truncated (a part is then skipped).
+async fn ask(
+    provider: &Provider,
+    request: &enfait_ai::Request,
+    input: &EditorInput<'_>,
+) -> Result<Result<(EditPlan, String), enfait_ai::AiError>> {
+    let mut last_error = enfait_ai::AiError::Unexpected("no storyboard".into());
     for _ in 0..2 {
-        let reply = provider.complete(&request).await?;
-        tokio::fs::write(work.join("editor.notes.md"), &reply.text).await?;
+        let reply = match provider.complete(request).await {
+            Ok(reply) => reply,
+            // The same request would stop at the same place.
+            Err(e @ enfait_ai::AiError::Truncated) => return Ok(Err(e)),
+            Err(e) => return Err(e.into()),
+        };
         match parse_plan(&reply.text, input.blocks.len(), input.has_video) {
-            Ok(plan) => {
-                tokio::fs::write(work.join("editor.json"), serde_json::to_vec_pretty(&plan)?)
-                    .await?;
-                return Ok(plan);
-            }
+            Ok(plan) => return Ok(Ok((plan, reply.text))),
             Err(e) => {
                 tracing::warn!("unreadable editor answer: {e}");
+                last_error = e;
+            }
+        }
+    }
+    Ok(Err(last_error))
+}
+
+/// The parts one after the other: each one sees the end of the previous
+/// one (last block written, its transition, the kinds chosen) and the
+/// crafted transitions left. A part that stays unreadable is skipped (its
+/// blocks stay as they are); a provider error stops everything.
+async fn write_parts(
+    provider: &Provider,
+    work: &Path,
+    input: &EditorInput<'_>,
+    ranges: &[std::ops::Range<usize>],
+    model: &str,
+    effort: Effort,
+    progress: &(dyn Fn(usize, usize) + Sync),
+) -> Result<EditPlan> {
+    let authored_transitions = input
+        .blocks
+        .iter()
+        .filter(|b| b.transition.is_some())
+        .count();
+    let mut plan = EditPlan::default();
+    let mut notes = String::new();
+    let mut last_error = None;
+    for (n, range) in ranges.iter().enumerate() {
+        progress(n.saturating_add(1), ranges.len());
+        let chosen = plan
+            .blocks
+            .iter()
+            .filter(|b| {
+                b.transition
+                    .as_ref()
+                    .is_some_and(|t| enfait_ai::editor::is_crafted(&t.kind))
+            })
+            .count();
+        let before = range
+            .start
+            .checked_sub(1)
+            .and_then(|i| plan.blocks.iter().find(|b| b.index == i.saturating_add(1)));
+        let recent_kinds = plan
+            .blocks
+            .iter()
+            .rev()
+            .take(RECENT_KINDS)
+            .rev()
+            .map(|b| b.kind.as_str())
+            .collect();
+        let part = EditorPart {
+            range: range.clone(),
+            before,
+            recent_kinds,
+            transitions_left: input
+                .max_transitions
+                .saturating_sub(authored_transitions.saturating_add(chosen)),
+        };
+        let request = part_request(input, &part, model, effort);
+        match ask(provider, &request, input).await? {
+            Ok((part_plan, text)) => {
+                let _ = std::fmt::Write::write_fmt(
+                    &mut notes,
+                    format_args!(
+                        "# Blocks {} to {}\n\n{text}\n\n",
+                        range.start.saturating_add(1),
+                        range.end
+                    ),
+                );
+                plan.blocks.extend(
+                    part_plan
+                        .blocks
+                        .into_iter()
+                        .filter(|b| range.contains(&b.index.saturating_sub(1))),
+                );
+                if range.start == 0 {
+                    plan.music = part_plan.music;
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "blocks {} to {} skipped: {e}",
+                    range.start.saturating_add(1),
+                    range.end
+                );
                 last_error = Some(e);
             }
         }
     }
-    Err(last_error.map_or_else(|| anyhow::anyhow!("no storyboard"), Into::into))
+    tokio::fs::write(work.join("editor.notes.md"), notes).await?;
+    if plan.blocks.is_empty()
+        && let Some(e) = last_error
+    {
+        return Err(e.into());
+    }
+    Ok(plan)
 }
 
 /// The files found for a plan, already copied into the library.
@@ -649,6 +789,11 @@ pub fn editor_blocks(
             text: transcript.text_in(b.range),
             authored: (keep_authored && authored(b))
                 .then(|| (plan_kind(b.kind), b.description.trim().to_owned())),
+            transition: match &b.transition_after {
+                Transition::Cut => None,
+                Transition::Auto => Some("auto".to_owned()),
+                Transition::Described(text) => Some(text.trim().to_owned()),
+            },
         })
         .collect()
 }
@@ -1014,6 +1159,90 @@ mod tests {
             music_candidates(&sounds, "calm piano")[0].duration,
             Some(120.0)
         );
+    }
+
+    #[test]
+    fn long_videos_are_written_in_parts() {
+        assert_eq!(parts(5, 8), vec![0..5]);
+        assert_eq!(parts(0, 8), vec![0..0]);
+        assert_eq!(parts(17, 8), vec![0..6, 6..12, 12..17]);
+        assert_eq!(parts(16, 8), vec![0..8, 8..16]);
+    }
+
+    /// Three parts with canned answers: each request holds only its blocks
+    /// and neighbours, the transition of the previous part is passed on, an
+    /// unreadable part is skipped.
+    #[tokio::test]
+    async fn parts_pass_their_context_on() {
+        use enfait_ai::editor::EditorBlock;
+        use std::sync::{Arc, Mutex};
+        let blocks: Vec<EditorBlock> = (1..=6)
+            .map(|i| EditorBlock {
+                start: 0.0,
+                end: 1.0,
+                text: format!("Phrase {i}."),
+                authored: None,
+                transition: None,
+            })
+            .collect();
+        let input = EditorInput {
+            width: 1920,
+            height: 1080,
+            language: "fr",
+            blocks: &blocks,
+            has_video: false,
+            video_banks: false,
+            script: None,
+            user_style: None,
+            library: None,
+            max_transitions: 1,
+        };
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let log = Arc::clone(&seen);
+        let provider = Provider::Canned(Arc::new(move |request: &enfait_ai::Request| {
+            let enfait_ai::Part::Text(user) = &request.user[0] else {
+                return Ok(String::new());
+            };
+            log.lock().unwrap().push(user.clone());
+            Ok(if user.contains("blocks 1 to 2") {
+                r#"```json
+{"blocks":[{"index":1,"kind":"animation","description":"un"},
+ {"index":2,"kind":"animation","description":"deux","transition":{"type":"described","description":"zoom"}},
+ {"index":5,"kind":"animation","description":"hors partie"}],
+ "music":{"query":"calm piano"}}
+```"#
+            } else if user.contains("blocks 3 to 4") {
+                "pas de JSON"
+            } else {
+                r#"{"blocks":[{"index":5,"kind":"animation","description":"cinq"}]}"#
+            }
+            .to_owned())
+        }));
+        let work = tempfile::tempdir().unwrap();
+        let ranges = parts(blocks.len(), 2);
+        let steps = Mutex::new(Vec::new());
+        let plan = write_parts(
+            &provider,
+            work.path(),
+            &input,
+            &ranges,
+            "m",
+            Effort::Medium,
+            &|part, count| steps.lock().unwrap().push((part, count)),
+        )
+        .await
+        .unwrap();
+        assert_eq!(*steps.lock().unwrap(), vec![(1, 3), (2, 3), (3, 3)]);
+        let indexes: Vec<usize> = plan.blocks.iter().map(|b| b.index).collect();
+        assert_eq!(indexes, vec![1, 2, 5], "outside its part, unreadable: dropped");
+        assert_eq!(plan.blocks[2].description, "cinq");
+        assert_eq!(plan.music.unwrap().query, "calm piano");
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1 + 2 + 1, "the unreadable part is asked twice");
+        assert!(!seen[0].contains("Phrase 4."));
+        assert!(seen[1].contains("transition into this part: “zoom”"));
+        assert!(seen[1].contains("Crafted transitions left: 0"));
+        assert!(seen[3].contains("Phrase 4.") && !seen[3].contains("transition into"));
     }
 
     #[test]

@@ -91,7 +91,7 @@ async fn storyboard_written_without_a_model() {
         max_transitions: magic::max_transitions(blocks.len()),
     };
     let work = tempfile::tempdir().unwrap();
-    let plan = magic::write_plan(&provider, work.path(), &input, Quality::Fast)
+    let plan = magic::write_plan(&provider, work.path(), &input, Quality::Fast, None, &|_, _| {})
         .await
         .unwrap();
     assert_eq!(

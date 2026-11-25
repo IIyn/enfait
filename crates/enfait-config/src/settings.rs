@@ -136,6 +136,12 @@ pub struct Settings {
     pub local_url: String,
     /// Local model name (`qwen3-coder:30b`…); empty: not configured.
     pub local_model: String,
+    /// A local model that can reason thinks before answering: better
+    /// answers sometimes, much longer always.
+    pub local_thinking: bool,
+    /// Ollama models enfait loaded itself: the only ones it unloads when
+    /// switching models.
+    pub local_loaded: Vec<String>,
     /// Recording with the prompter also films with the camera.
     pub record_camera: bool,
     /// Microphone for recording (an audio device id); `None`: the system's.
@@ -150,6 +156,10 @@ pub struct Settings {
     /// Most animations sent to the engine at once (magic mode, montage
     /// dialog): each one costs model credits. 0: no limit.
     pub max_blocks: u32,
+    /// Blocks the editor writes in one request when writing the
+    /// storyboard; a longer video is written part by part. 0: the whole
+    /// video at once.
+    pub storyboard_blocks: u32,
 }
 
 /// Sizes of the panels the user resizes with the mouse.
@@ -213,18 +223,27 @@ impl Default for Settings {
             notifications: true,
             local_url: DEFAULT_LOCAL_URL.to_owned(),
             local_model: String::new(),
+            local_thinking: false,
+            local_loaded: Vec::new(),
             record_camera: false,
             microphone: None,
             camera: None,
             panels: PanelSizes::default(),
             player_native: false,
             max_blocks: Self::DEFAULT_MAX_BLOCKS,
+            storyboard_blocks: Self::DEFAULT_STORYBOARD_BLOCKS,
         }
     }
 }
 
 impl Settings {
     pub const DEFAULT_MAX_BLOCKS: u32 = 4;
+    pub const DEFAULT_STORYBOARD_BLOCKS: u32 = 24;
+
+    /// Blocks per request of the editor (`None`: the whole video at once).
+    pub fn storyboard_part(&self) -> Option<usize> {
+        usize::try_from(self.storyboard_blocks).ok().filter(|n| *n > 0)
+    }
 
     /// How many animations one sending may hold (`None`: no limit).
     pub fn block_limit(&self) -> Option<usize> {
@@ -319,6 +338,8 @@ mod tests {
             notifications: false,
             local_url: "http://box:8080/v1".into(),
             local_model: "qwen".into(),
+            local_thinking: true,
+            local_loaded: vec!["qwen".into()],
             record_camera: true,
             microphone: Some("pulseaudio:mic".into()),
             camera: Some("/dev/video2".into()),
@@ -330,10 +351,12 @@ mod tests {
             },
             player_native: true,
             max_blocks: 0,
+            storyboard_blocks: 0,
         };
         settings.save_to(&path).unwrap();
         assert_eq!(Settings::load_from(&path).unwrap(), Some(settings));
         assert_eq!(Settings::default().block_limit(), Some(4));
+        assert_eq!(Settings::default().storyboard_part(), Some(24));
         assert_eq!(
             Settings {
                 max_blocks: 0,

@@ -27,6 +27,9 @@ pub struct CutState {
     pub choice: Vec<Option<usize>>,
     /// Script of the last analysis: redo it if it changed.
     pub analyzed: Option<String>,
+    /// Script whose analysis runs in the background (long takes take
+    /// seconds: never on the interface thread).
+    pub analyzing: Option<String>,
     /// Play the edit (else the whole take).
     pub montage: bool,
     /// Transcription progress, from 0 to 1 (bits of an `f32`), written by
@@ -46,12 +49,38 @@ impl Default for CutState {
             analysis: None,
             choice: Vec::new(),
             analyzed: None,
+            analyzing: None,
             montage: true,
             progress: Arc::new(AtomicU32::new(0)),
             started: None,
             shown: 0,
         }
     }
+}
+
+/// An analysis and the take kept for each sentence.
+pub type Analyzed = (Analysis, Vec<Option<usize>>);
+
+/// Aligns the transcript on `script` (without a script, sentences and
+/// retakes are found in the take), applies the "last take" rule, then the
+/// saved choices. Blocking: seconds on a long take.
+pub fn analyze(script: &str, transcript: &Transcript, saved: &BTreeMap<String, usize>) -> Analyzed {
+    let analysis = if script.trim().is_empty() {
+        enfait_speech::cleanup::analyze(transcript)
+    } else {
+        takes::analyze(script, transcript)
+    };
+    let mut choice = analysis.default_choice();
+    for (s, slot) in choice.iter_mut().enumerate() {
+        let rank = analysis
+            .sentences
+            .get(s)
+            .and_then(|sentence| saved.get(&sentence.text));
+        if let Some(take) = rank.and_then(|r| analysis.takes_of(s).nth(*r)) {
+            *slot = Some(take.0);
+        }
+    }
+    (analysis, choice)
 }
 
 impl CutState {
@@ -92,31 +121,21 @@ impl CutState {
         }
     }
 
-    /// Aligns the transcript on `script` (without a script, sentences and
-    /// retakes are found in the take), applies the "last take" rule, then
-    /// the saved choices.
+    /// [`analyze`] then [`CutState::install`], on the spot.
+    #[cfg(test)]
     pub fn analyze(&mut self, script: &str, saved: &BTreeMap<String, usize>) {
         let Some(transcript) = &self.transcript else {
             return;
         };
-        let analysis = if script.trim().is_empty() {
-            enfait_speech::cleanup::analyze(transcript)
-        } else {
-            takes::analyze(script, transcript)
-        };
-        let mut choice = analysis.default_choice();
-        for (s, slot) in choice.iter_mut().enumerate() {
-            let rank = analysis
-                .sentences
-                .get(s)
-                .and_then(|sentence| saved.get(&sentence.text));
-            if let Some(take) = rank.and_then(|r| analysis.takes_of(s).nth(*r)) {
-                *slot = Some(take.0);
-            }
-        }
+        let done = analyze(script, transcript, saved);
+        self.install(script.to_owned(), done);
+    }
+
+    /// Takes the result of [`analyze`] for `script`.
+    pub fn install(&mut self, script: String, (analysis, choice): Analyzed) {
         self.choice = choice;
         self.analysis = Some(analysis);
-        self.analyzed = Some(script.to_owned());
+        self.analyzed = Some(script);
     }
 
     /// The sentences were found in the take (no script).

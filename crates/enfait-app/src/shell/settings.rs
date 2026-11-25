@@ -119,7 +119,7 @@ pub(super) struct SettingsUi {
     local_url: Entity<InputState>,
     local_model: Entity<InputState>,
     /// Copy the settings into the fields at the next render.
-    sync: bool,
+    pub(super) sync: bool,
     notice: Option<(SharedString, bool)>,
     downloads: BTreeMap<Tool, Download>,
     update: UpdateState,
@@ -1135,12 +1135,19 @@ impl Shell {
                 .child(div().flex().flex_wrap().gap(px(6.)).children(providers))
                 .when_some(missing, |d, m| d.child(small(m, tokens::MIXED))),
             )
+            .when(provider == ProviderChoice::Local, |d| {
+                d.child(
+                    field(tr!("local.title"), Some(tr!("local.help")))
+                        .child(self.local_picker(super::local_models::PickerAt::Settings, cx)),
+                )
+            })
             .child(self.connect_field(cx))
             .child(
                 field(tr!("settings.quality"), Some(tr!("settings.quality_help")))
                     .child(div().flex().gap(px(6.)).children(qualities)),
             )
             .child(self.max_blocks_field(cx))
+            .child(self.storyboard_blocks_field(cx))
             .children(self.key_field(Secret::Anthropic, cx))
     }
 
@@ -1169,6 +1176,36 @@ impl Shell {
         field(
             tr!("settings.max_blocks"),
             Some(tr!("settings.max_blocks_help")),
+        )
+        .child(div().flex().flex_wrap().gap(px(6.)).children(choices))
+    }
+
+    /// Blocks per request of the editor: a long video in a single request
+    /// can exceed the context of a model.
+    fn storyboard_blocks_field(&self, cx: &mut Context<Self>) -> Div {
+        let current = prefs::settings(cx).storyboard_blocks;
+        let choices = [8_u32, 16, 24, 48, 0]
+            .into_iter()
+            .map(|n| {
+                let name = if n == 0 {
+                    tr!("settings.storyboard_blocks_all")
+                } else {
+                    SharedString::from(n.to_string())
+                };
+                chip(
+                    ("settings-storyboard-blocks", n as usize),
+                    name,
+                    n == current,
+                    true,
+                )
+                .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                    prefs::update(cx, |s| s.storyboard_blocks = n);
+                }))
+            })
+            .collect::<Vec<_>>();
+        field(
+            tr!("settings.storyboard_blocks"),
+            Some(tr!("settings.storyboard_blocks_help")),
         )
         .child(div().flex().flex_wrap().gap(px(6.)).children(choices))
     }

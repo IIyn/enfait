@@ -425,6 +425,9 @@ impl Shell {
             }
             CutStatus::Transcribing => Some((self.cut.transcribing_label(), tokens::FG2)),
             CutStatus::Failed(e) => Some((e.clone(), tokens::ERROR)),
+            CutStatus::Ready if self.cut.analysis.is_none() && self.cut.analyzing.is_some() => {
+                Some((tr!("cut.analyzing"), tokens::FG2))
+            }
             CutStatus::Ready
                 if self
                     .cut

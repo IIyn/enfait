@@ -172,6 +172,7 @@ impl Shell {
                         cx.notify();
                     }
                     shell.poll_magic(cx);
+                    shell.poll_local_models(cx);
                     if shell.cut.progress_moved() {
                         if shell.cut.started.is_none() {
                             let done = shell.cut.transcription_progress();
@@ -285,6 +286,11 @@ impl Shell {
         let (Some(board), Some(rush)) = (&self.board, &self.session.data.rush) else {
             return;
         };
+        if self.uses_cut() && self.cut.analysis.is_none() && self.cut.analyzing.is_some() {
+            // Without the analysis the edit ranges are empty: the engine
+            // gets the project when it lands.
+            return;
+        }
         let rush_video = enfait_media::MediaCache::new(super::media_cache())
             .dir_for(rush)
             .ok()

@@ -103,4 +103,7 @@ pub enum AiError {
     MissingKey,
     #[error("{0}")]
     Config(String),
+    /// The local model sent nothing for `secs` seconds.
+    #[error("the local model stopped answering ({secs} s without a word): too slow for this request")]
+    TimedOut { secs: u64 },
 }

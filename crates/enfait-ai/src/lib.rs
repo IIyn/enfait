@@ -17,6 +17,7 @@ pub mod direction;
 pub mod editor;
 pub mod llm;
 pub mod local;
+pub mod ollama;
 pub mod provider;
 pub mod quality;
 pub mod styles;
@@ -33,6 +34,8 @@ pub fn prompt_sources() -> Vec<(&'static str, &'static str)> {
     let mut sources = vec![
         ("director", direction::DIRECTOR),
         ("editor", editor::EDITOR),
+        ("editor_answer_all", editor::ANSWER_ALL),
+        ("editor_answer_part", editor::ANSWER_PART),
         ("animator", animate::ANIMATOR),
         ("style_guide", direction::STYLE_GUIDE),
     ];

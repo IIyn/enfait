@@ -26,9 +26,15 @@ _version: 2
 "worker.editor_writing":
   en: "the editor is writing the storyboard…"
   fr: "le monteur écrit le storyboard…"
+"worker.editor_part":
+  en: "the editor is writing the storyboard (part %{part}/%{count})…"
+  fr: "le monteur écrit le storyboard (partie %{part}/%{count})…"
 "worker.hard_cut":
   en: "hard cut: no transition to create"
   fr: "coupe nette : pas de transition à créer"
+"worker.local_timeout":
+  en: "the local model wrote nothing for %{min} min: too slow for this machine. Pick a smaller model (or turn reasoning off), lower the blocks per storyboard request, or use Claude."
+  fr: "le modèle local n'a rien écrit pendant %{min} min : trop lent pour cette machine. Choisis un modèle plus petit (ou coupe la réflexion), baisse les blocs par requête du storyboard, ou passe par Claude."
 "worker.loudness":
   en: ", sound brought from %{lufs} to −14 LUFS"
   fr: ", son ramené de %{lufs} à −14 LUFS"

@@ -143,6 +143,15 @@ _version: 2
 "settings.max_blocks_none":
   en: "No limit"
   fr: "Sans limite"
+"settings.storyboard_blocks":
+  en: "Blocks per storyboard request"
+  fr: "Blocs par requête du storyboard"
+"settings.storyboard_blocks_all":
+  en: "All at once"
+  fr: "Tout d'un coup"
+"settings.storyboard_blocks_help":
+  en: "When writing the storyboard, a longer video is written part by part, each part seeing the block before and the block after. Lower it if a local model refuses a prompt that is too big."
+  fr: "Pour écrire le storyboard, une vidéo plus longue est écrite partie par partie, chaque partie voyant le bloc d'avant et celui d'après. Baisse-le si un modèle local refuse un prompt trop gros."
 "settings.quality":
   en: "Default animation quality"
   fr: "Soin des animations par défaut"

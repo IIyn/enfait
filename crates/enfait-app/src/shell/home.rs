@@ -12,6 +12,7 @@ use super::{STEP_SCRIPT, STEP_STORYBOARD, STEP_VOICE, Shell, label, mono};
 use crate::session::{ProjectMode, SessionData, Start};
 use crate::theme::{color, tokens};
 use crate::tr;
+use enfait_ai::ProviderChoice;
 use enfait_config::projects::{ProjectEntry, Projects};
 use enfait_core::AspectRatio;
 use gpui_kit::component::input::{Input, Textarea};
@@ -45,6 +46,8 @@ pub(super) struct Wizard {
     aspect: AspectRatio,
     start: Start,
     derush: bool,
+    /// Model provider, chosen by hand: nothing is picked for the user.
+    provider: Option<ProviderChoice>,
     /// Voice or take to import (custom "recorded" and magic).
     file: Option<PathBuf>,
     error: Option<SharedString>,
@@ -57,6 +60,7 @@ impl Default for Wizard {
             aspect: AspectRatio::Portrait9x16,
             start: Start::Script,
             derush: true,
+            provider: None,
             file: None,
             error: None,
         }
@@ -337,6 +341,8 @@ impl Shell {
             Some(tr!("home.error.file_missing"))
         } else if magic && wizard.file.is_none() {
             Some(tr!("home.error.need_file"))
+        } else if wizard.provider.is_none() {
+            Some(tr!("home.error.need_model"))
         } else {
             None
         };
@@ -377,6 +383,7 @@ impl Shell {
             start,
             derush: magic || wizard.derush,
             aspect: Some(wizard.aspect),
+            provider: wizard.provider.unwrap_or_default(),
             duration: if start == Start::Silent {
                 duration
             } else {
@@ -718,6 +725,29 @@ impl Shell {
                     shell.edit_wizard(|w| w.aspect = a, cx);
                 }))
             });
+        let providers = [
+            ProviderChoice::Api,
+            ProviderChoice::ClaudeCode,
+            ProviderChoice::Local,
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, p)| {
+            chip(
+                ("new-provider", i),
+                super::studio::provider_name(p),
+                wizard.provider == Some(p),
+                true,
+            )
+            .on_click(cx.listener(move |shell, _: &ClickEvent, _, cx| {
+                shell.edit_wizard(|w| w.provider = Some(p), cx);
+            }))
+        });
+        let provider_note = match wizard.provider {
+            None => Some((tr!("home.model_help"), tokens::MUTE)),
+            Some(p) => super::studio::provider_hint(p, crate::prefs::settings(cx))
+                .map(|hint| (hint, tokens::ERROR)),
+        };
         let needs_file = magic || wizard.start == Start::Import;
         let file_name = wizard
             .file
@@ -905,6 +935,14 @@ impl Shell {
             .child(Input::new(&self.new_title))
             .child(label(tr!("home.format")))
             .child(div().flex().gap(px(4.)).children(formats))
+            .child(label(tr!("home.model")))
+            .child(div().flex().gap(px(4.)).children(providers))
+            .when_some(provider_note, |d, (text, tone)| {
+                d.child(div().text_size(px(11.)).text_color(color(tone)).child(text))
+            })
+            .when(wizard.provider == Some(ProviderChoice::Local), |d| {
+                d.child(self.local_picker(super::local_models::PickerAt::Home, cx))
+            })
             .children(starts)
             .children(file_zone)
             .when_some(wizard.error.clone(), |d, e| {

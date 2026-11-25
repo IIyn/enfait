@@ -77,6 +77,9 @@ _version: 2
 "home.error.file_missing":
   en: "The file cannot be found."
   fr: "Le fichier est introuvable."
+"home.error.need_model":
+  en: "Choose the model that will write the animations."
+  fr: "Choisis le modèle qui écrira les animations."
 "home.error.need_file":
   en: "Magic mode needs a voice or a take."
   fr: "Le mode magique a besoin d'une voix ou d'un rush."
@@ -104,6 +107,12 @@ _version: 2
 "home.magic_text":
   en: "Give your voice-over or your take: cleanup, storyboard, montage, sound and export are automatic. You can come back to the storyboard afterwards."
   fr: "Donne ta voix off ou ton rush : nettoyage, storyboard, montage, son et export sont automatiques. Tu peux revenir au storyboard ensuite."
+"home.model":
+  en: "Model"
+  fr: "Modèle"
+"home.model_help":
+  en: "API (Anthropic key), Claude Code (your subscription) or a local model. Can be changed later in Settings."
+  fr: "API (clé Anthropic), Claude Code (ton abonnement) ou un modèle local. Modifiable ensuite dans les Réglages."
 "home.new":
   en: "New project"
   fr: "Nouveau projet"
